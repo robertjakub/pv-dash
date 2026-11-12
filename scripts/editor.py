@@ -25,7 +25,7 @@ A live RENAME is a console-surface edit (the wire keys the flat
 registry name; the suites' pool/listing pins follow). An alias is an
 edit: the cli translates it through the spellings map, so a second
 spelling rides alone. The shared ref edits to a canon key of
-shared/options.json (resolved against the file, the node rows
+shared/suite/options.json (resolved against the file, the node rows
 included; the clear speaks inline again); a block-carried field shows
 the block's text marked (canon), editing it lays the inline override,
 and the value-help menu seeds the block's pairs first — the override
@@ -397,11 +397,11 @@ class OptionsEditor:
         self.pristine = None
 
     def _load_canon(self):
-        """shared/options.json — the `shared` field's ref target; an
+        """shared/suite/options.json — the `shared` field's ref target; an
         absent or broken file reads as no canon (the editor never crashes on
         the pre-wave tree, a ref just fails to resolve)."""
         try:
-            with open(os.path.join(ROOT, 'shared', 'options.json'), encoding='utf-8') as f:
+            with open(os.path.join(ROOT, 'shared', 'suite', 'options.json'), encoding='utf-8') as f:
                 return json.load(f)
         except (OSError, ValueError):
             return {}
@@ -563,7 +563,7 @@ class OptionsEditor:
         self.row = None
 
     def set_shared(self, value):
-        """The canon ref: a key of shared/options.json in the row's own
+        """The canon ref: a key of shared/suite/options.json in the row's own
         section; the clear deletes the ref — the row speaks inline again.
         The tool's own wiring (conv, live, default, ...) and any field the
         block does not speak stay inline; on success the status names the
@@ -579,7 +579,7 @@ class OptionsEditor:
         block = (self.canon.get(section) or {}).get(text)
         if block is None:
             keys = ', '.join(sorted((self.canon.get(section) or {}))) or 'none yet'
-            return False, 'err no canon key %r in shared/options.json (%s: %s)' % (text, section, keys)
+            return False, 'err no canon key %r in shared/suite/options.json (%s: %s)' % (text, section, keys)
         if isinstance(block, dict):
             bad = sorted({'name', 'only', 'shared'} & set(block))
             if bad:

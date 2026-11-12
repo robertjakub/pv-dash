@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The static-texts registry's gate, the lint_options shape. The registry
-(shared/texts.json at the tree root) must parse; every leaf must be a string; every key
+(shared/suite/texts.json at the tree root) must parse; every leaf must be a string; every key
 segment must be a clean lowercase word; every reference in the tree must
 resolve; every key must be referenced somewhere (the orphan gate); and no
 two leaves may share a value (one text, one home).
@@ -16,7 +16,7 @@ import os
 import re
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REGISTRY = os.path.join(REPO, 'shared', 'texts.json')
+REGISTRY = os.path.join(REPO, 'shared', 'suite', 'texts.json')
 SCAN_ROOTS = ['common',
               os.path.join('cache', 'bin'), os.path.join('cache', 'lib'),
               os.path.join('scraper', 'bin'), os.path.join('scraper', 'lib'),

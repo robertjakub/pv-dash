@@ -10,7 +10,7 @@ One package, imported as `common` from everywhere:
 
 Subpackages:
 - render/   — the human-facing rendering: the static texts (the T()
-              loader — shared/texts.json at the tree root), the
+              loader — shared/suite/texts.json at the tree root), the
               man-page builder, the time formats
 - runtime/  — the process scaffolding + the trail: the daemon-bin ladder,
               the audit trail writer, the UTC log stamps, the version

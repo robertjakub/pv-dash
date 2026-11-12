@@ -229,7 +229,7 @@ function rowHTML(g) {
         '" title="edit the tools\' rows">&#9998;</button> ' : '') +
     (g.members.some(m => m.tool === 'shared')
       ? '<button class="ed canon" data-scope="canon" data-sec="' + g.sec + '" data-name="' + esc(g.name) +
-        '" title="edit the canon block (shared/options.json)">&#9998;<span class="c">c</span></button>' : '') +
+        '" title="edit the canon block (shared/suite/options.json)">&#9998;<span class="c">c</span></button>' : '') +
     '</td></tr>';
 }
 

@@ -256,7 +256,7 @@ they name the wire.
   template per concept, the surface noun as the only variable.
 - **the restart-marker vocabularies** `[all]` — the same fact ships
   as `note restart required (startup-only knob)` (the wire leaf,
-  `shared/texts.json:82` — plus the set-path hand copy), `, restart` /
+  `shared/suite/texts.json:82` — plus the set-path hand copy), `, restart` /
   `startup-only — pass it by flag/env/config (set/clear refuse)`
   (show knobs + help config via `control_command()`,
   `common/settings/options.py:390-408`),
@@ -264,7 +264,7 @@ they name the wire.
   `scripts/gen_manual.py:143-146`), `restart: true` + the wire phrase
   (only the cache's man carries the trio now, `cache/lib/man.py:98-107`),
   and "restart to apply" (inverter/README.md:204). Outcome: a
-  two-phrase lexicon in `shared/texts.json`, every surface renders it,
+  two-phrase lexicon in `shared/suite/texts.json`, every surface renders it,
   the marker rule ("the % changed exception") stays.
 - **the scraper's man page still ships `unset`** `[scraper]` —
   `scraper/lib/man.py:70` reads `set/unset/show/help` and the
@@ -364,11 +364,11 @@ they name the wire.
   startup speaks flags) next to the texts.
 - **the control listener's three bind texts** — start bind failure
   is non-fatal by design (`control server cannot bind ... (use
-  --control-port 0 to disable it)`, `shared/texts.json:104`, rendered
+  --control-port 0 to disable it)`, `shared/suite/texts.json:104`, rendered
   `common/wire/control.py:212`), the live rebind says
-  `cannot bind control-port ...` (`shared/texts.json:108`, the flat
+  `cannot bind control-port ...` (`shared/suite/texts.json:108`, the flat
   spelling now), the Modbus surfaces say `cannot bind`
-  (`shared/texts.json:70` + the hand copies above). Outcome: keep the
+  (`shared/suite/texts.json:70` + the hand copies above). Outcome: keep the
   non-fatal behaviour, document the three-tier story once.
 
 ### The env plane — the same env layer everywhere
@@ -512,7 +512,7 @@ re-open — is the history half:
 - **schema every family JSON** `[common]` — `scripts/validate_json.py`
   speaks the draft-2020-12 core but only the shipped spec pairs meet it
   today (the drift sweep's schema/example pass). Give the family's
-  remaining JSON artifacts schemas and one gate: `shared/texts.json`,
+  remaining JSON artifacts schemas and one gate: `shared/suite/texts.json`,
   the four `options.json`/`defaults.json` pairs, the profiles' format
   (profile-lint checks it in code — a schema would let editors speak
   it) and the config-defaults placeholders; decide the surface (a lint

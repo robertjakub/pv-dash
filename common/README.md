@@ -11,7 +11,7 @@ the ACL map, the defaults ladder:
 
 | module | what |
 |---|---|
-| `texts.py` | the family's static texts, one JSON home (`shared/texts.json` at the tree root — the directory that contains `common/`, the same walk in every layout): the console's faces and reconnect ladder, the ctl's, the welcome banners, the wire's fixed replies, the daemon bind/startup lines — the dotted `T(key)` resolves, the caller applies the `%`-format; `scripts/lint_texts.py --check` gates the references both ways (every reference resolves, every key referenced, no duplicated value) |
+| `texts.py` | the family's static texts, one JSON home (`shared/suite/texts.json` at the tree root — the directory that contains `common/`, the same walk in every layout): the console's faces and reconnect ladder, the ctl's, the welcome banners, the wire's fixed replies, the daemon bind/startup lines — the dotted `T(key)` resolves, the caller applies the `%`-format; `scripts/lint_texts.py --check` gates the references both ways (every reference resolves, every key referenced, no duplicated value) |
 | `manpage.py` | the man-page builder: the pages are GENERATED from the argparse parsers (`--man` prints one; `scripts/gen_man.py` ships them) |
 | `human.py` | `secs` — human time for the command reports: ms/s/m/h/d, one unit, always two decimals |
 
@@ -20,7 +20,7 @@ the ACL map, the defaults ladder:
 | module | what |
 |---|---|
 | `daemon.py` | the daemon-bin scaffolding the family's entry scripts shared as near-copies: the log setup, the default config path, the SIGHUP/SIGTERM watcher threads, the restart-marked state fold, the ops-verb policy check and the dump-posture log line |
-| `audit.py` | the append-only audit trail (`AuditLog`): `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type> hash=<hash> [<detail kv words>]` — flat KV, no wrapper word (the tags from `shared/tags.json`), the chained per-writer hashes (the application/writer/instance triple), the KV detail rules (an empty value drops the word, a space value rides quoted — `audit_quote`, the reserved outer keys never land in the detail), size/daily rotation, `-` = stdout |
+| `audit.py` | the append-only audit trail (`AuditLog`): `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type> hash=<hash> [<detail kv words>]` — flat KV, no wrapper word (the tags from `shared/suite/tags.json`), the chained per-writer hashes (the application/writer/instance triple), the KV detail rules (an empty value drops the word, a space value rides quoted — `audit_quote`, the reserved outer keys never land in the detail), size/daily rotation, `-` = stdout |
 | `logutil.py` | `UtcFormatter` — UTC log timestamps |
 | `version.py` | the suite version string: `0.4.3`, or `0.4.3-<short git>` in a checkout |
 

@@ -6,7 +6,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 ## Done (the highlights; the git history has the details)
 
 The help-canon wave moved the registry's family-wide texts to
-shared/options.json: 47 rows reference their canon block and the
+shared/suite/options.json: 47 rows reference their canon block and the
 loader folds the block under the row's own fields. The alignment: the
 control-port setting-help matches the TCP tools, the metrics-max-clients
 spelling settles on the /metrics form with its help on the endpoint form,
@@ -94,7 +94,7 @@ preamble, the family handler, the tool's own branches). `KNOWN_VERBS`
 derives from the registry's command rows (`known_verbs`; the default
 ops policy derives with it — `clear` only where the grammar speaks
 it), the ladder refusals compose `on_off` and the wire's refusal texts
-compose `shared/texts.json` byte-honest (the suite pins kept their
+compose `shared/suite/texts.json` byte-honest (the suite pins kept their
 bytes). The dashboard's live audit-forward/dump-path/dump-interval renders ride `show config` now (the write-back contract the other three kept), and the bin's 9353/16/0 fallback literals read `DEFAULTS` — the statics are the one home.
 
 ## Done (the highlights; the git history has the details)

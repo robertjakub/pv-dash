@@ -37,10 +37,10 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/modbus-scraper/common/wire
     install -m644 ${../../../common}/wire/*.py $out/share/modbus-scraper/common/wire/
     install -m644 ${../../../common}/wire/defaults.json $out/share/modbus-scraper/common/wire/
-    install -dm755 $out/share/modbus-scraper/shared
-    install -m644 ${../../../shared}/texts.json $out/share/modbus-scraper/shared/
-    install -m644 ${../../../shared}/tags.json $out/share/modbus-scraper/shared/
-    install -m644 ${../../../shared}/options.json $out/share/modbus-scraper/shared/
+    install -dm755 $out/share/modbus-scraper/shared/suite
+    install -m644 ${../../../shared}/suite/texts.json $out/share/modbus-scraper/shared/suite/
+    install -m644 ${../../../shared}/suite/tags.json $out/share/modbus-scraper/shared/suite/
+    install -m644 ${../../../shared}/suite/options.json $out/share/modbus-scraper/shared/suite/
     install -dm755 $out/share/modbus-scraper/common/modbus
     install -m644 ${../../../common}/modbus/*.py $out/share/modbus-scraper/common/modbus/
     install -m644 ${../../../common}/modbus/protocol.json $out/share/modbus-scraper/common/modbus/

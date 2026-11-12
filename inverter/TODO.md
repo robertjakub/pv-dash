@@ -6,7 +6,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 ## Done (the highlights; the git history has the details)
 
 The help-canon wave moved the registry's family-wide texts to
-shared/options.json: 49 rows reference their canon block and the
+shared/suite/options.json: 49 rows reference their canon block and the
 loader folds the block under the row's own fields. The alignment: the
 fake's connect-acl takes the full value grammar (the cache's
 any|none|IP,...|file:<path> hint and the any/none words — the TAB pool
@@ -87,7 +87,7 @@ preamble, the family handler, the tool's own branches). `KNOWN_VERBS`
 derives from the registry's command rows (`known_verbs`; the default
 ops policy derives with it — `clear` only where the grammar speaks
 it), the ladder refusals compose `on_off` and the wire's refusal texts
-compose `shared/texts.json` byte-honest (the suite pins kept their
+compose `shared/suite/texts.json` byte-honest (the suite pins kept their
 bytes). The fake's keeps: its own log-level branch (the fake-inverter logger, the `log level` refusal), the metrics enable/acl plumbing, `record_cfg` dropping (the show config is the argv that would restart this fake), and the audit rebuild mirroring onto the fake's writer through the family one.
 
 The audit-forward targets wave (the off-box copy, the F10 finish line):

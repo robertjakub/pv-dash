@@ -237,7 +237,7 @@ def canon_coverage():
     per tool, the exempt names lint_options carries. The drift gate lives in
     lint_options --check — this report shows the fold's reach."""
     from lint_options import EXEMPT
-    with open(os.path.join(REPO, 'shared', 'options.json'), encoding='utf-8') as f:
+    with open(os.path.join(REPO, 'shared', 'suite', 'options.json'), encoding='utf-8') as f:
         canon = json.load(f)
     refs = {t: {} for t in TOOLS}
     for t in TOOLS:
@@ -1244,7 +1244,7 @@ def emit():
     ap(KNOBS_FINDINGS)
     ap('')
     canon, refs, n_exempt = canon_coverage()
-    ap('**The canon coverage** (shared/options.json — the registry')
+    ap('**The canon coverage** (shared/suite/options.json — the registry')
     ap('texts the rows ref; the drift and must-ref gates live in')
     ap('`lint_options --check`, the exempt names ride it):')
     ap('')

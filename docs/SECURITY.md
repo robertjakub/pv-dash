@@ -138,7 +138,7 @@ the intended demo feature, gated by control-server access only.
   `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type>
   hash=<12-hex> [<detail kv words>]` —
   `application=<TAG>` is always uppercase and names the tool (the daemon's own tag
-  from `shared/tags.json`), `tag=` names the writer — the daemon's own
+  from `shared/suite/tags.json`), `tag=` names the writer — the daemon's own
   `daemon` or the ctl and cli clients' shared `cli` —, `instance=` names the
   writer's daemon (the control port when `--audit-instance` is unset, the
   override when spelled; the clients spell their target's port), and every
@@ -160,7 +160,7 @@ the intended demo feature, gated by control-server access only.
 
   | key | value |
   |---|---|
-  | `application=` | the tool's tag, always uppercase — the `shared/tags.json` spelling (`CACHE` / `SCR` / `INV` / `DSH`) |
+  | `application=` | the tool's tag, always uppercase — the `shared/suite/tags.json` spelling (`CACHE` / `SCR` / `INV` / `DSH`) |
   | `tag=` | the writer role: `daemon` (the service's own trail) or `cli` (the ctl and cli clients, one role) |
   | `instance=` | the writer daemon's identity: the control port (the derived default) or the `--audit-instance` override — the chain groups by it |
   | `type=` | the event type, lowercase — see the table below |

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Combine the four tools' lib/options.json with shared/options.json —
+"""Combine the four tools' lib/options.json with shared/suite/options.json —
 the one drift report the family-unify assumption asks for: the option keys
 MUST be the same across the tools, and the family-wide definition lives in
 the canon. Every knob compares in its FOLDED form (the canon ref resolved by
 the loader's own canon_fold — the truth the daemons load):
 
-- the canon adoption — every block of shared/options.json and the
+- the canon adoption — every block of shared/suite/options.json and the
   tools that ref it: FAMILY (all of them), partial, single-tool, DEAD
   (nobody listens — a candidate for deletion);
 - the deviations — a row that contradicts a field its own canon block
@@ -15,7 +15,7 @@ the loader's own canon_fold — the truth the daemons load):
 - the candidates — the same flat knob in two or more tools with the
   whole shape agreeing, still spelled inline (or ref'd by some tools
   only): the promotion list, the keys that should move into
-  shared/options.json;
+  shared/suite/options.json;
 - the differences — the same flat knob, a shape field disagrees across
   the tools (the drift that blocks a shared definition), each drifting
   field spelled per tool, the per-tool console placements (live/alias)
@@ -58,7 +58,7 @@ def jv(v):
 def load(order):
     """The registries (raw rows) + the canon. Returns (raw, canon) — raw
     keyed tool then section; a missing registry exits 1."""
-    canon_path = os.path.join(ROOT, 'shared', 'options.json')
+    canon_path = os.path.join(ROOT, 'shared', 'suite', 'options.json')
     try:
         with open(canon_path, encoding='utf-8') as f:
             canon = json.load(f)
@@ -230,7 +230,7 @@ def main():
     rows = folded(raw, canon, order)
     cands, drifts, singles = compare(rows, order)
 
-    print('the option registries of %s against shared/options.json'
+    print('the option registries of %s against shared/suite/options.json'
           % ', '.join(order))
     print('')
 

@@ -6,7 +6,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 ## Done (the highlights; the git history has the details)
 
 The help-canon wave moved the registry's family-wide texts to
-shared/options.json: 44 rows reference their canon block and the
+shared/suite/options.json: 44 rows reference their canon block and the
 loader folds the block under the row's own fields. The alignment is the
 scraper's biggest: the /metrics cap trio (metrics-max-clients,
 metrics-client-timeout, metrics-max-conn-per-ip) speaks the cache's
@@ -123,7 +123,7 @@ preamble, the family handler, the tool's own branches). `KNOWN_VERBS`
 derives from the registry's command rows (`known_verbs`; the default
 ops policy derives with it — `clear` only where the grammar speaks
 it), the ladder refusals compose `on_off` and the wire's refusal texts
-compose `shared/texts.json` byte-honest (the suite pins kept their
+compose `shared/suite/texts.json` byte-honest (the suite pins kept their
 bytes). The scraper's registry lie died with it: `control/ops/verbs` and `control/trust-uids` carried live rows the grammar never spoke (a live `set` answered `unknown setting`) — they answer through the shared handler now, and the default ops policy is `show` (there is nothing to flush).
 
 The audit-forward targets wave (the off-box copy, the F10 finish line):

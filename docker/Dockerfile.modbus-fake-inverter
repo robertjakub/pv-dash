@@ -33,7 +33,7 @@ COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
 COPY --from=scripts entrypoints/entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
 COPY --from=common modbus/*.py common/modbus/
-COPY --from=shared texts.json shared/
+COPY --from=shared suite/texts.json shared/suite/
 COPY --chown=pvsuite bin/ inverter/bin/
 COPY --chown=pvsuite lib/ inverter/lib/
 COPY --chown=pvsuite examples/modbus-fake-inverter.conf inverter/modbus-fake-inverter.conf

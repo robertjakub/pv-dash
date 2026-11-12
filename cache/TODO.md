@@ -6,7 +6,7 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 ## Done (the highlights; the git history has the details)
 
 The help-canon wave moved the registry's family-wide texts to
-shared/options.json: 50 rows reference their canon block (`shared`:
+shared/suite/options.json: 50 rows reference their canon block (`shared`:
 "<name>") and the loader folds the block under the row's own fields —
 the per-tool prose (the dump family's cached words, the ops role's
 show,flush policy) stays inline as the override. The alignment restored
@@ -92,7 +92,7 @@ preamble, the family handler, the tool's own branches). `KNOWN_VERBS`
 derives from the registry's command rows (`known_verbs`; the default
 ops policy derives with it — `clear` only where the grammar speaks
 it), the ladder refusals compose `on_off` and the wire's refusal texts
-compose `shared/texts.json` byte-honest (the suite pins kept their
+compose `shared/suite/texts.json` byte-honest (the suite pins kept their
 bytes). The cache-specific keeps: the dump pair stays the proxy's (the dumper loop reads the proxy's homes), the metrics enable/caps branches stay (the proxy plumbing), and a live `set audit log-file -` spells stdout now (the raw spelling — the XDG fold was the drift).
 
 The audit-forward targets wave (the off-box copy, the F10 finish line):

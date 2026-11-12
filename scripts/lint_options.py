@@ -18,7 +18,7 @@ keys, missing names/descriptions, duplicate names, the `only` mark —
 a known tool, the file's own tool, never beside `shared` (the canon
 ref is the family-wide mark; `only` pins the knob tool-exclusive) —
 and — the big one — a row that does not read back as the canonical
-form. The shared/options.json is the fifth file under the gate: a
+form. The shared/suite/options.json is the fifth file under the gate: a
 block may carry every row key but the three placement keys (`name` —
 the flat name IS the block's key; `only`; `shared` — the ref itself),
 no unknown keys, a show/commands dict block speaks its section's
@@ -270,7 +270,7 @@ def _norm_row_bools(r):
 
 
 def render_canon(canon):
-    """The canonical text of shared/options.json — the registries' one
+    """The canonical text of shared/suite/options.json — the registries' one
     render, one shape up: the file's sections and blocks keep their landed
     order (the orphan gate keys on it), a dict block's fields render in the
     row rank (the block bools normalized — the flat show/commands strings
@@ -416,10 +416,10 @@ def family_lint():
     Returns the nits; main() prints them and exits 1."""
     from common.settings.options import canon_fold
     try:
-        with open(os.path.join(REPO, 'shared', 'options.json'), encoding='utf-8') as f:
+        with open(os.path.join(REPO, 'shared', 'suite', 'options.json'), encoding='utf-8') as f:
             canon = json.load(f)
     except (OSError, ValueError) as e:
-        return ['shared/options.json: does not parse: %s' % e]
+        return ['shared/suite/options.json: does not parse: %s' % e]
     metas = {}
     for tool in TOOLS:
         with open(os.path.join(REPO, tool, 'lib', 'options.json'), encoding='utf-8') as f:
@@ -574,13 +574,13 @@ def main():
                 sys.stdout.writelines(difflib.unified_diff(
                     disk.splitlines(True), canon.splitlines(True),
                     path, path + ' (canonical)'))
-    canon_path = os.path.join(REPO, 'shared', 'options.json')
+    canon_path = os.path.join(REPO, 'shared', 'suite', 'options.json')
     try:
         with open(canon_path, encoding='utf-8') as f:
             canon_disk = f.read()
         canon_text = render_canon(json.loads(canon_disk))
     except (OSError, ValueError) as e:
-        print('shared/options.json: does not parse: %s' % e)
+        print('shared/suite/options.json: does not parse: %s' % e)
         bad = True
     else:
         if canon_text == canon_disk:
@@ -588,9 +588,9 @@ def main():
         elif write:
             with open(canon_path, 'w', encoding='utf-8') as f:
                 f.write(canon_text)
-            print('shared/options.json: reformatted')
+            print('shared/suite/options.json: reformatted')
         else:
-            print('shared/options.json: off the canonical layout')
+            print('shared/suite/options.json: off the canonical layout')
             bad = True
             if diff:
                 import difflib

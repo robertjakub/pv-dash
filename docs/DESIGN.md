@@ -128,4 +128,4 @@ release.
 Prose lines ≤ 80 characters (the tables and code blocks are exempt);
 the man pages wrap at 72; strict cmark-gfm shape (the lint and the
 book build watch it); the texts the code renders ride
-shared/texts.json (`scripts/lint_texts.py`), not the docs.
+shared/suite/texts.json (`scripts/lint_texts.py`), not the docs.

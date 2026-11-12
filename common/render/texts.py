@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The family's static texts, one JSON home (shared/texts.json at the
+"""The family's static texts, one JSON home (shared/suite/texts.json at the
 tree root — the directory that contains common/, the same root in every
 layout: the checkout, the installed share/<tool>/ tree, the image's
 /pv-suite): the console's faces and reconnect ladder, the ctl's, the welcome
@@ -14,7 +14,7 @@ import json
 import os
 
 _tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-with open(os.path.join(_tree, 'shared', 'texts.json'), encoding='utf-8') as _f:
+with open(os.path.join(_tree, 'shared', 'suite', 'texts.json'), encoding='utf-8') as _f:
     TEXTS = json.load(_f)
 
 

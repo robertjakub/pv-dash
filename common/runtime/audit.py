@@ -439,14 +439,14 @@ def audit_params_of(cfg, derive=None):
 
 
 def load_audit_tags(tool):
-    """The audit trail's writer tag off shared/tags.json (the family's one
+    """The audit trail's writer tag off shared/suite/tags.json (the family's one
     tag home, found by the texts loader's tree walk): the tool's daemon tag
     ('cache' -> 'CACHE') — the daemon speaks it verbatim, the ctl and cli
     clients derive theirs as '<tag>-CLI' (one client tag: the two client
     kinds write the same trail role). A missing or malformed file fails
     loud: the audit is data, the tag names its writer."""
     tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    path = os.path.join(tree, 'shared', 'tags.json')
+    path = os.path.join(tree, 'shared', 'suite', 'tags.json')
     try:
         with open(path, encoding='utf-8') as f:
             tags = json.load(f)
@@ -483,7 +483,7 @@ class AuditLog:
     type=<type> hash=<chain hash> [<detail kv words>]' per line — the 12-hex
     hash chains the entry to this writer's previous one (entry_hash), making
     any edit/reorder/middle-deletion evident to scripts/audit_verify.py.
-    application= names the tool (the uppercase tag from shared/tags.json —
+    application= names the tool (the uppercase tag from shared/suite/tags.json —
     CACHE / SCR / INV / DSH), tag= the writer role (the daemon's own
     'daemon', the ctl and cli clients' 'cli'), instance= the daemon's
     identity (the control port when --audit-instance is unset, the override
@@ -509,7 +509,7 @@ class AuditLog:
         if forward_format not in AUDIT_FORWARD_FORMATS:
             raise ValueError('audit-forward-format must be one of %s' % ', '.join(AUDIT_FORWARD_FORMATS))
         self.instance = validate_instance(instance)   # the line's instance= word — the writer daemon's identity
-        self.prefix = prefix   # the tool's tag (shared/tags.json) — the line's application= word, always uppercase
+        self.prefix = prefix   # the tool's tag (shared/suite/tags.json) — the line's application= word, always uppercase
         self.writer = writer   # the writer role — the line's tag= word: 'daemon' or 'cli'
         self.app = app          # the syslog tag / APP-NAME (the bin name) when forwarding
         self.max_bytes = int(max_mb * 1024 * 1024) if max_mb and max_mb > 0 else 0

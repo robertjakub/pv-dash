@@ -36,7 +36,7 @@ TOOLS = {
 # the env twins spell bare names (DUMP_INTERVAL, LOG_ACCESS) — the one
 # control env is the common CTL, no tool-tag spelling may return (the
 # MCH_/SCR_/INV_/DSH_ era is retired, docs/TODO.md's rename + env-prefix
-# record): the historical shorts plus every tag the shared/tags.json file
+# record): the historical shorts plus every tag the shared/suite/tags.json file
 # can spell, checked against the registry rows and the tools' own sources
 TAG_ENV_PREFIXES = ('MCH_', 'SCR_', 'INV_', 'DSH_', 'CACHE_', 'SCRAPER_', 'DASHBOARD_', 'FAKE_')
 

@@ -547,7 +547,7 @@ _CANON = None
 
 
 def load_canon():
-    """shared/options.json at the tree root — the directory that
+    """shared/suite/options.json at the tree root — the directory that
     contains common/ (the texts.py walk, spelled locally: the loaders
     import flat, so the walk cannot be imported from the render module).
     Cached; an absent file reads as no canon (the rows speak inline — the
@@ -558,7 +558,7 @@ def load_canon():
     if _CANON is None:
         tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         try:
-            with open(os.path.join(tree, 'shared', 'options.json'), encoding='utf-8') as f:
+            with open(os.path.join(tree, 'shared', 'suite', 'options.json'), encoding='utf-8') as f:
                 _CANON = json.load(f)
         except FileNotFoundError:
             _CANON = {}
@@ -599,7 +599,7 @@ def canon_fold(row, canon, section='options', label='registry'):
     blocks = canon.get(section) or {}
     if key not in blocks:
         raise ValueError('%s: the row %r refs the canon key %r — no such block in '
-                         'shared/options.json' % (label, row.get('name'), key))
+                         'shared/suite/options.json' % (label, row.get('name'), key))
     field = 'setting-help' if section == 'show' else 'help'
     block = blocks[key]
     if section == 'options':

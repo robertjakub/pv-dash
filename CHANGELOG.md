@@ -166,6 +166,18 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   the suites' docstrings (which still said the retired
   `scripts/battery.sh`); scripts/ keeps the gates + editors only.
 
+- **the shared suite JSONs get a dedicated subdir** — `shared/options.json`,
+  `texts.json` and `tags.json` become `shared/suite/{options,texts,tags}.json`
+  (`shared/schema/` stays put — the schemas keep their own home and
+  README). The loaders re-pin (`common/render/texts.py`,
+  `common/settings/options.py`, `common/runtime/audit.py` — the tree-root
+  walk now joins the `suite` segment), the lints and the editor pair
+  follow, the four `package.nix` files install the trio to
+  `share/<tool>/shared/suite/` and the four Dockerfiles COPY
+  `suite/texts.json` to `shared/suite/`; the docs and the per-tool TODOs
+  re-spell. The packaged and in-image layouts mirror the checkout again —
+  the loaders' walk is unchanged in shape, one segment deeper.
+
 ### Added
 
 - **the four CLIs** — **the console pager**: every console reply prints

@@ -118,9 +118,9 @@ translate). The namespaces group them.
 | `grid-frequency-wander` | `set grid-frequency-wander` | settable | `Hz` | `--grid-frequency-wander` / — | the frequency machine's clamp in Hz around the nominal; 0 = the flat frequency |
 | `seed` | `set seed` | settable | `N` | `--seed` / — | re-seed the chaos RNG |
 | `connect-acl` | `set connect-acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--connect-acl` / `CONNECT_ACL` | the Modbus clients allowed to connect (the cache's connect-acl, mirrored: "any", "none", or a comma-separated IP/CIDR list) |
-| `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous Modbus client limit |
-| `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | disconnect Modbus clients silent for this long |
-| `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous Modbus connections from one peer IP |
+| `max-clients` | `set max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous client limit |
+| `client-timeout` | `set client-timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | disconnect clients silent for this long |
+| `max-conn-per-ip` | `set max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous connections from one peer IP |
 | `metrics-listen` | — | startup-only | `HOST:PORT` | `--metrics-listen` / — | the metrics bind address HOST:PORT |
 | `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / — | maximum concurrent /metrics clients; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / — | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
@@ -144,8 +144,8 @@ the Modbus session the fake serves: the auth scheme its clients must speak
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | inverter profile (JSON: name -> register + optional type/scale) |
-| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the fake's Modbus clients must speak: suite (the crypt handshake) or none |
+| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON (a bare name resolves in profiles/profiles/) |
+| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the Modbus auth scheme: suite (the crypt handshake) or none |
 | `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 
 ### write
@@ -184,21 +184,21 @@ presents and the client ACL checked at accept
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / — | the fake's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
-| `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | require Authorization: Bearer \<token> on the /metrics endpoint (the same scheme the scraper speaks) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `metrics-server` | `set metrics enable` | settable | `on\|off` | `--metrics-server` / — | the tool's own Prometheus /metrics endpoint (needs a token beyond loopback; the address is --metrics-listen) |
+| `metrics-token` | — | startup-only (secret) | `TOKEN` | `--metrics-token` / `METRICS_TOKEN` | the metrics bearer token (Authorization: Bearer) — startup-only (pass it by flag/env/config); the value never renders back (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `metrics-acl` | `set metrics acl` | settable | `any\|none\|IP,...\|file:\<path>` | `--metrics-acl` / `METRICS_ACL` | clients allowed to connect to /metrics: "any", "none", comma-separated IPs/prefixes, or file:\<path> (the ip-prefix acl file) |
 
 ### audit
 
-the INV audit trail: the sink, the forwarding, the rotation, the kill switch
+the audit trail: the sink, the forwarding, the rotation, the kill switch
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | INV audit trail: a file path or - for stdout (the docker/journald way); `none` = no local file (the forward carries the trail); the XDG state home when unset |
+| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | the audit trail's file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home |
 | `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
 | `audit-forward-format` | `set audit forward format` (the console also takes `set audit forward-format`) | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
 | `audit-instance` | `set audit instance` | settable | `ID` | `--audit-instance` / `AUDIT_INSTANCE` | the audit lines' instance word: the writer daemon's identity — the control port when unset, the override when spelled |
-| `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the INV audit trail |
+| `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the audit trail entirely |
 
 ### audit/rotate
 

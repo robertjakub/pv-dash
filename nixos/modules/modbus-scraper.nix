@@ -36,15 +36,15 @@ let
     "CONTROL_OPS_TOKEN"
     "METRICS_TOKEN"
     "AUTH_TOKEN"
-    "AUTH_KEY"
-    "AUTH_UPSTREAM_KEY"
+    "MODBUS_AUTH_KEY"
+    "MODBUS_UPSTREAM_AUTH_KEY"
     "DUMP_KEY"
   ];
 
   # the <secret>File credentials: mounted verbatim via LoadCredential, the
   # env file carries the file: pointer — the value never enters the store
   credentials = with cfg;
-    lib.optionals (authKeyFile != null) [ { env = "AUTH_KEY"; name = "auth-key"; path = authKeyFile; } ]
+    lib.optionals (modbusAuthKeyFile != null) [ { env = "MODBUS_AUTH_KEY"; name = "modbus-auth-key"; path = modbusAuthKeyFile; } ]
     ++ lib.optionals (controlTokenFile != null) [ { env = "CONTROL_TOKEN"; name = "control-token"; path = controlTokenFile; } ]
     ++ lib.optionals (controlOpsTokenFile != null) [ { env = "CONTROL_OPS_TOKEN"; name = "control-ops-token"; path = controlOpsTokenFile; } ]
     ++ lib.optionals (authTokenFile != null) [ { env = "AUTH_TOKEN"; name = "auth-token"; path = authTokenFile; } ]
@@ -86,7 +86,7 @@ let
 in
 {
   imports = [
-    (removedOpt "authKey" "authKeyFile")
+    (removedOpt "authKey" "modbusAuthKeyFile")
     (removedOpt "controlToken" "controlTokenFile")
     (removedOpt "controlOpsToken" "controlOpsTokenFile")
     (removedOpt "authToken" "authTokenFile")
@@ -120,7 +120,7 @@ in
       '';
     };
 
-    authKeyFile = mkFileOption "The shared key the suite handshake proves (min 16 characters). Needs settings.MODBUS_AUTH = \"suite\".";
+    modbusAuthKeyFile = mkFileOption "The shared key the suite handshake proves (min 16 characters). Needs settings.MODBUS_AUTH = \"suite\".";
     controlTokenFile = mkFileOption "The control token from a file (the first line is the token) — the hardened way to pass the secret over TCP control.";
     controlOpsTokenFile = mkFileOption "The read-only ops control token from a file (the first line is the token). Needs controlTokenFile.";
     authTokenFile = mkFileOption "The /metrics bearer token from a file (single line, trimmed).";

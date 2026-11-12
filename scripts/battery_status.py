@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """The battery's live view: the running slot links with their run ids and
 owning pids, plus (after a blank line, its own block) the last non-live
-run — finished or canceled. The read-only sibling of the battery runner —
+run — finished or canceled. A running slot also carries the current
+suite's live check counts (the suite: row reads the suite's log as the
+suite writes it). The read-only sibling of the battery runner —
 nothing here mutates the battery state (the stale links stay for the next
 battery start's housekeeping sweep). Stdlib only, like the rest of the
 family.
@@ -75,6 +77,22 @@ def grep_first(status, prefix):
     return None
 
 
+def suite_counts(log):
+    """The running suite's live check counts off its log — the same
+    column-0 PASS/FAIL rows the runner's SUITE row counts; (0, 0) before
+    the log exists (the spawn opens it a beat after the START row)."""
+    pas = fail = 0
+    try:
+        for row in log.read_text().splitlines():
+            if row.startswith('PASS '):
+                pas += 1
+            elif row.startswith('FAIL '):
+                fail += 1
+    except OSError:
+        pass
+    return pas, fail
+
+
 def run_stamp(rid):
     """The run id's <YYYYMMDD>-<HHMMSS> head as an epoch — the elapsed
     wall time reads off it."""
@@ -140,6 +158,19 @@ def render():
             if e:
                 line += ', %s elapsed' % e
             print('  %-9s %s' % ('stats:', line))
+            # the running suite: the last START row names it while no SUITE
+            # verdict (or SKIP) has landed after — the WAIT row leaves it
+            # cleared (the quiet window sits before the START, nothing runs)
+            cur = ''
+            for l in rows:
+                m = re.match(r'\S+ START \d+/\d+ (\S+)', l)
+                if m:
+                    cur = m.group(1)
+                elif re.match(r'\S+ (?:SUITE|SKIP) \d+/\d+ ', l):
+                    cur = ''
+            if cur:
+                sp, sf = suite_counts(d / (cur + '.log'))
+                print('  %-9s %s — %d pass, %d fail so far' % ('suite:', cur, sp, sf))
             # the queued suite: the WAIT row (the runner wrote it on the first
             # busy poll) is the status's last word exactly while the runner
             # sits in the quiet window — the START row (or a cancellation

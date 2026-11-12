@@ -35,11 +35,11 @@ NOTE'd by the next start's housekeeping. Four port slots: four
 concurrent batteries max. The run dirs keep the newest 8 — the four a
 live battery can hold plus the newest history (the newest finished run
 is simply the newest dir) — and the eta history is one JSON home,
-eta.json: profile -> suite -> the slowest observed seconds (the
-per-profile .txt files the sh runner kept migrate into it once).
+eta.json: profile -> suite -> the slowest observed seconds.
 
 One suite at a time within a run; a suite's verdict = its own ALL PASS
-with no FAIL lines; the tally lands at the end of the status file, and
+with no FAIL lines, and the SUITE row carries the suite's own check
+counts (pass/total off the log); the tally lands at the end of the status file, and
 the whole run archives to backups/<run-id>.tar.gz (the newest 32 kept —
 the green runs drop the tmp scratch after, the failed ones keep it to
 post-mortem)."""
@@ -72,15 +72,6 @@ if os.path.isdir('/tmp/pvbattery'):
             os.rename(d, dst)
 LOGROOT = pathlib.Path(HOME_ROOT)
 os.makedirs(LOGROOT / 'slots', exist_ok=True)
-os.makedirs(LOGROOT / 'eta', exist_ok=True)
-# the one-time eta migration: the history files lived at the root as
-# eta-<profile>.txt before the eta/ dir
-for f in glob.glob(str(LOGROOT / 'eta-*.txt')):
-    p = f[len(str(LOGROOT)) + 1:]
-    prof = p[len('eta-'):-len('.txt')]
-    dst = LOGROOT / 'eta' / (prof + '.txt')
-    if not dst.exists():
-        os.rename(f, dst)
 
 # the keep-8 housekeeping: the newest 8 run dirs, a live run's dir
 # untouchable (the pid file is the liveness marker)
@@ -267,6 +258,22 @@ def fmt(sec):
     return '%dm%02ds' % (sec // 60, sec % 60) if sec >= 60 else '%ds' % sec
 
 
+def suite_counts(log):
+    """the suite's own check counts off its log — the column-0 PASS/FAIL
+    rows the harness writes per check (the detail render indents, so a
+    captured verdict line can never pose as a check row)"""
+    pas = fail = 0
+    try:
+        for row in log.read_text().splitlines():
+            if row.startswith('PASS '):
+                pas += 1
+            elif row.startswith('FAIL '):
+                fail += 1
+    except OSError:
+        pass
+    return pas, pas + fail
+
+
 def etatime(sec):
     """seconds-from-now -> the wall clock (falls back to ~minutes)"""
     t = datetime.datetime.now() + datetime.timedelta(seconds=sec)
@@ -283,8 +290,7 @@ BT0 = time.time()
 
 # the eta: the prior history of the same profile predicts the whole
 # batch — one JSON home (eta.json: profile -> suite -> the slowest
-# observed seconds), migrated once from the per-profile eta/*.txt files
-# the sh runner kept. A suite without history goes partial instead of
+# observed seconds). A suite without history goes partial instead of
 # zeroing the whole batch, and every finished suite's actual lands in
 # the file right away — an interrupted run keeps its finished suites.
 ETAFILE = LOGROOT / 'eta.json'
@@ -298,21 +304,7 @@ def _load_etas():
                 return data
         except ValueError:
             pass
-    etas = {}
-    eta_dir = LOGROOT / 'eta'
-    if eta_dir.is_dir():
-        for f in sorted(eta_dir.glob('*.txt')):
-            for row in f.read_text().splitlines():
-                parts = row.split()
-                if len(parts) == 2 and parts[1].isdigit():
-                    cur = etas.setdefault(f.stem, {})
-                    v = int(parts[1])
-                    if v > cur.get(parts[0], 0):
-                        cur[parts[0]] = v
-        if etas:
-            ETAFILE.write_text(json.dumps(etas, indent=1, sort_keys=True) + '\n')
-            shutil.rmtree(eta_dir, ignore_errors=True)   # the one-time migration: the JSON is the home
-    return etas
+    return {}
 
 
 ETAS = _load_etas()
@@ -461,6 +453,7 @@ for i, s in enumerate(SUITES, 1):
     rc = r.returncode
     ds = int(time.time() - t0)
     dur = fmt(ds)
+    pas, tot = suite_counts(RUNDIR / (s + '.log'))
     if rc == 0:
         # the history row lands per-suite on a PASS only — a failed leg's
         # duration is noise (a hang or a crash predicts nothing); the row
@@ -471,9 +464,9 @@ for i, s in enumerate(SUITES, 1):
         prev = ETAS.get(PROFILE, {}).get(s)
         ETAS.setdefault(PROFILE, {})[s] = ds if prev is None or ds > prev else prev
         ETAFILE.write_text(json.dumps(ETAS, indent=1, sort_keys=True) + '\n')
-        say('%s SUITE %d/%d %s: PASS (%s)' % (time.strftime('%H:%M:%S'), n, total, s, dur))
+        say('%s SUITE %d/%d %s: PASS (%s) (%d/%d)' % (time.strftime('%H:%M:%S'), n, total, s, dur, pas, tot))
     else:
-        say('%s SUITE %d/%d %s: FAILED (%s)' % (time.strftime('%H:%M:%S'), n, total, s, dur))
+        say('%s SUITE %d/%d %s: FAILED (%s) (%d/%d)' % (time.strftime('%H:%M:%S'), n, total, s, dur, pas, tot))
         log = (RUNDIR / (s + '.log')).read_text().splitlines()
         for row in log[-6:]:
             print(row)

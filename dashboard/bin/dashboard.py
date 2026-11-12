@@ -420,7 +420,7 @@ def main():
         if control.dump_path and cfg['restore_on_start']:
             logger.info('restore-on-start: %s', control.restore_state())
         # the dumper thread always runs (it parks while dump-interval is off):
-        # a live `set dump-interval` wakes it without a restart — and a live
+        # a live `set dump interval` wakes it without a restart — and a live
         # `set dump/path` (no path at start) finds the thread waiting too
         threading.Thread(target=control.run_dump_interval, daemon=True, name='dump').start()
     metrics_caps = (cfg.get('metrics_max_clients', 16),

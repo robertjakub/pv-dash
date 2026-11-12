@@ -65,10 +65,10 @@ The kinds — every row of the tables below carries one:
 | `ping` | command (internal) | keep-alive: answers pong |
 | `quit` | command | close the session |
 | `request` | namespace | the state machinery: the dump written and restored, the daemon reloaded |
-| `request dump` | command | write the state dump: the live setting overrides, sealed (when the daemon has a dump path) |
+| `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the daemon has a dump path) |
 | `request reload` | command | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
 | `request reload-config` | command | re-read the config file (the SIGHUP path) |
-| `request restore` | command | re-apply a state dump's overrides (when the daemon has a dump path) |
+| `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
 | `set` | command | configure a setting (set log-queries on, set metrics enable on) |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the dashboard server (asks to confirm) |
@@ -98,7 +98,6 @@ translate). The namespaces group them.
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
 | `metrics-max-conn-per-ip` | — | startup-only | `N` | `--metrics-max-conn-per-ip` / `METRICS_MAX_CONN_PER_IP` | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
 | `log-queries` | `set log-queries` | settable | `on\|off` | `--log-queries` / `LOG_QUERIES` | log the proxied Prometheus queries at INFO |
-| `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 
 ### system
 
@@ -184,6 +183,7 @@ the state dump: the live overrides' file, the restore-on-start
 |---|---|---|---|---|---|
 | `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |
+| `dump-interval` | `set dump interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 | `restore-on-start` | `set dump restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
 
 ## Show reports

@@ -255,7 +255,7 @@ def main():
               st == 'ok' and 'restore a setting' in tx, '%s %s' % (st, tx))
         st, tx = roundtrip(CTRL_PORT, signed('help request'))
         check('rider: the wire help lists a command namespace',
-              st == 'ok' and 'reload' in tx and 'restore' in tx, '%s %s' % (st, tx))
+              st == 'ok' and 'reload' in tx and 'reload-config' in tx, '%s %s' % (st, tx))
         st, tx = roundtrip(CTRL_PORT, signed('help bogus'))
         check('rider: the unknown topic is the reworded two-space error',
               st == 'fail' and tx == 'unknown command or setting bogus (try ?)', '%s %s' % (st, tx))

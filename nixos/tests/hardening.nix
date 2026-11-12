@@ -2,8 +2,11 @@
 # review"): both family units run inside a NixOS VM and are scored with
 # systemd-analyze security — the hardened sandbox must land in the low
 # exposure band (the default for an unprotected service is ~9.6; the suite's
-# strict sandbox targets under 2.0). Runs on Linux only (a VM); `nix flake
-# check` picks it up there, darwin evaluates and skips it.
+# strict sandbox targets under 2.0). A second node runs the cache under the
+# family's shared static account (`user`/`group` = pvsuite — the module
+# creates it, the unit renders User=/Group= instead of the DynamicUser).
+# Runs on Linux only (a VM); `nix flake check` picks it up there, darwin
+# evaluates and skips it.
 { pkgs }:
 
 pkgs.testers.nixosTest (
@@ -36,14 +39,14 @@ pkgs.testers.nixosTest (
       { lib, pkgs, ... }:
       {
         imports = [
-          ../nixos/modules/modbus-cache.nix
-          ../nixos/modules/modbus-scraper.nix
-          ../nixos/modules/dashboard.nix
+          ../modules/modbus-cache.nix
+          ../modules/modbus-scraper.nix
+          ../modules/dashboard.nix
         ];
         # the raw modules (no flake wrapper) — the packages named explicitly
         services.modbus-cache = {
           enable = true;
-          package = pkgs.callPackage ../nixos/pkgs/modbus-cache/package.nix { };
+          package = pkgs.callPackage ../pkgs/modbus-cache/package.nix { };
           settings = {
             LISTEN = "127.0.0.1:15502";
             # the audit trail to the journal: the hardened service has no
@@ -53,7 +56,7 @@ pkgs.testers.nixosTest (
         };
         services.modbus-scraper = {
           enable = true;
-          package = pkgs.callPackage ../nixos/pkgs/modbus-scraper/package.nix { };
+          package = pkgs.callPackage ../pkgs/modbus-scraper/package.nix { };
           settings = {
             LISTEN = "127.0.0.1:9350";
             AUDIT_LOG = "-";
@@ -64,11 +67,32 @@ pkgs.testers.nixosTest (
         };
         services.dashboard = {
           enable = true;
-          package = pkgs.callPackage ../nixos/pkgs/dashboard/package.nix { };
+          package = pkgs.callPackage ../pkgs/dashboard/package.nix { };
           settings = {
             LISTEN = "127.0.0.1:8080";
             AUDIT_LOG = "-";
             CTL = "/run/dashboard/control.socket";
+          };
+        };
+        virtualisation.graphics = false;
+      };
+
+    # the static-account node: the cache under the family's shared pvsuite
+    # identity — the module auto-creates the account and the unit drops the
+    # DynamicUser for User=/Group= (the sandbox knobs are the same)
+    nodes.static =
+      { lib, pkgs, ... }:
+      {
+        imports = [ ../modules/modbus-cache.nix ];
+        services.modbus-cache = {
+          enable = true;
+          package = pkgs.callPackage ../pkgs/modbus-cache/package.nix { };
+          user = "pvsuite";
+          group = "pvsuite";
+          settings = {
+            LISTEN = "127.0.0.1:15502";
+            AUDIT_LOG = "-";
+            CTL = "/run/modbus-cache/control.socket";
           };
         };
         virtualisation.graphics = false;
@@ -94,6 +118,18 @@ pkgs.testers.nixosTest (
           score = float(line.split(":")[1].split()[0])
           print("%s exposure: %.2f" % (unit, score))
           assert score < 2.0, "%s too exposed: %.2f (%s)" % (unit, score, line)
+
+      # the static-account node: the cache runs as pvsuite/pvsuite — the
+      # module created the account, the unit renders User=/Group= instead of
+      # the DynamicUser, and the RuntimeDirectory is owned by the account
+      static.start()
+      static.wait_for_unit("modbus-cache.service", timeout=90)
+      static.wait_until_succeeds("test -S /run/modbus-cache/control.socket", timeout=30)
+      assert static.succeed("systemctl show modbus-cache -p User --value").strip() == "pvsuite"
+      assert static.succeed("systemctl show modbus-cache -p Group --value").strip() == "pvsuite"
+      assert static.succeed("systemctl show modbus-cache -p DynamicUser --value").strip() == "no"
+      assert static.succeed("stat -c %U:%G /run/modbus-cache").strip() == "pvsuite:pvsuite"
+      static.succeed("/run/current-system/sw/bin/modbus-cache-cli --control-port /run/modbus-cache/control.socket show version")
 
       # the services still serve their surfaces sandboxed: the control
       # sockets speak (the ctl inside the VM), the metrics answer, the

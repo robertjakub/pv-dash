@@ -79,7 +79,16 @@ All three modules behave the same way:
   warns); give `settings.CTL` a path under `/run/<tool>/` and the module
   creates the `RuntimeDirectory` for it. A TCP `CTL` binds 127.0.0.1 and
   **refuses to start without a token** (F5).
-- **Hardened units, verified.** `DynamicUser`, `UMask 0077`,
+- **The account: dynamic by default, `pvsuite` when named.** The units run
+  under the systemd `DynamicUser`; set `user`/`group` and the module renders
+  `User=`/`Group=` instead — and creates the account (a system user, no
+  login) unless the host already defines the same `users.users` entry.
+  `pvsuite` is the family's shared identity: one owner across the three
+  daemons for the state dumps and the control sockets. A `group` without
+  `user` refuses (a group alone would run the daemon as root), and naming
+  `root` warns.
+- **Hardened units, verified.** `DynamicUser` (or the named `user`),
+  `UMask 0077`,
   `ProtectSystem=strict`, `PrivateDevices`, `PrivateTmp`, `ProtectHome`,
   the kernel/control-group/clock/hostname protections,
   `MemoryDenyWriteExecute`, `CapabilityBoundingSet=""`,
@@ -91,8 +100,8 @@ All three modules behave the same way:
   hole is unreachable.
 
 `scripts/check_options.py` (the one-knob-one-source gate) keeps the modules
-structural: exactly `enable`/`package`/`openFirewall`/`settings`, every
-registry secret row's `*File` credential option (the dashboard adds
+structural: exactly `enable`/`package`/`user`/`group`/`openFirewall`/`settings`,
+every registry secret row's `*File` credential option (the dashboard adds
 `solarConfig`/`staticDir`), and nothing else — a knob option declared by
 hand fails the gate.
 
@@ -108,12 +117,14 @@ services.modbus-scraper = {
     LISTEN = "0.0.0.0:9350";         # only if Prometheus runs on another host
   };
   authTokenFile = "/etc/secrets/metrics.token";
+  user = "pvsuite";                  # the shared static identity (group = user)
 };
 ```
 
 | Option | Meaning |
 |---|---|
 | `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, MODBUS_PROFILE, METRICS_SPEC, METRICS_PREFIX, MAX_KWP, DUMP_PATH, CTL, AUDIT_LOG, LOG_LEVEL, ...; `docker/env/scraper.env.example` is the key list) |
+| `user` / `group` | run as a static account instead of the `DynamicUser` (the module creates it; `pvsuite` is the family's shared identity) |
 | `authKeyFile` / `authTokenFile` | the suite-handshake key / the `/metrics` bearer token, from a file outside the store (LoadCredential) |
 | `controlTokenFile` / `controlOpsTokenFile` | the control plane's admin / read-only ops tokens, from a file |
 | `dumpKeyFile` | the seal key for the state dump (needs settings `DUMP_PATH`) |
@@ -161,6 +172,7 @@ services.modbus-scraper = {
 | Option | Meaning |
 |---|---|
 | `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, MODBUS_UNIT, TIMEOUT, INTERVAL, READ_DELAY, MERGE_GAP, CACHE_TTL, ALLOW_WRITE, WRITE_REGISTERS, CONNECT_ACL, WRITE_ACL, MODBUS_PROFILE, SELECTION, METRICS_SERVER, METRICS_LISTEN, METRICS_ACL, MAX_CLIENTS, CTL, DUMP_PATH, DUMP_WITH_CACHE, DUMP_INTERVAL, RESTORE_ON_START, AUDIT_REQUESTS, AUDIT_LOG, AUDIT_FORWARD, AUDIT_INSTANCE, LOG_LEVEL, ...; `docker/env/cache.env.example` is the key list) |
+| `user` / `group` | run as a static account instead of the `DynamicUser` (the module creates it; `pvsuite` is the family's shared identity) |
 | `authKeyFile` / `authUpstreamKeyFile` | the key the cache's **own clients** prove (needs `MODBUS_AUTH = "suite"`) / the key **toward the inverter** (`suite` or `waveshare`), from a file outside the store (LoadCredential) |
 | `controlTokenFile` / `controlOpsTokenFile` | the control plane's admin / read-only ops tokens, from a file |
 | `metricsTokenFile` | the cache's own `/metrics` bearer token (mandatory when `settings.METRICS_SERVER = "true"`; bind `METRICS_LISTEN` 127.0.0.1:9351) |
@@ -194,6 +206,7 @@ services.modbus-scraper = {
 | Option | Meaning |
 |---|---|
 | `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (LISTEN, PROM_URL, PROM_PREFIX, MAX_CLIENTS, CLIENT_TIMEOUT, MAX_CONN_PER_IP, CTL, AUDIT_LOG, AUDIT_FORWARD, AUDIT_INSTANCE, LOG_LEVEL, LOG_ACCESS, LOG_QUERIES, LOCAL_TIME, METRICS_SERVER, METRICS_LISTEN, METRICS_ACL, METRICS_MAX_CLIENTS, DUMP_PATH, RESTORE_ON_START, ...; `docker/env/dashboard.env.example` is the key list) |
+| `user` / `group` | run as a static account instead of the `DynamicUser` (the module creates it; `pvsuite` is the family's shared identity) |
 | `solarConfig` | the SOLAR_CONFIG attrset rendered to the served `config.js` (a settings `CONFIG_JS` entry — a path — takes precedence) |
 | `staticDir` | override the packaged `static/` (the Exec pins the package's own assets by default) |
 | `authTokenFile` | the page's bearer token, from a file — mandatory beyond loopback (F21) |

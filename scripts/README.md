@@ -60,6 +60,23 @@ directory's TODO section is separate from [docs/TODO.md](../docs/TODO.md)
   the form gates live in `lint_options.py`, the tool-vs-tool identity
   fields in `compare_options.py`. `--tool` names the tools comma
   separated with `all` the default.
+- **`option_diff.py`** — one flat name, every tool, every section: the
+  deep diff beside the family-scale pair (`compare_options.py` the
+  identity fields, `options_drift.py` the whole family). The search
+  walks the registry's three sections (options, show, commands — the
+  canon's own three) and every one that rows the name reports: the
+  EFFECTIVE rows per tool (the loader's own `canon_fold`), the
+  byte-identical field on one line and the drift one tool per line
+  (`*` on the off-majority values), the canon state (the block, the
+  refs, the inline-wins deviations, the block gaps) and the move
+  verdict — what riding shared/options-help.json takes: the fields the
+  block could carry (byte-identical on every carrier), the console
+  placements the house keeps on the rows, the gated drift with its
+  exempt status, and the must-ref / byte-equal-twins predictions. The
+  verdict re-uses `lint_options.py`'s own GATED/EXEMPT/SECTION_FIELD/
+  KEY_RANK and the loader's `canon_fold` — it can never drift from the
+  gates it predicts. `python3 scripts/option_diff.py <flat-name>`;
+  `--tool` names the tools comma separated with `all` the default.
 
 ## The checks (the shipped artifacts)
 

@@ -81,7 +81,11 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   whose reports read the effective rows now, and the new
   `options_drift` report: the knobs in their folded form against the
   canon — the blocks' adoption census, the inline-wins deviations, the
-  block gaps, the promotion list and the shape-field drifts), the
+  block gaps, the promotion list and the shape-field drifts; and the
+  new `option_diff` deep diff — one flat name, every tool, every
+  section (options, show, commands): the effective rows field by field,
+  the canon state and the move verdict that re-uses the lint's own
+  gates), the
   linter and the raw editors stay raw by design, `lint_options` renders
   the canon file in the canonical layout (the sections and blocks in
   their landed order, a block's fields in the row rank) beside the four

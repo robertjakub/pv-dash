@@ -65,7 +65,7 @@ services:
       # the server side: every client proves the stack's suite key right
       # after connect — ERR and the client is dropped
       MODBUS_AUTH: suite
-      AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
     env_file:
       - path: ../env/fake.env
         required: false
@@ -88,11 +88,11 @@ services:
     image: modbus-cache
     environment:
       # the upstream side: the cache proves the same suite key to the fake
-      AUTH_UPSTREAM: suite
-      AUTH_UPSTREAM_KEY: file:/config/modbus-auth.token
+      MODBUS_UPSTREAM_AUTH: suite
+      MODBUS_UPSTREAM_AUTH_KEY: file:/config/modbus-auth.token
       # the server side: the scraper (any client) proves it to the cache
       MODBUS_AUTH: suite
-      AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
     env_file:
       - path: ../env/cache.env
         required: false
@@ -118,7 +118,7 @@ services:
       # the client side: the scraper proves the stack's suite key to the
       # cache on every connect (the poller keeps retrying on ERR)
       MODBUS_AUTH: suite
-      AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the demo exporter never serves unauthenticated (the audit's F13) —
       # environment beats env_file, so scraper.env cannot override this;

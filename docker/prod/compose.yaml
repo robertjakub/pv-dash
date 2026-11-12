@@ -19,7 +19,7 @@
 #      carries the -production name (the demo stack reads
 #      ../env/cache.env) so one checkout can run both stacks. If the
 #      device (or its gateway) speaks an auth scheme, set
-#      AUTH_UPSTREAM=suite|waveshare and AUTH_UPSTREAM_KEY in the same
+#      MODBUS_UPSTREAM_AUTH=suite|waveshare and MODBUS_UPSTREAM_AUTH_KEY in the same
 #      file — the upstream credential is the device's, the env file is
 #      its edit surface (the stack's own hops are pre-wired below and
 #      cannot be overridden from the env file — environment beats
@@ -64,10 +64,10 @@ services:
       # the server side: the scraper (any client) proves the stack's suite
       # key right after connect — ERR and the client is dropped. Delete
       # this block to run the cache's Modbus open (an explicit operator
-      # act); the upstream side (AUTH_UPSTREAM*) stays the env file's —
+      # act); the upstream side (MODBUS_UPSTREAM_AUTH*) stays the env file's —
       # the device's credential, see the header
       MODBUS_AUTH: suite
-      AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
     env_file:
       # REQUIRED (no required: false): UPSTREAM is the operator's decision
       # — set it to the device's Modbus TCP HOST:PORT before up. The other
@@ -94,7 +94,7 @@ services:
       # the client side: the scraper proves the stack's suite key to the
       # cache on every connect (the poller keeps retrying on ERR)
       MODBUS_AUTH: suite
-      AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the exporter never serves unauthenticated (the audit's F13) —
       # environment beats env_file, so scraper-production.env cannot

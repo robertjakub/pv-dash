@@ -43,8 +43,8 @@ Each is called out in the compose file's comments:
   (`fake-inverter:5502`) only ever resolves in the demo. Set
   `UPSTREAM=HOST:PORT` to the device.
 - **the device's own auth** (optional) — if the device or its gateway
-  speaks an auth scheme, set `AUTH_UPSTREAM=suite|waveshare` and
-  `AUTH_UPSTREAM_KEY` in the same env file: the upstream credential is
+  speaks an auth scheme, set `MODBUS_UPSTREAM_AUTH=suite|waveshare` and
+  `MODBUS_UPSTREAM_AUTH_KEY` in the same env file: the upstream credential is
   the device's, the env file is its edit surface. (The Waveshare
   spelling is cache-only — the gateway connection password.) A device
   without auth stays `none` — the stack's own hops are authenticated
@@ -84,7 +84,7 @@ collector's pull are the two routes through:
           env/cache-production.env       └──────┬───────┘
           (the required file); its own          │
           auth, if any, rides                   │
-          AUTH_UPSTREAM there                   │
+          MODBUS_UPSTREAM_AUTH there                   │
                                                 │
           FC3/4 reads, 10s poll - the           │
           suite handshake (or the               │
@@ -132,7 +132,7 @@ collector's pull are the two routes through:
   its auth scheme, if any) live in the operator's
   `env/cache-production.env`.
 - **modbus-cache** — the proxy: polls the device every 10 s (proving
-  the suite key upstream when `AUTH_UPSTREAM` says so), owns the single
+  the suite key upstream when `MODBUS_UPSTREAM_AUTH` says so), owns the single
   client slot, serves reads from memory, demands the same key from its
   own clients; writes stay closed by default (`allow-write` off,
   `write-acl`/`write-registers` none).

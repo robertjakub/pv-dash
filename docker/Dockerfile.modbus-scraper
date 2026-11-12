@@ -30,7 +30,7 @@
 # --upstream 10.0.0.2:15502` on top). The compose stacks add
 # AUTH_TOKEN=file:/config/metrics.token (a random token the entrypoint
 # generates on the first seed, 0600, pvsuite, shared with the stack's
-# Prometheus) and AUTH/AUTH_KEY=file:/config/modbus-auth.token: the
+# Prometheus) and AUTH/MODBUS_AUTH_KEY=file:/config/modbus-auth.token: the
 # stack's Modbus hops ship authenticated (see README.md).
 FROM alpine:3.20
 

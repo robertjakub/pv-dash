@@ -75,8 +75,8 @@ Three operator decisions, each called out in the compose file's comments:
   because the image's default `UPSTREAM` (`fake-inverter:5502`) only ever
   resolves in the demo. Set `UPSTREAM=HOST:PORT` to the device.
 - **the device's auth** (optional) — if the device or its gateway speaks
-  an auth scheme, set `AUTH_UPSTREAM=suite|waveshare` and
-  `AUTH_UPSTREAM_KEY` in the same env file: the upstream credential is
+  an auth scheme, set `MODBUS_UPSTREAM_AUTH=suite|waveshare` and
+  `MODBUS_UPSTREAM_AUTH_KEY` in the same env file: the upstream credential is
   the device's, the env file is its edit surface. (The Waveshare spelling
   is cache-only — the gateway connection password.)
 - **your collector's way in** — the exporter's `/metrics` is published
@@ -202,11 +202,11 @@ default):
   (server), the cache proves it upstream and demands it from its own
   clients; in prod the cache demands it (server) and the scraper proves
   it — the upstream side stays the device's credential (the operator's
-  `AUTH_UPSTREAM*` in `env/cache-production.env`, or none for a device
+  `MODBUS_UPSTREAM_AUTH*` in `env/cache-production.env`, or none for a device
   without auth). The `environment:` blocks pin scheme + `file:` reference;
   opening a hop is a compose edit (an explicit operator act, the F7
   shape). Standalone runs stay auth-less — pass `-e MODBUS_AUTH=suite -e
-  AUTH_KEY=file:/config/modbus-auth.token` on a shared named volume to
+  MODBUS_AUTH_KEY=file:/config/modbus-auth.token` on a shared named volume to
   mirror the stacks by hand.
 - **the metrics hop** — the exporter never serves unauthenticated: the
   compose sets `AUTH_TOKEN=file:/config/metrics.token` (the `file:`

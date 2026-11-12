@@ -289,7 +289,7 @@
       "setting-help": "every cached range-entry: its words, age, expiry and status", "hidden": true },
     { "name": "uplink", "setting-help": "the inverter link: session counters, per-block latency and errors" },
     { "name": "uplink-sources",
-      "setting-help": "the uplink table widened: the sources column after the range names the register ranges each block pools" },
+      "setting-help": "the register map: one row per polled register — fc, register, the range that fetches it, source" },
     { "name": "version", "setting-help": "the modbus-cache version" },
     { "name": "config", "live": "config",
       "setting-help": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)" },

@@ -700,10 +700,9 @@ try:
           and 'fc3' in r and 'status' in r and 'sources' not in r, r[:200])
     r = ctl_cmd('show uplink-sources', 15514 + BASE)
     vhead = next((ln for ln in r.splitlines() if ln.startswith('fc')), '')
-    vhi = {w: i for i, w in enumerate(vhead.split())}
-    check('show uplink-sources: the sources column rides after the range',
-          r.startswith('ok uplink-sources\n') and 'range' in vhi and 'sources' in vhi and 'status' in vhi
-          and vhi['range'] < vhi['sources'] < vhi['status'], r[:200])
+    check('show uplink-sources: the register map (fc, register, range, source)',
+          r.startswith('ok uplink-sources\n') and vhead.split() == ['fc', 'register', 'range', 'source']
+          and 'fc3' in r, r[:200])
 
     # selection none: the map empties, every read forwards, nothing is stored
     r = ctl_cmd('set selection none', 15514 + BASE)

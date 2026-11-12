@@ -378,8 +378,9 @@ analyses the inverter link: session counters (connects, exchanges, bytes,
 errors) and one row per poll block with its status, latency (last/mean/max)
 and last error.
 .B show uplink-sources
-widens the table: the sources column after the range names the register
-ranges the block pools (one name, comma-separated when pooled).
+spells the register map: one row per polled register \(em its fc,
+register address, the range that fetches it and the source name (the
+health columns stay the blocks').
 .IP \(bu 2
 .B show write-registers-table
 renders the write gate as its acl chain (show-only): \fBallow any\fR /

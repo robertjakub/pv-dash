@@ -798,10 +798,10 @@ class ControlServer(_ControlServer):
     def uplink_report(self, with_sources=False):
         """The inverter link: the session counters (connects, exchanges,
         bytes, errors) and one row per poll block with its status, latency
-        and last error — `show uplink-sources` widens the table with the
-        block's sources column right after the range (one name,
-        comma-separated when pooled), for analysing what the upstream
-        connection does."""
+        and last error — `show uplink-sources` spells the register map
+        instead: one row per polled register with its fc, register address,
+        the range that fetches it and the source name (the health columns
+        stay the blocks')."""
         p = self.proxy
         u = p.upstream
         now = time.monotonic()
@@ -826,29 +826,28 @@ class ControlServer(_ControlServer):
             % (secs(p.interval), secs(p.poll_secs_last), secs(mean), secs(p.poll_secs_max),
                last_ok, len(p.blocks)),
         ]
-        cells = []
-        for fc, start, count, leaves in p.blocks:
-            names = ', '.join(p._name(lf) for lf in leaves) if with_sources else None
-            s = p.block_stats.get((fc, start, count))
-            if s is None:
-                row = ('fc%d' % fc, '%d:%d' % (start, count), 'pending', '-', '-', '-', '0', '-')
-            else:
+        if with_sources:
+            head = ('fc', 'register', 'range', 'source')
+            cells = [('fc%d' % lf[0], '%d' % lf[1], '%d:%d' % (start, count), p._name(lf))
+                     for _, start, count, leaves in p.blocks for lf in leaves]
+        else:
+            head = ('fc', 'range', 'status', 'last', 'mean', 'max', 'fails', 'last error')
+            cells = []
+            for fc, start, count, leaves in p.blocks:
+                s = p.block_stats.get((fc, start, count))
+                if s is None:
+                    cells.append(('fc%d' % fc, '%d:%d' % (start, count), 'pending', '-', '-', '-', '0', '-'))
+                    continue
                 if s['last_err'] is None:
                     status, err = 'ok', '-'
                 elif s['last_code'] is not None:
                     status, err = 'ex %d' % s['last_code'], s['last_err']
                 else:
                     status, err = 'error', s['last_err']
-                row = ('fc%d' % fc, '%d:%d' % (start, count), status, secs(s['last']),
-                       secs(s['sum'] / s['ok_n']) if s['ok_n'] else '-',
-                       secs(s['max']), '%d' % s['fails'], err)
-            if names is not None:
-                row = row[:2] + (names,) + row[2:]   # the sources column rides after the range
-            cells.append(row)
+                cells.append(('fc%d' % fc, '%d:%d' % (start, count), status, secs(s['last']),
+                              secs(s['sum'] / s['ok_n']) if s['ok_n'] else '-',
+                              secs(s['max']), '%d' % s['fails'], err))
         if cells:
-            head = (('fc', 'range', 'sources', 'status', 'last', 'mean', 'max', 'fails', 'last error')
-                    if with_sources else
-                    ('fc', 'range', 'status', 'last', 'mean', 'max', 'fails', 'last error'))
             widths = [max(len(h), max((len(r[i]) for r in cells), default=0)) for i, h in enumerate(head)]
             rows.append('  '.join(h.ljust(w) for h, w in zip(head, widths)))
             for r in cells:

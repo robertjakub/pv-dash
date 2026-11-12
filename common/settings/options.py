@@ -677,6 +677,33 @@ def default_ops_verbs(verbs):
     return 'show,flush' if 'flush' in verbs else 'show'
 
 
+def load_options_module(ns, here, extra_choices=None, socket_timeout=False):
+    """The four lib/options.py loaders' shared glue (the hoist was a move,
+    not a rename — each loader carried the same body): defaults.json next to
+    the loader carries the log_levels (the LOG_LEVELS the control grammar
+    validates against), the tool's extra choice vocabularies join them (the
+    fake's timezone), the registry parses and — on the Modbus tools — the
+    protocol tree's socket_timeout arms the modbus-timeout row's default.
+    `ns` is the caller's globals(): the registry's sections fill it (the
+    COMMANDS/SHOW_* tables the module publishes), KNOWN_VERBS (the RBAC
+    vocabulary — the registry's rows are its one home) and
+    DEFAULT_OPS_VERBS follow. Returns the option rows."""
+    with open(os.path.join(here, 'defaults.json'), encoding='utf-8') as f:
+        static = json.load(f)
+    choices = {'log-level': tuple(static['log_levels'])}
+    if extra_choices:
+        choices.update(extra_choices)
+    _rows, sections, options = load_registry(here, choices=choices)
+    if socket_timeout:
+        from common.modbus.protocol import apply_socket_timeout
+        apply_socket_timeout(options)   # the modbus timeout's default is the protocol tree's socket_timeout
+    for key, value in sections.items():
+        ns[key] = value
+    ns['KNOWN_VERBS'] = known_verbs(ns['COMMANDS'])
+    ns['DEFAULT_OPS_VERBS'] = default_ops_verbs(ns['KNOWN_VERBS'])
+    return options
+
+
 def parse_registry_sections(meta):
     """The registry's `show` and `commands` sections -> the control-grammar
     vocabulary, one parse for the family's four loaders (the rows live in
@@ -909,6 +936,25 @@ def registry_view(options, show_options):
         node_by_name={o.name: o for o in options if o.node},   # the hierarchy nodes (help-only)
         describe=(describe_setting, describe_value),
     )
+
+
+def unpack_registry_view(view, ns):
+    """The registry_view's tables as the module-level names the family
+    imports off the lib.options modules — the one unpack (each loader
+    carried the same fourteen lines). `ns` is the caller's globals(): the
+    same fill mechanism the registry's sections ride."""
+    ns['SETTINGS'] = view.settings
+    ns['SETTING_BY_NAME'] = view.setting_by_name   # the FLAT wire names — the daemon's match map
+    ns['SETTING_SPELLINGS'] = view.spellings   # + the console spellings (the live/alias paths) — the cli's match map
+    ns['SETTING_NAMES'] = view.setting_names   # the flat names: the dump keys, the clear defaults, the help lists
+    ns['POOL_NAMES'] = view.pool_names   # the console spellings (the lives + aliases) — the ?/TAB pools' raw list
+    ns['ALIAS_NAMES'] = view.alias_names
+    ns['SET_BY_NAME'] = view.set_by_name
+    ns['SHOW_LIVES'] = view.show_lives
+    ns['LIVE_SETTINGS'] = view.live_settings   # a row the registry spells without a `live` name (the restart-marked
+    ns['HIDDEN_SETTINGS'] = view.hidden_settings   # startup knobs, mid-grant) never lists; the wire still answers
+    ns['NODE_BY_NAME'] = view.node_by_name
+    ns['describe_setting'], ns['describe_value'] = view.describe
 
 
 def word_groups(words, groups):

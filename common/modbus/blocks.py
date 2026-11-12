@@ -3,7 +3,7 @@ merge sorted address ranges into as few Modbus reads as possible (stdlib
 only). Every address is a (fc, addr) tuple and every range an
 (fc, start, count) tuple — a cached bit is a word 0/1 like any other.
 Blocks never merge across function codes (a read can only serve one)."""
-from .protocol import PROTOCOL
+from .protocol import PROTOCOL, DeviceError
 
 MAX_COUNT = PROTOCOL['max_count']              # max registers per FC3/FC4 read
 MAX_BITS = PROTOCOL['max_bits']                # max bits per FC1/FC2 read (the Modbus spec's 0x7D0)
@@ -49,3 +49,26 @@ def build_blocks(ranges, merge_gap):
         if start is not None:
             blocks.append((fc, start, end - start, tuple(group)))
     return blocks
+
+
+def block_stat(stats, key, secs, err=None):
+    """The `show uplink` tally of one poll-block attempt (the cache's Proxy
+    and the scraper's Scraper share it — the hoist was a move, not a
+    rename): the round-trip time, the outcome (DeviceError keeps its
+    Modbus exception code). `stats` is the tool's live block_stats dict,
+    `key` the (fc, start, count) block."""
+    s = stats.setdefault(key, {'n': 0, 'ok_n': 0, 'fails': 0,
+                               'last': 0.0, 'sum': 0.0, 'max': 0.0,
+                               'last_err': None, 'last_code': None})
+    s['n'] += 1
+    s['last'] = secs
+    s['max'] = max(s['max'], secs)
+    if err is None:
+        s['ok_n'] += 1
+        s['sum'] += secs
+        s['last_err'] = None
+        s['last_code'] = None
+    else:
+        s['fails'] += 1
+        s['last_err'] = str(err)
+        s['last_code'] = err.code if isinstance(err, DeviceError) else None

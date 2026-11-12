@@ -5,17 +5,24 @@ them behind its own serialized connection. The error texts are pinned by
 the regtests; change them with the suites in hand. The per-tool limits
 come from each tool's lib/defaults.json."""
 import socket
+import time
 
-from .protocol import (DeviceError, ModbusError, auth_handshake_client,
-                       recv_exact, waveshare_handshake_client)
+from .protocol import (DeviceError, ModbusError, PROTOCOL,
+                       auth_handshake_client, check_head, recv_exact,
+                       waveshare_handshake_client)
 
 
 class ClientBase:
     """The client-leg plumbing both Modbus TCP clients share: the endpoint
-    fields, the close, the recv wrapper (OSError -> ModbusError) and the
-    reconnect-on-connect (the auth handshake armed). The subclass keeps
-    its own extras (the scraper's offset/apply, the cache's counters) and
-    its read ladders."""
+    fields, the session counters (connects, exchanges, bytes, errors —
+    `show uplink` renders them), the close, the recv wrapper (OSError ->
+    ModbusError), the reconnect-on-connect (the auth handshake armed) and
+    the wire exchange with its accounting (_exchange — the hoist was a
+    move, not a rename: both legs carried the same body). The subclass
+    keeps its own extras (the scraper's offset/apply, the cache's lock)
+    and its read ladders."""
+
+    MAX_PDU = PROTOCOL['max_pdu']   # the largest Modbus PDU (the MBAP head's bound)
 
     def __init__(self, host, port, unit, timeout, auth=None, auth_key=None):
         self.host = host
@@ -27,9 +34,20 @@ class ClientBase:
         self.auth_key = auth_key  # the shared key the handshake proves
         self.sock = None
         self.txn = 0
+        self.exchanges = 0         # completed request/reply exchanges
+        self.connects = 0          # successful connects (2 = one reconnect)
+        self.errors = 0            # failed exchanges (timeout, reset, bad frame)
+        self.last_error = None     # the text of the last failure
+        self.last_error_at = None  # monotonic
+        self.connected_since = None
+        self.bytes_in = 0
+        self.bytes_out = 0
 
     def after_connect(self):
-        """The subclass's post-connect hook (the cache's session counters)."""
+        """The post-connect tally both legs keep (the subclass's own extras
+        override with super() if one ever grows more)."""
+        self.connects += 1
+        self.connected_since = time.monotonic()
 
     def close(self):
         if self.sock:
@@ -49,6 +67,34 @@ class ClientBase:
             return recv_exact(self.sock, n)
         except OSError as e:
             raise ModbusError(str(e))
+
+    def _exchange(self, out, want_txn):
+        """One wire exchange with the session accounting: send + the two
+        recvs count the bytes, a txn/proto mismatch raises, any failure
+        lands in errors/last_error and re-raises. `out` is the READY frame
+        (the caller packs — the cache forwards client frames verbatim);
+        returns (txn, proto, length, unit, body)."""
+        try:
+            if not self.sock:
+                self._connect()
+            self.sock.sendall(out)
+            self.bytes_out += len(out)
+            head = self._recv_exact(7)
+            self.bytes_in += len(head)
+            txn, proto, length, unit = check_head(head, self.MAX_PDU)
+            body = self._recv_exact(length - 1)
+            self.bytes_in += len(body)
+            if txn != want_txn:
+                raise ModbusError('transaction id mismatch')
+            if proto != 0:
+                raise ModbusError('unexpected protocol id %d' % proto)
+        except (ModbusError, OSError) as e:
+            self.errors += 1
+            self.last_error = str(e)
+            self.last_error_at = time.monotonic()
+            raise
+        self.exchanges += 1
+        return txn, proto, length, unit, body
 
 
 def open_socket(host, port, timeout, auth=None, auth_key=None):

@@ -11,7 +11,8 @@ from .protocol import (AUTH_DOMAIN, AUTH_ERR, AUTH_FRAME_LEN, AUTH_MAGIC,
                        read_frame, recv_exact, unpack_bits,
                        waveshare_handshake_client)
 from .client import ClientBase, check_data_bytes, check_reply, open_socket
-from .blocks import BIT_READ_FUNCS, MAX_BITS, MAX_COUNT, READ_FUNCS, build_blocks, span
+from .blocks import (BIT_READ_FUNCS, MAX_BITS, MAX_COUNT, READ_FUNCS,
+                     block_stat, build_blocks, span)
 from .server import serve_modbus
 from .writes import describe_write, write_kv, write_shape_error, write_target
 

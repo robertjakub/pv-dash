@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """console-style interactive CLI for the fake inverter's control server.
 
-A session front-end on top of the control socket: prompt with the connected
+One client, three modes by the invocation shape: command words one-shot
+(modbus-fake-cli.py --control-port 15509 show config — the raw verdict head prints),
+piped stdin batch (the script lines run in order, the same raw faces),
+a bare terminal the console session: prompt with the connected
 port, TAB completion and `?` in every position, `show` commands print the
 state lines, `set` commands print only the confirmation, and `shutdown`
 asks before it stops the fake.
@@ -56,4 +59,4 @@ SPEC = dict(audit_tag=TAGS, label='the fake inverter', daemon_label='fake invert
             silent_ok=None, render=None, cli_page=cli_page)
 
 if __name__ == '__main__':
-    cli.run_cli(SPEC)
+    cli.run_client(SPEC)

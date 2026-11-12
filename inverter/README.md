@@ -19,7 +19,6 @@ It ships three tools:
 | Tool | Purpose |
 |---|---|
 | `modbus-fake-inverter.py` | the server (also packaged as `modbus-fake-inverter`) |
-| `modbus-fake-ctl.py` | one-shot / batch client for the runtime control server (`modbus-fake-ctl`) |
 | `modbus-fake-cli.py` | console-style interactive session on the same control server (`modbus-fake-cli`) |
 
 ## How it works
@@ -113,7 +112,7 @@ The startup surface is the family's: **flag > env > config script > the
 built-in defaults**. The config file (`--config PATH`, `$CONFIG`, then
 `modbus-fake-inverter.conf` next to the script) speaks the **set grammar** — every
 line a `set <name> <value>` in the CLI spelling, the same line pastes
-into the console or `modbus-fake-ctl` — and the bundled sample is
+into the console or `modbus-fake-cli` — and the bundled sample is
 [examples/modbus-fake-inverter.conf](examples/modbus-fake-inverter.conf). The pins and the
 machines (`pv`, `load`, `batt`, `grid`, `soc`, `mppt`, `cloud`,
 `scenario`, `battery-state`, `grid-outage`) stay control-wire settings:
@@ -231,11 +230,11 @@ option registry (`lib/options.json`) that both the control server and the
 CLIs read, so the wire grammar, the help texts and the completions can
 never drift.
 
-### `modbus-fake-ctl` — one-shot / batch client
+### `modbus-fake-cli` — one-shot / batch / console
 
 ```bash
-python3 inverter/bin/modbus-fake-ctl.py set pv 2500
-printf 'set pv 2500\nset soc 30\nshow pv\n' | python3 inverter/bin/modbus-fake-ctl.py --control-port 15599
+python3 inverter/bin/modbus-fake-cli.py set pv 2500
+printf 'set pv 2500\nset soc 30\nshow pv\n' | python3 inverter/bin/modbus-fake-cli.py --control-port 15599
 ```
 
 Same `--control-port` flag / `CTL` env as the fake itself; several
@@ -399,7 +398,6 @@ logs.
 inverter/
 ├── bin/
 │   ├── modbus-fake-inverter.py    # CLI entry, logging, wiring
-│   ├── modbus-fake-ctl.py         # control-server CLI client (one-shot / batch)
 │   └── modbus-fake-cli.py         # console-style interactive control session
 └── lib/
     ├── options.json    # the knob registry: the flags, the env twins, the live settings

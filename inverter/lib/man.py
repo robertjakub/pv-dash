@@ -4,7 +4,7 @@ sections render from the tools' argparse parsers, the prose sections live
 here as roff (ported from the original hand-written pages). scripts/gen_man.py
 writes the shipped man/*.1 from these; `modbus-fake-inverter --man` (and the
 ctl/cli's --man) prints the same page."""
-from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
+from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.3'
@@ -107,8 +107,6 @@ the family's control knobs all set live: \\fBcontrol ops verbs\\fR (the
 read-only role's policy), \\fBcontrol trust-uids\\fR (the peer-cred
 list), \\fBcontrol socket-group\\fR (0660 instead of 0600, the live
 socket re-modes). See
-.BR modbus-fake-ctl (1)
-and
 .BR modbus-fake-cli (1)."""
     security = """.SH SECURITY
 The fake is a development/test instrument, not a security-first design
@@ -186,51 +184,17 @@ the audit trail when \\fB--audit-log\\fR is unset."""
         options_section(parser),
         extra_sections=(signals, control, security, environment, files, exit_status),
         kind='daemon',
-        see_also='.BR modbus-fake-ctl (1),\n.BR modbus-fake-cli (1),\n.BR modbus-cache (1),\n.BR modbus-scraper (1)\n.PP\n\\fBinverter/README.md\\fR in the suite checkout \\(em the full documentation,\nincluding the state machines.')
+        see_also='.BR modbus-fake-cli (1),\n.BR modbus-cache (1),\n.BR modbus-scraper (1)\n.PP\n\\fBinverter/README.md\\fR in the suite checkout \\(em the full documentation,\nincluding the state machines.')
 
-
-def ctl_page(parser):
-    description = """\
-Sends one control command (or a batch piped on stdin, one per line) to the
-\\fBmodbus-fake-inverter\\fR JSON-lines control server and prints the
-replies on stdout, one per line. Every invocation lands in the audit trail
-(prefix \\fBCTL\\fR).
-.PP
-The command grammar is the fake's: \\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/
-\\fBhelp\\fR (the settings registry),
-\\fBshow connections\\fR (the live Modbus clients: peer, age, requests),
-\\fBshow registers\\fR, \\fBshow version\\fR,
-\\fBshow knobs\\fR (the dictionary of the registry),
-\\fBinspect\\fR, \\fBreset\\fR, \\fBrequest reload\\fR,
-\\fBrequest reload-config\\fR, \\fBshutdown\\fR,
-\\fBquit\\fR. See
-.BR modbus-fake-inverter (1)
-CONTROL."""
-    examples = """.SH EXAMPLES
-.RS
-.IP \\(bu 2
-.B modbus-fake-ctl set pv 2500
-.IP \\(bu 2
-.B printf 'set pv 2500\\enset soc 30\\enshow pv\\en' | modbus-fake-ctl
-.RE"""
-    environment = """.SH ENVIRONMENT
-.TP
-.B CTL ", " CONTROL_TOKEN
-the control target and the TCP token when the flags are unset."""
-    exit_status = EXIT_STATUS_CTL
-    return page(
-        'one-shot control client for the fake inverter',
-        'modbus-fake-ctl', 1, DATE, VERSION, MANUAL,
-        '.B modbus-fake-ctl\n.RI [ options ]\n.IB command " [args ...]"\n.br\n.B modbus-fake-ctl\n.RI [ options ]\n< commands',
-        description,
-        options_section(parser),
-        extra_sections=(examples, environment, exit_status),
-        kind='ctl',
-        see_also='.BR modbus-fake-inverter (1),\n.BR modbus-fake-cli (1)')
 
 
 def cli_page(parser):
     description = """\
+One client, three modes by the invocation shape: command words one-shot
+(\\fBmodbus-fake-cli\\fR show config\\fR \\(em the raw verdict head prints,
+exit 0 ok, 1 connection error, 2 misuse), piped stdin batch (the script lines
+run in order, the same raw faces), a bare terminal the interactive console.
+.PP
 An interactive console on the \\fBmodbus-fake-inverter\\fR JSON-lines
 control server; the prompt shows the
 connected port (\\fBfake-inverter:5502 >\\fR). TAB completes commands,
@@ -268,9 +232,9 @@ the control target and TCP token when the flags are unset."""
     return page(
         'console-style control session for the fake inverter',
         'modbus-fake-cli', 1, DATE, VERSION, MANUAL,
-        '.B modbus-fake-cli\n.RI [ options ]',
+        '.B modbus-fake-cli\n.RI [ options ]\n.IB command " [args ...]"',
         description,
         options_section(parser),
         extra_sections=(environment, exit_status),
         kind='cli',
-        see_also='.BR modbus-fake-inverter (1),\n.BR modbus-fake-ctl (1)')
+        see_also='.BR modbus-fake-inverter (1)')

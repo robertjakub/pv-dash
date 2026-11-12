@@ -28,7 +28,7 @@ import sys
 import time
 
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-CTL = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
+CTL = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py')
 LOG = os.path.join(SCRATCH, 'inv_regtest.log')
 FAILURES = failures   # the suite's upper-case name for the shared accumulator (the doc + the tail speak FAILURES)
 
@@ -966,7 +966,7 @@ def main():
               'cannot read dump-key' in line and procs[-1].poll() is not None, line[-220:])
 
         # ---- --man: every tool prints its generated roff page
-        for tool, title in ((F, 'MODBUS-FAKE-INVERTER'), (CTL, 'MODBUS-FAKE-CTL'),
+        for tool, title in ((F, 'MODBUS-FAKE-INVERTER'),
                             (os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'), 'MODBUS-FAKE-CLI')):
             r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
             check('--man: %s prints the page' % os.path.basename(tool),
@@ -1154,24 +1154,20 @@ def main():
         check('fake control: the trust uids drop', tx.startswith('ok control-trust-uids=off'), tx[:90])
 
         # the logout verb: the cli's local session-close (quit's sibling) —
-        # the session ends with stdin still open (the exit is logout's, not EOF's)
-        p_cli = subprocess.Popen([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py')],
-                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True, env={**os.environ, 'CTL': msock})
+        # the session ends with stdin still open (the exit is logout's, not
+        # EOF's) — the tty edition, the piped stdin is the batch now
+        m_pty, p_cli = pty_cli(os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'),
+                               24, 80, env_extra={'CTL': msock})
         time.sleep(1.0)          # the banner + the prompt
+        pty_send(m_pty, 'logout\n')
         closed = False
-        out = ''
         try:
-            p_cli.stdin.write('logout\n')
-            p_cli.stdin.flush()
-            try:
-                p_cli.wait(timeout=5)
-                closed = True
-            except subprocess.TimeoutExpired:
-                p_cli.kill()
-            out, _ = p_cli.communicate()
-        except OSError as e:
-            out = 'broken pipe: %s' % e
+            p_cli.wait(timeout=5)
+            closed = True
+        except subprocess.TimeoutExpired:
+            p_cli.kill()
+        out = pty_read(m_pty)
+        os.close(m_pty)
         check('fake_cli: logout closes the session', closed and p_cli.returncode == 0
               and 'fake-inverter' in out, repr(out[-120:] if out else 'no output'))
 

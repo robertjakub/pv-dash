@@ -34,14 +34,14 @@ through FC43). A synthesized diagnostics block at registers
 65000\\(en65003 lets clients tell cached data from live data.
 .PP
 Modbus auth (\\fB--modbus-auth\\fR): with \\fBsuite\\fR the cache's own clients
-prove a shared key (\\fB--auth-key\\fR, min 16 characters) with a crypt
+prove a shared key (\\fB--modbus-auth-key\\fR, min 16 characters) with a crypt
 handshake right after every connect \\(em 52 bytes: magic, fresh nonce,
 HMAC\\-SHA256 proof; the cache answers \\fBOK\\fR (plain Modbus follows)
 or \\fBERR\\fR (the client is dropped before it ever sees a frame).
-\\fB--auth-upstream\\fR/\\fB--auth-upstream-key\\fR do the same toward
+\\fB--modbus-auth-upstream\\fR/\\fB--modbus-auth-upstream-key\\fR do the same toward
 the inverter: an \\fBERR\\fR fails the exchange like any other upstream
 fault and the poller retries. The upstream leg also speaks
-\\fB--auth-upstream waveshare\\fR for a Waveshare RS485\\-to\\-TCP
+\\fB--modbus-auth-upstream waveshare\\fR for a Waveshare RS485\\-to\\-TCP
 gateway: the shared key goes out as the gateway's connection password
 (raw ASCII, right after every connect) and the gateway's \\fBOK\\fR opens
 the plain Modbus session \\(em anything else fails the exchange like any
@@ -75,7 +75,7 @@ The control server speaks JSON lines: one request
 the reports
 .BR inspect ", " "show connections" ,
 .BR "show cache" " [all]" ", " "show write-registers-table" ,
-.BR "show uplink" ", " "show version" ,
+.BR "show uplink" ", " "show uplink-sources" ", " "show version" ,
 .BR "show connect-acl-table" ", " "show write-acl-table" ,
 .BR "show metrics-acl-table" ,
 the ops
@@ -90,7 +90,7 @@ client-timeout, upstream, unit, metrics-server,
 metrics-listen, the metrics caps, metrics-acl,
 requests-audit, dump-interval, log-level, local-time, profile,
 selection, connect-acl, write-acl, timeout, modbus-auth,
-auth-upstream, control-port, control-ops-verbs, control-trust-uids,
+modbus-auth-upstream, control-port, control-ops-verbs, control-trust-uids,
 control-socket-group, audit-log, audit-forward, audit-max-mb,
 no-audit-log, dump-path, dump-with-cache); a SIGHUP \\(em or the wire's
 \\fBrequest reload-config\\fR \\(em re-applies the config
@@ -113,6 +113,9 @@ prints every cached entry: name, words, values, age, expiry, poll status.
 analyses the inverter link: session counters (connects, exchanges, bytes,
 errors) and one row per poll block with its status, latency (last/mean/max)
 and last error.
+.B show uplink-sources
+widens the table: the sources column after the range names the register
+ranges the block pools (one name, comma-separated when pooled).
 .IP \\(bu 2
 .B show write-registers-table
 renders the write gate as its acl chain (show-only): \\fBallow any\\fR /
@@ -257,7 +260,7 @@ The command grammar is the daemon's: \\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/
 \\fBhelp\\fR (the settings registry), \\fBinspect\\fR,
 \\fBshow connections\\fR, \\fBshow cache\\fR [\\fBall\\fR],
 \\fBshow write-registers-table\\fR, \\fBshow uplink\\fR,
-\\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
+\\fBshow uplink-sources\\fR, \\fBshow version\\fR, \\fBshow knobs\\fR (the dictionary of the registry),
 \\fBrequest flush cache\\fR, \\fBrequest reload\\fR, \\fBrequest restart\\fR,
 \\fBshutdown\\fR,
 \\fBquit\\fR. See

@@ -329,12 +329,12 @@ def validate_config(cfg):
     if cfg['metrics_max_conn_per_ip'] < 0:
         fail('metrics_max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
     parse_listen(cfg['metrics_listen'])
-    if cfg['auth'] and not cfg['auth_key']:
-        fail('auth', "the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)")
-    if cfg['auth_upstream'] and not cfg['auth_upstream_key']:
-        fail('auth-upstream', "the %s auth needs a key: set --auth-upstream-key/$AUTH_UPSTREAM_KEY too%s"
-                              % (cfg['auth_upstream'],
-                                 ' (min 16 characters)' if cfg['auth_upstream'] == 'suite' else ''))
+    if cfg['auth'] and not cfg['modbus_auth_key']:
+        fail('auth', "the suite auth needs a key: set --modbus-auth-key/$MODBUS_AUTH_KEY too (min 16 characters)")
+    if cfg['modbus_auth_upstream'] and not cfg['modbus_auth_upstream_key']:
+        fail('modbus_auth_upstream', "the %s auth needs a key: set --modbus-auth-upstream-key/$MODBUS_UPSTREAM_AUTH_KEY too%s"
+                              % (cfg['modbus_auth_upstream'],
+                                 ' (min 16 characters)' if cfg['modbus_auth_upstream'] == 'suite' else ''))
     if cfg['level'] not in LOG_LEVELS:
         fail('log-level', 'must be one of %s' % ', '.join(LOG_LEVELS))
     if not (AUDIT_MAX_MB_MIN <= cfg['audit_max_mb'] <= AUDIT_MAX_MB_MAX):
@@ -383,9 +383,9 @@ def resolve_config(args, script_dir=None):
                        DEFAULTS['upstream'], str)
     host, port = parse_upstream(upstream or DEFAULTS['upstream'])
     upstream_auth = parse_auth_type(
-        resolve(getattr(args, 'auth_upstream', None), 'AUTH_UPSTREAM', 'auth_upstream',
-                DEFAULTS['auth_upstream'], str),
-        'auth-upstream', schemes=('suite', 'waveshare'))
+        resolve(getattr(args, 'modbus_auth_upstream', None), 'MODBUS_UPSTREAM_AUTH', 'modbus_auth_upstream',
+                DEFAULTS['modbus_auth_upstream'], str),
+        'modbus-auth-upstream', schemes=('suite', 'waveshare'))
     cfg = {
         'upstream': '%s:%d' % (host, port),
         'host': host,
@@ -393,14 +393,14 @@ def resolve_config(args, script_dir=None):
         'unit': resolve(args.unit, 'UNIT', 'unit', DEFAULTS['unit'], int, row=OPT['unit']),
         'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float, row=OPT['timeout']),
         'auth': parse_auth_type(resolve(args.modbus_auth, 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
-        'auth_key': check_auth_key(
-            parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
-                          or '').strip() or None, 'auth-key'), 'auth-key'),
-        'auth_upstream': upstream_auth,
-        'auth_upstream_key': check_auth_key(
-            parse_secret((resolve(getattr(args, 'auth_upstream_key', None), 'AUTH_UPSTREAM_KEY',
-                                  'auth_upstream_key', '', str) or '').strip() or None, 'auth-upstream-key'),
-            'auth-upstream-key', kind=upstream_auth),
+        'modbus_auth_key': check_auth_key(
+            parse_secret((resolve(getattr(args, 'modbus_auth_key', None), 'MODBUS_AUTH_KEY', 'modbus_auth_key', '', str)
+                          or '').strip() or None, 'modbus-auth-key'), 'modbus-auth-key'),
+        'modbus_auth_upstream': upstream_auth,
+        'modbus_auth_upstream_key': check_auth_key(
+            parse_secret((resolve(getattr(args, 'modbus_auth_upstream_key', None), 'MODBUS_UPSTREAM_AUTH_KEY',
+                                  'modbus_auth_upstream_key', '', str) or '').strip() or None, 'modbus-auth-upstream-key'),
+            'modbus-auth-upstream-key', kind=upstream_auth),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
         'interval': interval,
         'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay', DEFAULTS['read_delay'], float,

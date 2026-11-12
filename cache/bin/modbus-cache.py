@@ -171,7 +171,7 @@ def main():
     else:
         audit_display = cfg['audit_log'] or default_audit_path('modbus-cache')
     upstream = Upstream(cfg['host'], cfg['port'], cfg['unit'], cfg['timeout'],
-                        auth=cfg['auth_upstream'], auth_key=cfg['auth_upstream_key'])
+                        auth=cfg['modbus_auth_upstream'], auth_key=cfg['modbus_auth_upstream_key'])
     cache = Cache(ranges, cfg['cache_ttl'], range_names, range_ttls)
     proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
                   cfg['profile'], cfg)
@@ -205,7 +205,7 @@ def main():
                 acl_gate_summary(proxy.connect_acl),
                 acl_gate_summary(proxy.write_acl),
                 proxy.describe_write_gate(),
-                cfg['auth'] or 'none', cfg['auth_upstream'] or 'none',
+                cfg['auth'] or 'none', cfg['modbus_auth_upstream'] or 'none',
                 'required on TCP' if control_token else 'none',
                 'read-only ops token set' if control_ops_token else 'no ops token',
                 audit_display,
@@ -288,7 +288,7 @@ def main():
                     'metrics-acl': acl_value_text(cfg['metrics_acl']),
                     'timeout': '%g' % cfg['timeout'],
                     'modbus-auth': cfg['auth'] or 'none',
-                    'auth-upstream': cfg['auth_upstream'] or 'none',
+                    'modbus-auth-upstream': cfg['modbus_auth_upstream'] or 'none',
                     'control-port': control_target,
                     'control-ops-verbs': ','.join(sorted(ops_verbs)) if ops_verbs else 'off',
                     'control-trust-uids': ','.join(str(u) for u in sorted(cfg['control_trust_uids'] or [])) or 'off',

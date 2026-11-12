@@ -96,8 +96,8 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle |
 | `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Auth** | | |
-| `--modbus-auth` / `--auth-key` | `none` | the auth scheme the cache's **own Modbus clients** must speak + the shared key (**min 16 characters**) — see [Modbus auth](#modbus-auth); the value may be `file:<path>` |
-| `--auth-upstream` / `--auth-upstream-key` | `none` | the auth scheme **toward the upstream inverter** (`suite` or `waveshare`) + the key — see [Modbus auth](#modbus-auth) |
+| `--modbus-auth` / `--modbus-auth-key` | `none` | the auth scheme the cache's **own Modbus clients** must speak + the shared key (**min 16 characters**) — see [Modbus auth](#modbus-auth); the value may be `file:<path>` |
+| `--modbus-auth-upstream` / `--modbus-auth-upstream-key` | `none` | the auth scheme **toward the upstream inverter** (`suite` or `waveshare`) + the key — see [Modbus auth](#modbus-auth) |
 | **Write path** | | |
 | `--allow-write` | disabled | forward write requests (FC05/06/15/16/22/23) to the inverter |
 | `--write-registers` | `none` | register ranges a forwarded write may touch: comma-separated `START:COUNT`, `any`, `none`, `profile` (the device profile's acl gate), `file:<path>` (the standalone acl file) |
@@ -139,7 +139,7 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--local-time` | UTC | log timestamps in the system time zone |
 | `--man` | off | print the generated man page (roff) to stdout and exit |
 
-The six **secret knobs** (`--auth-key`, `--auth-upstream-key`,
+The six **secret knobs** (`--modbus-auth-key`, `--modbus-auth-upstream-key`,
 `--control-token`, `--control-ops-token`, `--metrics-token`, `--dump-key`)
 never render back: the config file, the state dumps and the reload state
 file carry the `*** SECRET REMOVED ***` placeholder where a value would
@@ -201,6 +201,7 @@ authenticated with.
 | `show connections` | connected clients: peer, connection age, requests served |
 | `show cache` / `show cache-all` | cache contents / one row per profile range with values, ages, poll status |
 | `show uplink` | the inverter link: session counters plus one row per poll block — status, latency, failures |
+| `show uplink-sources` | the uplink table widened: the sources column after the range names the register ranges each block pools |
 | `show write-registers-table` | the write gate as its acl chain (show-only) |
 | `show connect-acl-table` / `show write-acl-table` / `show metrics-acl-table` | the ACLs as their rule chains (show-only) |
 | `request dump` / `request restore` | write the write-behind state / load it back — see [Persistence](#persistence) |
@@ -337,9 +338,9 @@ client that cannot prove the key never sees a frame).
 
 The two legs are configured separately, with separate keys:
 
-- **`--modbus-auth` / `--auth-key`** — the auth the cache's *own clients* must
+- **`--modbus-auth` / `--modbus-auth-key`** — the auth the cache's *own clients* must
   speak on the listen port. `none` (the default) = no auth at all.
-- **`--auth-upstream` / `--auth-upstream-key`** — the auth the cache
+- **`--modbus-auth-upstream` / `--modbus-auth-upstream-key`** — the auth the cache
   *presents* to the upstream inverter: `suite` handshakes after every
   (re)connect, `waveshare` presents the key as a **Waveshare RS485-to-TCP
   gateway's** connection password. The upstream-only scheme of the pair:

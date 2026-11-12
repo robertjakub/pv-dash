@@ -116,9 +116,9 @@ map, the auth schemes both directions
 | `unit` | `set modbus unit` | settable | `ID` | `--unit` / `UNIT` | the Modbus unit id the session speaks |
 | `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | upstream Modbus connect/read timeout in seconds |
 | `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none |
-| `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key for the cache's clients, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
-| `auth-upstream` | `set modbus auth-upstream` | settable | `suite\|waveshare\|none` | `--auth-upstream` / `AUTH_UPSTREAM` | the auth scheme the cache speaks to the upstream inverter: suite (the crypt handshake), waveshare (the gateway connection password) or none |
-| `auth-upstream-key` | — | startup-only (secret) | `KEY` | `--auth-upstream-key` / `AUTH_UPSTREAM_KEY` | the key the cache presents upstream: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |
+| `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key for the cache's clients, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
+| `modbus-auth-upstream` | `set modbus auth-upstream` | settable | `suite\|waveshare\|none` | `--modbus-auth-upstream` / `MODBUS_UPSTREAM_AUTH` | the auth scheme the cache speaks to the upstream inverter: suite (the crypt handshake), waveshare (the gateway connection password) or none |
+| `modbus-auth-upstream-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-upstream-key` / `MODBUS_UPSTREAM_AUTH_KEY` | the key the cache presents upstream: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |
 | `interval` | `set modbus interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between cache polls of the device |
 | `read-delay` | `set modbus read-delay` | settable | `s` | `--read-delay` / `READ_DELAY` | seconds between consecutive device reads within a poll cycle |
 | `merge-gap` | `set modbus merge-gap` | settable | `registers` | `--merge-gap` / `MERGE_GAP` | max register gap when merging ranges into block reads; the plan rebuilds |
@@ -247,6 +247,7 @@ the write gates: the forwarding toggle and the register ranges
 | `show cache` | show-only | cache contents: ranges, words, freshness, hits/misses |
 | `show cache-all` | show-only (hidden) | every cached range-entry: its words, age, expiry and status |
 | `show uplink` | show-only | the inverter link: session counters, per-block latency and errors |
+| `show uplink-sources` | show-only | the uplink table widened: the sources column after the range names the register ranges each block pools |
 | `show version` | show-only | the modbus-cache version |
 | `show config` | show-only | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
 | `show knobs` | show-only | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |

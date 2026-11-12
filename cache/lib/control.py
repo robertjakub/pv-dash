@@ -71,6 +71,7 @@ class ControlServer(_ControlServer):
     SHOW_OPTIONS = SHOW_OPTIONS
     SHOW_REPORTS = {'show cache-all': 'cache_all_report',
                     'show uplink': 'uplink_report',
+                    'show uplink-sources': ('uplink_report', True),
                     'show cache': 'cache_report',
                     'show write-registers-table': 'write_registers_table_report',
                     'show connect-acl-table': ('acl_table_report', 'connect'),
@@ -107,7 +108,7 @@ class ControlServer(_ControlServer):
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|cache|'
-                'uplink|version|config|knobs|write-registers-table|acl-connect-table|acl-write-table>')
+                'uplink|uplink-sources|version|config|knobs|write-registers-table|acl-connect-table|acl-write-table>')
         cmds += ', request flush cache, request poll now, request reload, request reload-config, request restart, shutdown, quit'
         return self.command_help_tail(cmds, dump_words=', request dump [with-cache], request restore')
 
@@ -254,25 +255,25 @@ class ControlServer(_ControlServer):
                 v = parse_auth_type(val, 'modbus-auth')
             except SystemExit as e:
                 raise ValueError(str(e))
-            if v and not p.config.get('auth_key'):
+            if v and not p.config.get('modbus_auth_key'):
                 raise ValueError(T('wire.suite_auth_needs_key') % AUTH_MIN_KEY)
             p.config['auth'] = v   # the next connection handshakes; the standing ones keep their session
             return v or 'none'
-        if key == 'auth-upstream':
+        if key == 'modbus-auth-upstream':
             try:
-                v = parse_auth_type(val, 'auth-upstream', schemes=('suite', 'waveshare'))
+                v = parse_auth_type(val, 'modbus-auth-upstream', schemes=('suite', 'waveshare'))
             except SystemExit as e:
                 raise ValueError(str(e))
-            standing = p.config.get('auth_upstream_key')
+            standing = p.config.get('modbus_auth_upstream_key')
             if v and not standing:
-                raise ValueError('the %s auth needs a key: pass auth-upstream-key by flag/env/config and restart%s'
+                raise ValueError('the %s auth needs a key: pass modbus-auth-upstream-key by flag/env/config and restart%s'
                                  % (v, ' (min %d characters)' % AUTH_MIN_KEY if v == 'suite' else ''))
             if v and standing is not None:
                 err = auth_key_floor_error(v, standing)
                 if err:
-                    raise ValueError('the %s auth rejects the standing key (auth-upstream-key %s) — '
-                                     'pass auth-upstream-key by flag/env/config and restart' % (v, err))
-            p.config['auth_upstream'] = v
+                    raise ValueError('the %s auth rejects the standing key (modbus-auth-upstream-key %s) — '
+                                     'pass modbus-auth-upstream-key by flag/env/config and restart' % (v, err))
+            p.config['modbus_auth_upstream'] = v
             p.upstream.auth = v
             p.upstream.close()   # the session re-proves the new scheme on the next exchange
             return v or 'none'
@@ -492,8 +493,8 @@ class ControlServer(_ControlServer):
             return '%d' % p.upstream.unit
         if key == 'modbus-auth':
             return p.config.get('auth') or 'none'
-        if key == 'auth-upstream':
-            return p.config.get('auth_upstream') or 'none'
+        if key == 'modbus-auth-upstream':
+            return p.config.get('modbus_auth_upstream') or 'none'
         if key == 'allow-write':
             return 'on' if p.allow_write else 'off'
         if key == 'write-registers':
@@ -560,7 +561,7 @@ class ControlServer(_ControlServer):
             'version   modbus-cache %s' % version_string(),
             'upstream  %s:%d unit %d, timeout %s, upstream auth %s, last poll %s%s' % (p.upstream.host, p.upstream.port,
                                                                                        p.upstream.unit, secs(p.upstream.timeout),
-                                                                                       p.config.get('auth_upstream') or 'none',
+                                                                                       p.config.get('modbus_auth_upstream') or 'none',
                                                                                        age,
                                                                                        '' if p.poll_ok else ' (FAILING)'),
             'listen    %s:%d, control %s, connect-acl %s, client auth %s'
@@ -717,7 +718,7 @@ class ControlServer(_ControlServer):
             'connect-acl': self._acl_text(p.connect_acl), 'write-acl': self._acl_text(p.write_acl),
             'metrics-acl': self._acl_text(p.metrics_acl),
             'modbus-auth': p.config.get('auth') or 'none',
-            'auth-upstream': p.config.get('auth_upstream') or 'none',
+            'modbus-auth-upstream': p.config.get('modbus_auth_upstream') or 'none',
             'upstream': '%s:%d' % (p.upstream.host, p.upstream.port),
             'unit': p.upstream.unit,
             'timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
@@ -794,10 +795,13 @@ class ControlServer(_ControlServer):
         return 'ok restored %d word(s), %d setting(s) from %s%s' % (
             n, applied, path, ' (%d skipped: %s)' % (len(failed), ', '.join(failed)) if failed else '')
 
-    def uplink_report(self):
+    def uplink_report(self, with_sources=False):
         """The inverter link: the session counters (connects, exchanges,
         bytes, errors) and one row per poll block with its status, latency
-        and last error — for analysing what the upstream connection does."""
+        and last error — `show uplink-sources` widens the table with the
+        block's sources column right after the range (one name,
+        comma-separated when pooled), for analysing what the upstream
+        connection does."""
         p = self.proxy
         u = p.upstream
         now = time.monotonic()
@@ -823,24 +827,30 @@ class ControlServer(_ControlServer):
                last_ok, len(p.blocks)),
         ]
         cells = []
-        for fc, start, count, _leaves in p.blocks:
+        for fc, start, count, leaves in p.blocks:
+            names = ', '.join(p._name(lf) for lf in leaves) if with_sources else None
             s = p.block_stats.get((fc, start, count))
             if s is None:
-                cells.append(('fc%d' % fc, '%d:%d' % (start, count), 'pending', '-', '-', '-', '0', '-'))
-                continue
-            if s['last_err'] is None:
-                status, err = 'ok', '-'
-            elif s['last_code'] is not None:
-                status, err = 'ex %d' % s['last_code'], s['last_err']
+                row = ('fc%d' % fc, '%d:%d' % (start, count), 'pending', '-', '-', '-', '0', '-')
             else:
-                status, err = 'error', s['last_err']
-            cells.append(('fc%d' % fc, '%d:%d' % (start, count), status, secs(s['last']),
-                          secs(s['sum'] / s['ok_n']) if s['ok_n'] else '-',
-                          secs(s['max']), '%d' % s['fails'], err))
+                if s['last_err'] is None:
+                    status, err = 'ok', '-'
+                elif s['last_code'] is not None:
+                    status, err = 'ex %d' % s['last_code'], s['last_err']
+                else:
+                    status, err = 'error', s['last_err']
+                row = ('fc%d' % fc, '%d:%d' % (start, count), status, secs(s['last']),
+                       secs(s['sum'] / s['ok_n']) if s['ok_n'] else '-',
+                       secs(s['max']), '%d' % s['fails'], err)
+            if names is not None:
+                row = row[:2] + (names,) + row[2:]   # the sources column rides after the range
+            cells.append(row)
         if cells:
-            head = ('fc', 'range', 'status', 'last', 'mean', 'max', 'fails', 'last error')
+            head = (('fc', 'range', 'sources', 'status', 'last', 'mean', 'max', 'fails', 'last error')
+                    if with_sources else
+                    ('fc', 'range', 'status', 'last', 'mean', 'max', 'fails', 'last error'))
             widths = [max(len(h), max((len(r[i]) for r in cells), default=0)) for i, h in enumerate(head)]
             rows.append('  '.join(h.ljust(w) for h, w in zip(head, widths)))
             for r in cells:
                 rows.append('  '.join(v.ljust(w) for v, w in zip(r, widths)))
-        return 'ok uplink\n' + '\n'.join(rows)
+        return 'ok %s\n%s' % ('uplink-sources' if with_sources else 'uplink', '\n'.join(rows))

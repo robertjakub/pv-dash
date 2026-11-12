@@ -638,6 +638,7 @@ try:
     r = ctl_cmd('help request', 15514 + BASE)
     check('help <command node>: the namespace lists its children (the ? shape)',
           r == 'ok     flush         drop the cached registers and repoll now\n'
+               '    poll          the poll loop\'s manual wake\n'
                '    reload        save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)\n'
                '    reload-config re-read the config file (the SIGHUP path)', r)
     r = ctl_cmd('help request reload', 15514 + BASE)
@@ -696,7 +697,13 @@ try:
     r = ctl_cmd('show uplink', 15514 + BASE)
     check('show uplink: session counters and per-block latency rows', r.startswith('ok uplink\n')
           and 'exchanges' in r and 'connects' in r and 'mean' in r and 'fails' in r
-          and 'fc3' in r and 'status' in r, r[:200])
+          and 'fc3' in r and 'status' in r and 'sources' not in r, r[:200])
+    r = ctl_cmd('show uplink-sources', 15514 + BASE)
+    vhead = next((ln for ln in r.splitlines() if ln.startswith('fc')), '')
+    vhi = {w: i for i, w in enumerate(vhead.split())}
+    check('show uplink-sources: the sources column rides after the range',
+          r.startswith('ok uplink-sources\n') and 'range' in vhi and 'sources' in vhi and 'status' in vhi
+          and vhi['range'] < vhi['sources'] < vhi['status'], r[:200])
 
     # selection none: the map empties, every read forwards, nothing is stored
     r = ctl_cmd('set selection none', 15514 + BASE)
@@ -1443,14 +1450,14 @@ try:
     check('audit node: help answers the same listing', r == 'ok ' + listing, r)
     r = ctl_cmd('show modbus', 15530 + BASE)
     check('modbus node: the listing hides the secret rows (the pools rule — the typed path still answers)',
-          r.count('\n') == 9 and 'auth-key' not in r and 'auth-upstream-key' not in r, r[:160])
+          r.count('\n') == 9 and 'modbus-auth-key' not in r and 'modbus-auth-upstream-key' not in r, r[:160])
     r = ctl_cmd('show', 15530 + BASE)
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check("bare show: the root in the console's own words (the gated word hidden while the dump is off)",
           words == ['acl', 'audit', 'cache', 'config', 'connections', 'control', 'dump',
                     'knobs', 'limits', 'metrics', 'modbus', 'system',
-                    'uplink', 'version', 'write'],
+                    'uplink', 'uplink-sources', 'version', 'write'],
           r[:220])
     r = ctl_cmd('set audit-max-mb 5', 15530 + BASE)
     check('audit rotate: max-size set', r.startswith('ok audit-max-mb=5'), r[:90])
@@ -2411,8 +2418,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
 
     # 6b-9. the suite auth, both legs: the cache demands the handshake from
-    #       its own clients (--auth/--auth-key) and presents it upstream
-    #       (--auth-upstream/--auth-upstream-key) — one round trip after
+    #       its own clients (--auth/--modbus-auth-key) and presents it upstream
+    #       (--modbus-auth-upstream/--modbus-auth-upstream-key) — one round trip after
     #       every connect, OK opens the session, ERR kills it
     sys.path.insert(0, REPO)
     from common.modbus import auth_handshake_client
@@ -2420,14 +2427,14 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     AUTH_FAKE, AUTH_PORT, AUTH_CTL = 15561, 15562, 15563
     CL_KEY, UP_KEY = 'cl-suite-key-16chars!', 'up-suite-key-16chars!'
     start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (AUTH_FAKE), '--control-port', '0',
-           '--modbus-auth', 'suite', '--auth-key', UP_KEY])
+           '--modbus-auth', 'suite', '--modbus-auth-key', UP_KEY])
     time.sleep(0.7)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
            '--listen', '127.0.0.1:%d' % AUTH_PORT, '--profile', R,
            '--timeout', '1', '--interval', '2',
            '--control-port', str(AUTH_CTL), '--control-token', 'ctok-a',
-           '--modbus-auth', 'suite', '--auth-key', CL_KEY,
-           '--auth-upstream', 'suite', '--auth-upstream-key', UP_KEY],
+           '--modbus-auth', 'suite', '--modbus-auth-key', CL_KEY,
+           '--modbus-auth-upstream', 'suite', '--modbus-auth-upstream-key', UP_KEY],
           log=os.path.join(SCRATCH, 'reg_auth_cache.log'))
     time.sleep(1.2)
 
@@ -2448,8 +2455,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     c.close()
     r = ctl_auth('show', 'modbus-auth')
     check('suite auth: the per-setting show carries auth=', r == 'ok modbus-auth=suite', r[:120])
-    r = ctl_auth('show', 'auth-upstream')
-    check('suite auth: the per-setting show carries auth-upstream=', r == 'ok auth-upstream=suite', r[:120])
+    r = ctl_auth('show', 'modbus-auth-upstream')
+    check('suite auth: the per-setting show carries auth-upstream=', r == 'ok modbus-auth-upstream=suite', r[:120])
     ins = ctl_auth('inspect')
     check('suite auth: the poll is healthy (no FAILING mark)',
           'upstream' in ins and '(FAILING)' not in ins, ins[:200])
@@ -2476,14 +2483,14 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # the wire: the four lives speak, the keys are secrets
     r = ctl_auth('show', 'modbus-auth')
     check('suite auth: show modbus auth reads suite', r == 'ok modbus-auth=suite', r[:80])
-    r = ctl_auth('show', 'auth-upstream')
-    check('suite auth: show modbus auth-upstream reads suite', r == 'ok auth-upstream=suite', r[:80])
-    r = ctl_auth('show', 'auth-key')
-    check('suite auth: the client key never shows', r.startswith('% error: auth-key is a secret'), r[:80])
-    r = ctl_auth('clear', 'auth-upstream-key')
+    r = ctl_auth('show', 'modbus-auth-upstream')
+    check('suite auth: show modbus auth-upstream reads suite', r == 'ok modbus-auth-upstream=suite', r[:80])
+    r = ctl_auth('show', 'modbus-auth-key')
+    check('suite auth: the client key never shows', r.startswith('% error: modbus-auth-key is a secret'), r[:80])
+    r = ctl_auth('clear', 'modbus-auth-upstream-key')
     check('suite auth: clear refuses the upstream key (startup-only)',
           r.startswith('% error: restart required (startup-only knob)'), r[:80])
-    r = ctl_auth('set', 'auth-key', 'short')
+    r = ctl_auth('set', 'modbus-auth-key', 'short')
     check('suite auth: startup-only — the key set refuses with the rest',
           r.startswith('% error: restart required (startup-only knob)'), r[:100])
     # the live legs: disabling the client auth serves plain clients again,
@@ -2498,8 +2505,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     body = recvn(c, struct.unpack('>HHH', head[:6])[2] - 1)
     c.close()
     check('suite auth: a plain client reads after the disable', body[0] == 3, body.hex())
-    r = ctl_auth('set', 'auth-upstream', 'none')
-    check('suite auth: the upstream auth disables live', r.startswith('ok auth-upstream=none'), r[:100])
+    r = ctl_auth('set', 'modbus-auth-upstream', 'none')
+    check('suite auth: the upstream auth disables live', r.startswith('ok modbus-auth-upstream=none'), r[:100])
     for _ in range(200):
         r = ctl_auth('inspect')
         if '(FAILING)' in r:
@@ -2507,9 +2514,9 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
         time.sleep(0.5)
     check('suite auth: the plain upstream session fails against the authed fake (poll=down)',
           '(FAILING)' in r, r[-200:])
-    r = ctl_auth('set', 'auth-upstream', 'suite')
+    r = ctl_auth('set', 'modbus-auth-upstream', 'suite')
     check('suite auth: the upstream auth re-enables live (the key persisted)',
-          r.startswith('ok auth-upstream=suite'), r[:100])
+          r.startswith('ok modbus-auth-upstream=suite'), r[:100])
     for _ in range(90):
         r = ctl_auth('inspect')
         if '(FAILING)' not in r:
@@ -2528,7 +2535,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           r.returncode != 0 and 'needs a key' in r.stderr, r.stderr[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
                         '--listen', '127.0.0.1:%d' % AUTH_PORT, '--dry-run',
-                        '--modbus-auth', 'suite', '--auth-key', 'short'], capture_output=True, text=True, timeout=15)
+                        '--modbus-auth', 'suite', '--modbus-auth-key', 'short'], capture_output=True, text=True, timeout=15)
     check('suite auth: a short key fails the config fast',
           r.returncode != 0 and 'at least 16 characters' in r.stderr, r.stderr[-160:])
 
@@ -2611,7 +2618,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
            '--timeout', '2', '--interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
-           '--auth-upstream', 'waveshare', '--auth-upstream-key', GW_KEY],
+           '--modbus-auth-upstream', 'waveshare', '--modbus-auth-upstream-key', GW_KEY],
           log=os.path.join(SCRATCH, 'reg_ws_cache.log'))
     time.sleep(1.2)
 
@@ -2633,9 +2640,9 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('waveshare auth: the gateway saw the password (no bad attempts)',
           ws.ok_attempts >= 1 and ws.bad_attempts == 0,
           'ok=%d bad=%d' % (ws.ok_attempts, ws.bad_attempts))
-    r = ctl_ws('show', 'auth-upstream')
+    r = ctl_ws('show', 'modbus-auth-upstream')
     check('waveshare auth: the per-setting show carries auth-upstream=',
-          r == 'ok auth-upstream=waveshare', r[:200])
+          r == 'ok modbus-auth-upstream=waveshare', r[:200])
     # the reconnect re-proves: the restart verb drops the session, the next
     # poll dials fresh and hands the password over again
     ok_before = ws.ok_attempts
@@ -2653,7 +2660,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # the wrong password: a spawned instance (the key is startup-only) — the
     # proofs fail against the gateway, the poll goes down, the log carries
     # the exchange errors
-    r = ctl_ws('set', 'auth-upstream-key', 'gw-pass2')
+    r = ctl_ws('set', 'modbus-auth-upstream-key', 'gw-pass2')
     check('waveshare auth: startup-only — the key set refuses',
           r.startswith('% error: restart required (startup-only knob)'), r[:100])
     procs[-1].terminate()
@@ -2663,7 +2670,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
            '--timeout', '2', '--interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
-           '--auth-upstream', 'waveshare', '--auth-upstream-key', 'gw-pass2'],
+           '--modbus-auth-upstream', 'waveshare', '--modbus-auth-upstream-key', 'gw-pass2'],
           log=os.path.join(SCRATCH, 'reg_ws_cache_bad.log'))
     time.sleep(1.2)
     for _ in range(200):
@@ -2685,7 +2692,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
            '--timeout', '2', '--interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
-           '--auth-upstream', 'waveshare', '--auth-upstream-key', GW_KEY],
+           '--modbus-auth-upstream', 'waveshare', '--modbus-auth-upstream-key', GW_KEY],
           log=os.path.join(SCRATCH, 'reg_ws_cache.log'))
     time.sleep(1.2)
     for _ in range(40):
@@ -2697,63 +2704,63 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # the scheme dance (the scheme is not a secret — it sets live; the KEY
     # stands): the short standing key refuses the suite wake, the waveshare
     # wake re-proves the standing password
-    r = ctl_ws('set', 'auth-upstream', 'none')
+    r = ctl_ws('set', 'modbus-auth-upstream', 'none')
     check('waveshare auth: the upstream auth disables live',
-          r.startswith('ok auth-upstream=none'), r[:100])
-    r = ctl_ws('set', 'auth-upstream', 'suite')
+          r.startswith('ok modbus-auth-upstream=none'), r[:100])
+    r = ctl_ws('set', 'modbus-auth-upstream', 'suite')
     check('waveshare auth: going suite over the short standing key refuses',
           r.startswith('% error: the suite auth rejects the standing key'), r[:120])
-    r = ctl_ws('set', 'auth-upstream', 'waveshare')
+    r = ctl_ws('set', 'modbus-auth-upstream', 'waveshare')
     check('waveshare auth: the scheme wakes over the standing key',
-          r.startswith('ok auth-upstream=waveshare'), r[:100])
+          r.startswith('ok modbus-auth-upstream=waveshare'), r[:100])
     for _ in range(40):
         r = ctl_ws('inspect')
         if '(FAILING)' not in r:
             break
         time.sleep(0.5)
     check('waveshare auth: the woken scheme hands the standing password over', '(FAILING)' not in r, r[-200:])
-    r = ctl_ws('set', 'auth-upstream', 'none')
+    r = ctl_ws('set', 'modbus-auth-upstream', 'none')
     check('waveshare auth: the upstream auth disables again', r.startswith('ok'), r[:60])
     # the dormant floor at start: a short key with no scheme passes (dormant
     # material), the same key under suite refuses — the dry-run proves both
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
-                        '--auth-upstream', 'none', '--auth-upstream-key', 'shorty'],
+                        '--modbus-auth-upstream', 'none', '--modbus-auth-upstream-key', 'shorty'],
                        capture_output=True, text=True, timeout=15)
     check('waveshare auth: a short key with no scheme is accepted at start (dormant)',
           r.returncode == 0 and 'dry-run' in (r.stdout + r.stderr), (r.stdout + r.stderr)[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
-                        '--auth-upstream', 'suite', '--auth-upstream-key', 'shorty'],
+                        '--modbus-auth-upstream', 'suite', '--modbus-auth-upstream-key', 'shorty'],
                        capture_output=True, text=True, timeout=15)
     check('waveshare auth: the same key under the suite scheme refuses the start',
           r.returncode != 0 and 'must be at least' in r.stderr, r.stderr[-160:])
     # the start-time grammar: the waveshare fast-fails and the dry-run accept
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
-                        '--auth-upstream', 'waveshare'], capture_output=True, text=True, timeout=15)
+                        '--modbus-auth-upstream', 'waveshare'], capture_output=True, text=True, timeout=15)
     check('waveshare auth: waveshare without a key fails the config fast',
           r.returncode != 0 and 'needs a key' in r.stderr, r.stderr[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
-                        '--auth-upstream', 'waveshare', '--auth-upstream-key', 'pässwört'],
+                        '--modbus-auth-upstream', 'waveshare', '--modbus-auth-upstream-key', 'pässwört'],
                        capture_output=True, text=True, timeout=15)
     check('waveshare auth: a non-ASCII password fails the config fast',
           r.returncode != 0 and 'ASCII' in r.stderr, r.stderr[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
-                        '--auth-upstream', 'waveshare', '--auth-upstream-key', GW_KEY],
+                        '--modbus-auth-upstream', 'waveshare', '--modbus-auth-upstream-key', GW_KEY],
                        capture_output=True, text=True, timeout=15)
     check('waveshare auth: the dry-run accepts the waveshare pair',
           r.returncode == 0 and 'dry-run' in (r.stdout + r.stderr), (r.stdout + r.stderr)[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
-                        '--auth-upstream', 'bogus'], capture_output=True, text=True, timeout=15)
+                        '--modbus-auth-upstream', 'bogus'], capture_output=True, text=True, timeout=15)
     check('waveshare auth: a bogus upstream scheme names both schemes',
           r.returncode != 0 and "use 'suite' / 'waveshare'" in r.stderr, r.stderr[-160:])
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
                         '--listen', '127.0.0.1:%d' % WS_PORT, '--dry-run',
-                        '--modbus-auth', 'waveshare', '--auth-key', 'x' * 16],
+                        '--modbus-auth', 'waveshare', '--modbus-auth-key', 'x' * 16],
                        capture_output=True, text=True, timeout=15)
     check('waveshare auth: waveshare on the client leg fails the config fast (upstream only)',
           r.returncode != 0 and "use 'suite'" in r.stderr, r.stderr[-160:])

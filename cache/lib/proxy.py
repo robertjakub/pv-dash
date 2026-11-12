@@ -186,8 +186,8 @@ class Proxy:
         self.upstream.port = self.config['port']
         self.upstream.unit = self.config['unit']
         self.upstream.timeout = self.config['timeout']
-        self.upstream.auth = self.config['auth_upstream']
-        self.upstream.auth_key = self.config['auth_upstream_key']
+        self.upstream.auth = self.config['modbus_auth_upstream']
+        self.upstream.auth_key = self.config['modbus_auth_upstream_key']
         with self.upstream.lock:
             self.upstream.close()
         ranges, names, ttls = self.load_map()
@@ -475,7 +475,7 @@ class Proxy:
         return self._allowed(self.connect_acl, ip)
 
     def suite_key(self):
-        return self.config.get('auth_key') if self.config.get('auth') == 'suite' else None
+        return self.config.get('modbus_auth_key') if self.config.get('auth') == 'suite' else None
 
     def on_session(self):
         pass

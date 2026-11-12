@@ -77,6 +77,7 @@ def pack_mbap(txn, unit, pdu):
 def mbap(pdu, port, unit=1):
     """one MBAP transaction: the PDU in, the response body out"""
     import socket
+    import struct
     s = socket.create_connection(('127.0.0.1', port), timeout=10)
     s.sendall(pack_mbap(77, unit, pdu))
     head = b''

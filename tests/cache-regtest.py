@@ -447,7 +447,7 @@ try:
         except OSError as e:
             return {'status': 'fail', 'text': 'cannot reach control server at 127.0.0.1:%d: %s' % (port, e)}
 
-    r = ctl_raw(b'not json at all\n', 15514, token='sekrit')
+    r = ctl_raw(b'not json at all\n', 15514 + BASE, token='sekrit')
     check('control: malformed frame rejected cleanly', r.get('status') == 'fail'
           and 'malformed request' in r.get('text', ''), str(r))
 

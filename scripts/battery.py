@@ -438,7 +438,7 @@ for i, s in enumerate(SUITES, 1):
         time.sleep(2)
     se = remain[s]
     if se is not None:
-        say('%s START %d/%d %s eta %s (%s)' % (time.strftime('%H:%M:%S'), n, total, s, fmt(se), etatime(se)))
+        say('%s START %d/%d %s eta %s' % (time.strftime('%H:%M:%S'), n, total, s, fmt(se)))
     else:
         say('%s START %d/%d %s' % (time.strftime('%H:%M:%S'), n, total, s))
     # the copy exists so a suite's processes carry the zz_ name the quiet

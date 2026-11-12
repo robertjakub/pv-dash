@@ -211,12 +211,12 @@ class ControlServer(_ControlServer):
         if handled:                                        # the audit family, the log level, local-time)
             return shown
 
-        if key == 'interval':
-            v = num(val, 'interval', 'seconds')
+        if key == 'modbus-interval':
+            v = num(val, 'modbus-interval', 'seconds')
             if not 0 < v <= 86400:
                 raise ValueError(T('wire.interval_range'))
             p.interval = v
-            p.config['interval'] = v   # the live overrides ride show config (show_config_cfg's contract)
+            p.config['modbus_interval'] = v   # the live overrides ride show config (show_config_cfg's contract)
             p.poll_wake.set()
             return secs(v)
         if key == 'cache-ttl':
@@ -229,26 +229,26 @@ class ControlServer(_ControlServer):
             p.cache.cache_ttl = v
             p.config['cache_ttl'] = v
             return secs(v)
-        if key == 'read-delay':
-            v = num(val, 'read-delay', 'seconds')
+        if key == 'modbus-read-delay':
+            v = num(val, 'modbus-read-delay', 'seconds')
             self._gate_range(key, v, 'seconds')
             p.read_delay = v
-            p.config['read_delay'] = v
+            p.config['modbus_read_delay'] = v
             return secs(v)
-        if key == 'merge-gap':
-            v = numi(val, 'merge-gap', 'registers')
+        if key == 'modbus-merge-gap':
+            v = numi(val, 'modbus-merge-gap', 'registers')
             self._gate_range(key, v, 'registers')
             p.merge_gap = v
-            p.config['merge_gap'] = v
+            p.config['modbus_merge_gap'] = v
             p.blocks = build_blocks(p.cache.ranges, v)
             p.poll_wake.set()
             return '%d' % v
-        if key == 'unit':
-            v = numi(val, 'unit', 'unit id')
+        if key == 'modbus-unit':
+            v = numi(val, 'modbus-unit', 'unit id')
             self._gate_range(key, v)
             p.upstream.unit = v
             p.upstream.close()   # the in-flight session spoke the old unit
-            p.config['unit'] = v
+            p.config['modbus_unit'] = v
             return '%d' % v
         if key == 'modbus-auth':
             try:
@@ -389,12 +389,12 @@ class ControlServer(_ControlServer):
             p.log_access = on   # the next connect/disconnect log line picks it up
             p.config['log_access'] = on
             return 'on' if on else 'off'
-        if key == 'timeout':
-            v = num(val, 'timeout', 'seconds')
+        if key == 'modbus-timeout':
+            v = num(val, 'modbus-timeout', 'seconds')
             if not 0 < v <= 60:
                 raise ValueError(T('wire.timeout_range'))
             p.upstream.timeout = v
-            p.config['timeout'] = v
+            p.config['modbus_timeout'] = v
             return secs(v)
         if key == 'connect-acl':
             if val.lower() == 'table':   # the show word is never a value — point at the report
@@ -417,10 +417,10 @@ class ControlServer(_ControlServer):
             if p.metrics_acl_warn:   # the acl file's permission warning rides the reply (the log and the audit trail carry it too)
                 shown += ' (%s)' % p.metrics_acl_warn
             return shown
-        if key in ('profile', 'selection'):
+        if key in ('modbus-profile', 'selection'):
             cfg = self._live_cfg()
-            if key == 'profile':
-                cfg['profile'] = default_profile_path() if val in ('default', 'auto') \
+            if key == 'modbus-profile':
+                cfg['modbus_profile'] = default_profile_path() if val in ('default', 'auto') \
                     else resolve_profile_file(val)
             else:
                 cfg['selection'] = parse_selection(val)
@@ -435,7 +435,7 @@ class ControlServer(_ControlServer):
                 p.config = saved
                 p.write_registers, p.write_ranges = saved_gate
                 raise
-            return cfg['profile'] if key == 'profile' else (cfg['selection'] or 'all')
+            return cfg['modbus_profile'] if key == 'modbus-profile' else (cfg['selection'] or 'all')
         shown = self.apply_typed_key(key, val)   # the typed-row fallback: the row's words, conv, choices, bounds, check
         if shown is not None:
             return str(shown)
@@ -446,12 +446,12 @@ class ControlServer(_ControlServer):
         reload never undoes what the control surface already applied."""
         p = self.proxy
         cfg = dict(p.config)
-        cfg.update(interval=p.interval, read_delay=p.read_delay, merge_gap=p.merge_gap,
+        cfg.update(modbus_interval=p.interval, modbus_read_delay=p.read_delay, modbus_merge_gap=p.merge_gap,
                    cache_ttl=p.cache.cache_ttl, allow_write=p.allow_write,
                    write_registers=p.write_registers, max_clients=p.max_clients,
                    client_timeout=p.client_timeout, requests_audit_s=p.requests_audit_s,
                    connect_acl=p.connect_acl, write_acl=p.write_acl, metrics_acl=p.metrics_acl,
-                   timeout=p.upstream.timeout,
+                   modbus_timeout=p.upstream.timeout,
                    upstream='%s:%d' % (p.upstream.host, p.upstream.port),
                    host=p.upstream.host, port=p.upstream.port, unit=p.upstream.unit)
         return cfg
@@ -481,15 +481,15 @@ class ControlServer(_ControlServer):
         handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,
         if handled:                                 # the audit family, the log level, local-time, dump/path)
             return value
-        if key == 'interval':
+        if key == 'modbus-interval':
             return secs(p.interval)
         if key == 'cache-ttl':
             return 'off' if not p.cache.cache_ttl else secs(p.cache.cache_ttl)
-        if key == 'read-delay':
+        if key == 'modbus-read-delay':
             return secs(p.read_delay)
-        if key == 'merge-gap':
+        if key == 'modbus-merge-gap':
             return '%d' % p.merge_gap
-        if key == 'unit':
+        if key == 'modbus-unit':
             return '%d' % p.upstream.unit
         if key == 'modbus-auth':
             return p.config.get('auth') or 'none'
@@ -519,7 +519,7 @@ class ControlServer(_ControlServer):
             return 'off' if not p.requests_audit_s else secs(p.requests_audit_s)
         if key == 'log-access':
             return 'on' if p.log_access else 'off'
-        if key == 'timeout':
+        if key == 'modbus-timeout':
             return secs(p.upstream.timeout)
         if key == 'connect-acl':
             return self._acl_text(p.connect_acl)
@@ -527,8 +527,8 @@ class ControlServer(_ControlServer):
             return self._acl_text(p.write_acl)
         if key == 'metrics-acl':
             return self._acl_text(p.metrics_acl)
-        if key == 'profile':
-            return p.config.get('profile') or p.profile
+        if key == 'modbus-profile':
+            return p.config.get('modbus_profile') or p.profile
         if key == 'selection':
             return p.config.get('selection') or 'all'
         s = SETTING_BY_NAME.get(key)
@@ -567,7 +567,7 @@ class ControlServer(_ControlServer):
             'listen    %s:%d, control %s, connect-acl %s, client auth %s'
             % (p.listen_addr[0], p.listen_addr[1], self.describe(),
                acl_gate_summary(p.connect_acl), p.config.get('auth') or 'none'),
-            'profile   %s, map v%d' % (cfg.get('profile') or p.profile,
+            'profile   %s, map v%d' % (cfg.get('modbus_profile') or p.profile,
                                        p.cache.map_version),
             'selection %s' % (cfg.get('selection') or 'all'),
             'metrics   %s' % getattr(p, 'metrics_desc', 'off'),
@@ -701,9 +701,9 @@ class ControlServer(_ControlServer):
         stays as the class invariant's guard."""
         p = self.proxy
         raw = {
-            'interval': p.interval, 'cache-ttl': p.cache.cache_ttl,
-            'read-delay': p.read_delay,
-            'merge-gap': p.merge_gap, 'allow-write': 'on' if p.allow_write else 'off',
+            'modbus-interval': p.interval, 'cache-ttl': p.cache.cache_ttl,
+            'modbus-read-delay': p.read_delay,
+            'modbus-merge-gap': p.merge_gap, 'allow-write': 'on' if p.allow_write else 'off',
             'write-registers': p.describe_write_ranges(), 'max-clients': p.max_clients,
             'client-timeout': p.client_timeout, 'max-conn-per-ip': p.conn_gate.max_per_ip,
             'metrics-server': 'on' if p.metrics_srv else 'off',
@@ -714,14 +714,14 @@ class ControlServer(_ControlServer):
             'audit-requests': p.requests_audit_s,
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
             'log-access': 'on' if p.log_access else 'off',
-            'profile': p.config.get('profile'), 'selection': p.config.get('selection') or 'all',
+            'modbus-profile': p.config.get('modbus_profile'), 'selection': p.config.get('selection') or 'all',
             'connect-acl': self._acl_text(p.connect_acl), 'write-acl': self._acl_text(p.write_acl),
             'metrics-acl': self._acl_text(p.metrics_acl),
             'modbus-auth': p.config.get('auth') or 'none',
             'modbus-auth-upstream': p.config.get('modbus_auth_upstream') or 'none',
             'upstream': '%s:%d' % (p.upstream.host, p.upstream.port),
-            'unit': p.upstream.unit,
-            'timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
+            'modbus-unit': p.upstream.unit,
+            'modbus-timeout': p.upstream.timeout, 'dump-interval': p.dump_interval,
             'local-time': self._get('local-time'),
             'control-port': 'off' if self.stopped else (str(self.port) if not self.is_unix else self.sockpath),
             'control-ops-verbs': ','.join(sorted(self.ops_verbs)) or 'off',

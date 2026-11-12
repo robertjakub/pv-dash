@@ -84,12 +84,12 @@ the ops
 .RS
 .IP \\(bu 2
 .B set <setting> <value>
-changes a setting live (interval, cache-ttl, read-delay,
-merge-gap, allow-write, write-registers, max-clients,
-client-timeout, upstream, unit, metrics-server,
+changes a setting live (modbus-interval, cache-ttl, modbus-read-delay,
+modbus-merge-gap, allow-write, write-registers, max-clients,
+client-timeout, upstream, modbus-unit, metrics-server,
 metrics-listen, the metrics caps, metrics-acl,
-audit-requests, dump-interval, log-level, local-time, profile,
-selection, connect-acl, write-acl, timeout, modbus-auth,
+audit-requests, dump-interval, log-level, local-time, modbus-profile,
+selection, connect-acl, write-acl, modbus-timeout, modbus-auth,
 modbus-auth-upstream, control-port, control-ops-verbs, control-trust-uids,
 control-socket-group, audit-log, audit-forward, audit-max-mb,
 no-audit-log, dump-path, dump-with-cache); a SIGHUP \\(em or the wire's

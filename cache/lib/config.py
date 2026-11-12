@@ -300,16 +300,16 @@ def validate_config(cfg):
 
     if not 1 <= cfg['port'] <= 65535:
         fail('port', 'must be 1..65535')
-    if not UNIT_ID_RANGE[0] <= cfg['unit'] <= UNIT_ID_RANGE[1]:
-        fail('unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
-    if cfg['timeout'] <= 0:
-        fail('timeout', 'must be > 0')
-    if cfg['interval'] <= 0:
-        fail('interval', 'must be > 0')
-    if cfg['read_delay'] < 0:
-        fail('read_delay', 'must be >= 0')
-    if cfg['merge_gap'] < 0:
-        fail('merge_gap', 'must be >= 0')
+    if not UNIT_ID_RANGE[0] <= cfg['modbus_unit'] <= UNIT_ID_RANGE[1]:
+        fail('modbus-unit', 'must be %d..%d (Modbus unit id)' % UNIT_ID_RANGE)
+    if cfg['modbus_timeout'] <= 0:
+        fail('modbus-timeout', 'must be > 0')
+    if cfg['modbus_interval'] <= 0:
+        fail('modbus-interval', 'must be > 0')
+    if cfg['modbus_read_delay'] < 0:
+        fail('modbus-read-delay', 'must be >= 0')
+    if cfg['modbus_merge_gap'] < 0:
+        fail('modbus-merge-gap', 'must be >= 0')
     if cfg['cache_ttl'] < 0:
         fail('cache_ttl', 'must be >= 0')
     if cfg['cache_ttl'] > OPT['cache-ttl'].max:
@@ -378,7 +378,8 @@ def resolve_config(args, script_dir=None):
     resolve = r.resolve
     resolve_bool = r.resolve_bool
 
-    interval = resolve(args.interval, 'INTERVAL', 'interval', DEFAULTS['interval'], float, row=OPT['interval'])
+    interval = resolve(args.modbus_interval, 'MODBUS_INTERVAL', 'modbus_interval', DEFAULTS['modbus_interval'],
+                       float, row=OPT['modbus-interval'])
     upstream = resolve(getattr(args, 'upstream', None), 'UPSTREAM', 'upstream',
                        DEFAULTS['upstream'], str)
     host, port = parse_upstream(upstream or DEFAULTS['upstream'])
@@ -390,8 +391,10 @@ def resolve_config(args, script_dir=None):
         'upstream': '%s:%d' % (host, port),
         'host': host,
         'port': port,
-        'unit': resolve(args.unit, 'UNIT', 'unit', DEFAULTS['unit'], int, row=OPT['unit']),
-        'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float, row=OPT['timeout']),
+        'modbus_unit': resolve(args.modbus_unit, 'MODBUS_UNIT', 'modbus_unit',
+                               DEFAULTS['modbus_unit'], int, row=OPT['modbus-unit']),
+        'modbus_timeout': resolve(args.modbus_timeout, 'MODBUS_TIMEOUT', 'modbus_timeout',
+                                  DEFAULTS['modbus_timeout'], float, row=OPT['modbus-timeout']),
         'auth': parse_auth_type(resolve(args.modbus_auth, 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
         'modbus_auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'modbus_auth_key', None), 'MODBUS_AUTH_KEY', 'modbus_auth_key', '', str)
@@ -402,17 +405,17 @@ def resolve_config(args, script_dir=None):
                                   'modbus_auth_upstream_key', '', str) or '').strip() or None, 'modbus-auth-upstream-key'),
             'modbus-auth-upstream-key', kind=upstream_auth),
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
-        'interval': interval,
-        'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay', DEFAULTS['read_delay'], float,
-                              row=OPT['read-delay']),
-        'merge_gap': resolve(args.merge_gap, 'MERGE_GAP', 'merge_gap', DEFAULTS['merge_gap'], int,
-                             row=OPT['merge-gap']),
+        'modbus_interval': interval,
+        'modbus_read_delay': resolve(args.modbus_read_delay, 'MODBUS_READ_DELAY', 'modbus_read_delay',
+                                     DEFAULTS['modbus_read_delay'], float, row=OPT['modbus-read-delay']),
+        'modbus_merge_gap': resolve(args.modbus_merge_gap, 'MODBUS_MERGE_GAP', 'modbus_merge_gap',
+                                    DEFAULTS['modbus_merge_gap'], int, row=OPT['modbus-merge-gap']),
         'allow_write': resolve_bool(args.allow_write or None, 'ALLOW_WRITE', 'allow_write', DEFAULTS['allow_write']),
         'write_registers': parse_write_registers(
             resolve(getattr(args, 'write_registers', None), 'WRITE_REGISTERS',
                     'write_registers', DEFAULTS['write_registers'], str)),
-        'profile': resolve_profile_file(resolve(getattr(args, 'profile', None), 'PROFILE',
-                                                'profile', DEFAULTS['profile'], str)),
+        'modbus_profile': resolve_profile_file(resolve(getattr(args, 'modbus_profile', None), 'MODBUS_PROFILE',
+                                                       'modbus_profile', DEFAULTS['modbus_profile'], str)),
         'selection': parse_selection(resolve(getattr(args, 'selection', None), 'SELECTION',
                                             'selection', DEFAULTS['selection'], str)),
         'cache_ttl': resolve(args.cache_ttl, 'TTL', 'cache_ttl',

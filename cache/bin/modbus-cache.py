@@ -131,7 +131,7 @@ def main():
     if cfg['selection'] == 'none':
         ranges, range_names, range_ttls = [], {}, {}   # cache nothing: every read forwards
     else:
-        ranges, range_names, range_ttls = load_registers_file(cfg['profile'])
+        ranges, range_names, range_ttls = load_registers_file(cfg['modbus_profile'])
         if cfg['selection']:
             ranges, range_names, range_ttls = load_selection(cfg['selection'], range_names, range_ttls)
 
@@ -170,11 +170,11 @@ def main():
         audit_display = 'stdout'
     else:
         audit_display = cfg['audit_log'] or default_audit_path('modbus-cache')
-    upstream = Upstream(cfg['host'], cfg['port'], cfg['unit'], cfg['timeout'],
+    upstream = Upstream(cfg['host'], cfg['port'], cfg['modbus_unit'], cfg['modbus_timeout'],
                         auth=cfg['modbus_auth_upstream'], auth_key=cfg['modbus_auth_upstream_key'])
     cache = Cache(ranges, cfg['cache_ttl'], range_names, range_ttls)
-    proxy = Proxy(upstream, cache, cfg['read_delay'], cfg['merge_gap'], cfg['interval'],
-                  cfg['profile'], cfg)
+    proxy = Proxy(upstream, cache, cfg['modbus_read_delay'], cfg['modbus_merge_gap'], cfg['modbus_interval'],
+                  cfg['modbus_profile'], cfg)
     proxy.metrics_desc = metrics_desc
     proxy.metrics_srv = MetricsServer(proxy, metrics_listen, token=metrics_token,
                                       max_clients=cfg['metrics_max_clients'],
@@ -193,8 +193,8 @@ def main():
     proxy.audit_params = audit_params_of(cfg, derive=str(control_target) if isinstance(control_target, int) and control_target
                                          else str(listen_port))   # the audit lives rebuild from here
     logger.info('caching %d range(s) from %s (%s:%d unit %d) every %gs, %gs between reads, merge gap %d, cache ttl %gs, write support %s, client access log at %s; %s Modbus TCP on %s:%d (config: %s, log level: %s, log time: %s, client limit: %s, client timeout: %s, per-ip limit: %s, connect acl: %s, write acl: %s, write allow-list: %s, client auth: %s, upstream auth: %s, control token: %s, ops token: %s, audit trail: %s, requests audit: %s, metrics: %s, metrics acl: %s)',
-                len(ranges), cfg['selection'] or cfg['profile'], cfg['host'], cfg['port'], cfg['unit'], cfg['interval'],
-                cfg['read_delay'], cfg['merge_gap'], cfg['cache_ttl'],
+                len(ranges), cfg['selection'] or cfg['modbus_profile'], cfg['host'], cfg['port'], cfg['modbus_unit'], cfg['modbus_interval'],
+                cfg['modbus_read_delay'], cfg['modbus_merge_gap'], cfg['cache_ttl'],
                 'ENABLED' if cfg['allow_write'] else 'disabled (write requests are refused)',
                 'INFO' if cfg['log_access'] else 'DEBUG',
                 'would serve' if args.dry_run else 'serving',
@@ -233,10 +233,10 @@ def main():
     proxy.audit = audit
     if audit:
         audit.event('START', 'version=%s upstream=%s:%d unit=%d listen=%s:%d control=%s profile=%s'
-                    % (version_string(), cfg['host'], cfg['port'], cfg['unit'], listen_host, listen_port,
+                    % (version_string(), cfg['host'], cfg['port'], cfg['modbus_unit'], listen_host, listen_port,
                        audit_quote('off' if control_target is None else
                                    ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target)),
-                       audit_quote(cfg['selection'] or cfg['profile'])))
+                       audit_quote(cfg['selection'] or cfg['modbus_profile'])))
         if proxy.write_gate_warn:   # the start resolve warned before the audit existed — the ACL-FILE event lands after START
             audit.event('ACL-FILE', 'warn=%s' % audit_quote(proxy.write_gate_warn))
         for warn in (proxy.connect_acl_warn, proxy.write_acl_warn, proxy.metrics_acl_warn):
@@ -248,7 +248,7 @@ def main():
         override markers, audit."""
         proxy.config = resolve_config(args, SCRIPT_DIR)
         proxy.reload()
-        summary = '%d range(s) from %s' % (len(proxy.cache.ranges), proxy.config['profile'])
+        summary = '%d range(s) from %s' % (len(proxy.cache.ranges), proxy.config['modbus_profile'])
         if proxy.control:
             proxy.control.reloaded(summary)
         # the dump loop re-reads the configured interval (the parked dumper wakes to see it)
@@ -256,17 +256,17 @@ def main():
         proxy.dump_wake.set()
         if proxy.audit:
             proxy.audit.event('RELOAD', 'result=ok ranges=%d profile=%s'
-                              % (len(proxy.cache.ranges), audit_quote(proxy.config['profile'])))
+                              % (len(proxy.cache.ranges), audit_quote(proxy.config['modbus_profile'])))
         return summary
 
     stop = install_signal_handlers(proxy, cache, apply_reload)
     if control_target is not None:
-        defaults = {'interval': '%g' % cfg['interval'],
+        defaults = {'modbus-interval': '%g' % cfg['modbus_interval'],
                     'cache-ttl': 'off' if not cfg['cache_ttl'] else '%g' % cfg['cache_ttl'],
-                    'read-delay': '%g' % cfg['read_delay'],
-                    'merge-gap': '%d' % cfg['merge_gap'],
+                    'modbus-read-delay': '%g' % cfg['modbus_read_delay'],
+                    'modbus-merge-gap': '%d' % cfg['modbus_merge_gap'],
                     'upstream': cfg['upstream'],
-                    'unit': '%d' % cfg['unit'],
+                    'modbus-unit': '%d' % cfg['modbus_unit'],
                     'allow-write': 'on' if cfg['allow_write'] else 'off',
                     'write-registers': proxy.describe_write_ranges(),
                     'max-clients': '%d' % cfg['max_clients'],
@@ -281,12 +281,12 @@ def main():
                     'dump-interval': 'off' if not cfg['dump_interval'] else '%g' % cfg['dump_interval'],
                     'log-level': cfg['level'],
                     'local-time': 'on' if cfg['local_time'] else 'off',
-                    'profile': cfg['profile'],
+                    'modbus-profile': cfg['modbus_profile'],
                     'selection': cfg['selection'] or 'all',
                     'connect-acl': acl_value_text(cfg['connect_acl']),
                     'write-acl': acl_value_text(cfg['write_acl']),
                     'metrics-acl': acl_value_text(cfg['metrics_acl']),
-                    'timeout': '%g' % cfg['timeout'],
+                    'modbus-timeout': '%g' % cfg['modbus_timeout'],
                     'modbus-auth': cfg['auth'] or 'none',
                     'modbus-auth-upstream': cfg['modbus_auth_upstream'] or 'none',
                     'control-port': control_target,

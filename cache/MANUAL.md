@@ -113,16 +113,16 @@ map, the auth schemes both directions
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
 | `upstream` | `set modbus upstream` | settable (restart) | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502) |
-| `unit` | `set modbus unit` | settable | `ID` | `--unit` / `UNIT` | the Modbus unit id the session speaks |
-| `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | upstream Modbus connect/read timeout in seconds |
+| `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | the Modbus unit id the session speaks |
+| `modbus-timeout` | `set modbus timeout` | settable | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | upstream Modbus connect/read timeout in seconds |
 | `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the cache's own Modbus clients must speak: suite (the crypt handshake) or none |
 | `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key for the cache's clients, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 | `modbus-auth-upstream` | `set modbus auth-upstream` | settable | `suite\|waveshare\|none` | `--modbus-auth-upstream` / `MODBUS_UPSTREAM_AUTH` | the auth scheme the cache speaks to the upstream inverter: suite (the crypt handshake), waveshare (the gateway connection password) or none |
 | `modbus-auth-upstream-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-upstream-key` / `MODBUS_UPSTREAM_AUTH_KEY` | the key the cache presents upstream: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |
-| `interval` | `set modbus interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between cache polls of the device |
-| `read-delay` | `set modbus read-delay` | settable | `s` | `--read-delay` / `READ_DELAY` | seconds between consecutive device reads within a poll cycle |
-| `merge-gap` | `set modbus merge-gap` | settable | `registers` | `--merge-gap` / `MERGE_GAP` | max register gap when merging ranges into block reads; the plan rebuilds |
-| `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | device profile JSON: the register ranges to cache (a bare name resolves in profiles/profiles/) |
+| `modbus-interval` | `set modbus interval` | settable | `s` | `--modbus-interval` / `MODBUS_INTERVAL` | seconds between cache polls of the device |
+| `modbus-read-delay` | `set modbus read-delay` | settable | `s` | `--modbus-read-delay` / `MODBUS_READ_DELAY` | seconds between consecutive device reads within a poll cycle |
+| `modbus-merge-gap` | `set modbus merge-gap` | settable | `registers` | `--modbus-merge-gap` / `MODBUS_MERGE_GAP` | max register gap when merging ranges into block reads; the plan rebuilds |
+| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON: the register ranges to cache (a bare name resolves in profiles/profiles/) |
 | `selection` | `set modbus selection` | settable | `\<file>\|all\|none` | `--selection` / `SELECTION` | selection JSON: which profile names to fetch ("all" = every entry, "none" = cache nothing) |
 
 ### system

@@ -134,7 +134,7 @@ try:
            '--allow-write'])
     time.sleep(0.7)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT, '--listen', '127.0.0.1:%d' % CACHE_PORT,
-           '--interval', '1', '--cache-ttl', '3', '--allow-write', '--profile', R,
+           '--modbus-interval', '1', '--cache-ttl', '3', '--allow-write', '--modbus-profile', R,
            '--write-acl', 'any', '--write-registers', 'any',
            '--audit-log', os.path.join(SCRATCH, 'reg_audit.log')], log=os.path.join(SCRATCH, 'reg_cache.log'))
     time.sleep(2.5)
@@ -161,8 +161,8 @@ try:
                     {'name': 'grid-power', 'register': 37113, 'type': 'i32', 'scale': 1, 'cache': True},
                 ]}, open(mini, 'w'))
     c3 = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                           '--listen', '127.0.0.1:%d' % (15517 + BASE), '--interval', '1', '--cache-ttl', '3',
-                           '--profile', mini], stdout=open(os.path.join(SCRATCH, 'reg_mini.log'), 'w'), stderr=subprocess.STDOUT)
+                           '--listen', '127.0.0.1:%d' % (15517 + BASE), '--modbus-interval', '1', '--cache-ttl', '3',
+                           '--modbus-profile', mini], stdout=open(os.path.join(SCRATCH, 'reg_mini.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(c3)
     time.sleep(1.5)
     b = rd(32089, 1, port=15517 + BASE)
@@ -214,8 +214,8 @@ try:
 
     # write support disabled by default: refused with illegal function, upstream untouched
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                                   '--listen', '127.0.0.1:%d' % (15507 + BASE), '--interval', '1',
-                                   '--profile', R],
+                                   '--listen', '127.0.0.1:%d' % (15507 + BASE), '--modbus-interval', '1',
+                                   '--modbus-profile', R],
                                   stdout=open(os.path.join(SCRATCH, 'reg_cache_nowrite.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(1.5)
     s = socket.create_connection(('127.0.0.1', 15507 + BASE), timeout=5)
@@ -289,8 +289,8 @@ try:
     badmap = os.path.join(SCRATCH, 'reg_badmap.json')
     _json.dump(map_, open(badmap, 'w'))
     c2 = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-                           '--listen', '127.0.0.1:%d' % (15506 + BASE), '--interval', '1', '--cache-ttl', '3',
-                           '--profile', badmap], stdout=open(os.path.join(SCRATCH, 'reg_cache2.log'), 'w'),
+                           '--listen', '127.0.0.1:%d' % (15506 + BASE), '--modbus-interval', '1', '--cache-ttl', '3',
+                           '--modbus-profile', badmap], stdout=open(os.path.join(SCRATCH, 'reg_cache2.log'), 'w'),
                           stderr=subprocess.STDOUT)
     procs.append(c2)
     time.sleep(2.5)
@@ -310,8 +310,8 @@ try:
     evil = EvilUpstream(15509 + BASE)
     evil.mode = 'garbage'  # cold from the start: no fine-mode poll can fill the cache
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15509 + BASE),
-           '--listen', '127.0.0.1:%d' % (15508 + BASE), '--interval', '1', '--cache-ttl', '3',
-           '--profile', R], log=os.path.join(SCRATCH, 'reg_evil.log'))
+           '--listen', '127.0.0.1:%d' % (15508 + BASE), '--modbus-interval', '1', '--cache-ttl', '3',
+           '--modbus-profile', R], log=os.path.join(SCRATCH, 'reg_evil.log'))
     time.sleep(2)
     for mode in ('garbage', 'short', 'lying', 'txn', 'unit', 'stall'):
         evil.mode = mode
@@ -373,7 +373,7 @@ try:
     # the shipped example selection: the essential set, by name
     SEL = os.path.join(REPO, 'extras', 'examples', 'modbus-cache-filter.json')
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-           '--listen', '127.0.0.1:%d' % (15518 + BASE), '--interval', '1', '--profile', R,
+           '--listen', '127.0.0.1:%d' % (15518 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
            '--selection', SEL], log=os.path.join(SCRATCH, 'reg_sel.log'))
     time.sleep(1.5)
     plan = open(os.path.join(SCRATCH, 'reg_sel.log')).read()
@@ -387,7 +387,7 @@ try:
           b[0] == 3 and struct.unpack('>H', b[2:4])[0] == 512, b.hex())
 
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-           '--listen', '127.0.0.1:%d' % (15513 + BASE), '--interval', '1', '--profile', R,
+           '--listen', '127.0.0.1:%d' % (15513 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
            '--write-acl', 'any', '--write-registers', 'any',
            '--control-port', '%d' % (15514 + BASE)], log=os.path.join(SCRATCH, 'reg_ctl.log'),
           env_extra={'CONTROL_TOKEN': 'sekrit'})
@@ -455,7 +455,7 @@ try:
           and 'malformed request' in r.get('text', ''), str(r))
 
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-           '--listen', '127.0.0.1:%d' % (15519 + BASE), '--interval', '1', '--profile', R,
+           '--listen', '127.0.0.1:%d' % (15519 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
            '--control-port', '%d' % (15520 + BASE), '--control-token', 'sekrit',
            '--audit-log', os.path.join(SCRATCH, 'reg_audit_ctl.log')], log=os.path.join(SCRATCH, 'reg_ctl_tok.log'))
     time.sleep(1.5)
@@ -566,7 +566,7 @@ try:
           and r.stdout == '',
           repr((r.returncode, r.stderr[-160:])))
     p_unix = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                               '--listen', '127.0.0.1:%d' % (15515 + BASE), '--interval', '1', '--profile', R],
+                               '--listen', '127.0.0.1:%d' % (15515 + BASE), '--modbus-interval', '1', '--modbus-profile', R],
                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     procs.append(p_unix)
     time.sleep(1.5)
@@ -589,7 +589,7 @@ try:
 
     # the group-accessible unix socket (--control-socket-group): 0660
     p_unix_g = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                                 '--listen', '127.0.0.1:%d' % (15516 + BASE), '--interval', '1', '--profile', R,
+                                 '--listen', '127.0.0.1:%d' % (15516 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
                                  '--control-socket-group'],
                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     procs.append(p_unix_g)
@@ -615,19 +615,19 @@ try:
           and r.stdout.startswith('ok cache ') and 'ok cache cleared' in r.stdout, repr(r.stdout[:160]))
 
     # 5d. set/clear/show: the live settings registry (the inverter's pattern)
-    r = ctl_cmd('set interval 2', 15514 + BASE)
-    check('set: interval applied with the state summary', r.startswith('ok interval=2.00s upstream=127.0.0.1:%d' % (15512 + BASE))
+    r = ctl_cmd('set modbus-interval 2', 15514 + BASE)
+    check('set: interval applied with the state summary', r.startswith('ok modbus-interval=2.00s upstream=127.0.0.1:%d' % (15512 + BASE))
           and 'poll=' in r and 'hits=' in r, r[:120])
-    r = ctl_cmd('show interval', 15514 + BASE)
-    check('set: the per-setting show reflects the new interval', r == 'ok interval=2.00s', r[:120])
-    r = ctl_cmd('set interval bogus', 15514 + BASE)
-    check('set: a bogus value is a clean err', r.startswith('fail interval must be seconds'), r[:100])
+    r = ctl_cmd('show modbus-interval', 15514 + BASE)
+    check('set: the per-setting show reflects the new interval', r == 'ok modbus-interval=2.00s', r[:120])
+    r = ctl_cmd('set modbus-interval bogus', 15514 + BASE)
+    check('set: a bogus value is a clean err', r.startswith('fail modbus-interval must be seconds'), r[:100])
     r = ctl_cmd('set bogus 1', 15514 + BASE)
     check('set: unknown setting', r.startswith('fail unknown setting'), r[:100])
     r = ctl_cmd('show settings', 15514 + BASE)
     check('show settings: retired answers the fail verdict', r.startswith('fail'), r[:80])
-    r = ctl_cmd('show interval', 15514 + BASE)
-    check('show <setting>: the bare value', r == 'ok interval=2.00s', r)
+    r = ctl_cmd('show modbus-interval', 15514 + BASE)
+    check('show <setting>: the bare value', r == 'ok modbus-interval=2.00s', r)
     r = ctl_cmd('show cache-ttl', 15514 + BASE)
     check('show <setting>: the path spelling answers the live', r == 'ok cache-ttl=30.00s', r)
     r = ctl_cmd('help cache-ttl', 15514 + BASE)
@@ -650,16 +650,16 @@ try:
     r = ctl_cmd('help bogus', 15514 + BASE)
     check('help <unknown topic>: the reworded two-space error',
           r == 'fail unknown command or setting bogus (try ?)', r)
-    r = ctl_cmd('clear interval', 15514 + BASE)
-    check('clear: restores the configured value', r.startswith('ok interval=1.00s'), r[:110])
-    r = ctl_cmd('set timeout 5', 15514 + BASE)
-    check('set: modbus timeout applied (the rekeyed branch)', r.startswith('ok timeout=5.00s upstream='), r[:120])
-    r = ctl_cmd('show timeout', 15514 + BASE)
-    check('show: modbus timeout answers the bare value', r == 'ok timeout=5.00s', r)
-    r = ctl_cmd('set timeout 99', 15514 + BASE)
-    check('set: modbus timeout range-gated', r.startswith('fail timeout must be 0 < N <= 60'), r[:100])
-    r = ctl_cmd('clear timeout', 15514 + BASE)
-    check('clear: modbus timeout restores the configured value', r.startswith('ok timeout=3.00s'), r[:110])
+    r = ctl_cmd('clear modbus-interval', 15514 + BASE)
+    check('clear: restores the configured value', r.startswith('ok modbus-interval=1.00s'), r[:110])
+    r = ctl_cmd('set modbus-timeout 5', 15514 + BASE)
+    check('set: modbus timeout applied (the rekeyed branch)', r.startswith('ok modbus-timeout=5.00s upstream='), r[:120])
+    r = ctl_cmd('show modbus-timeout', 15514 + BASE)
+    check('show: modbus timeout answers the bare value', r == 'ok modbus-timeout=5.00s', r)
+    r = ctl_cmd('set modbus-timeout 99', 15514 + BASE)
+    check('set: modbus timeout range-gated', r.startswith('fail modbus-timeout must be 0 < N <= 60'), r[:100])
+    r = ctl_cmd('clear modbus-timeout', 15514 + BASE)
+    check('clear: modbus timeout restores the configured value', r.startswith('ok modbus-timeout=3.00s'), r[:110])
     r = ctl_cmd('set config 5', 15514 + BASE)
     check('set: a show report is not a setting', r.startswith('fail unknown setting config'), r[:100])
     r = ctl_cmd('set connections 5', 15514 + BASE)
@@ -689,7 +689,7 @@ try:
     check('dump: the help hides the dump commands without a path', 'request dump' not in r, r[:160])
     r = ctl_cmd('show knobs', 15514 + BASE)
     check('show knobs: the dictionary of the registry — flag, env twin, how it changes',
-          r.startswith('ok knobs') and '--interval' in r and '$INTERVAL' in r
+          r.startswith('ok knobs') and '--modbus-interval' in r and '$MODBUS_INTERVAL' in r
           and 'set modbus interval <value>' in r and '--control-ops-token' in r and ', secret' in r
           and 'set modbus upstream <value>, restart' in r, r[:200])   # the restart-marked knob carries the suffix
     body = r.split('\n')
@@ -735,7 +735,7 @@ try:
 
     # --selection none at startup: the same, straight from the command line
     p_none = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                               '--listen', '127.0.0.1:%d' % (15526 + BASE), '--interval', '1', '--profile', R,
+                               '--listen', '127.0.0.1:%d' % (15526 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
                                '--selection', 'none', '--control-port', '%d' % (15527 + BASE)],
                               stdout=open(os.path.join(SCRATCH, 'reg_cache_none.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
@@ -760,8 +760,8 @@ try:
                     {'name': 'device-status', 'register': 32089, 'type': 'u16'},
                 ]}, open(ttlmap, 'w'))
     p_ttl = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                              '--listen', '127.0.0.1:%d' % (15533 + BASE), '--interval', '5', '--cache-ttl', '30',
-                              '--profile', ttlmap, '--control-port', '%d' % (15534 + BASE)],
+                              '--listen', '127.0.0.1:%d' % (15533 + BASE), '--modbus-interval', '5', '--cache-ttl', '30',
+                              '--modbus-profile', ttlmap, '--control-port', '%d' % (15534 + BASE)],
                              stdout=open(os.path.join(SCRATCH, 'reg_cache_ttl.log'), 'w'), stderr=subprocess.STDOUT,
                              env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
     procs.append(p_ttl)
@@ -786,7 +786,7 @@ try:
     # but the kernel-vouched peers (root, the daemon's own user) skip the handshake
     cred_sock = '/tmp/reg_cred.socket'
     p_cred = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                               '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--profile', R,
+                               '--listen', '127.0.0.1:%d' % (15538 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
                                '--control-port', cred_sock, '--control-token', 'sekrit'],
                               stdout=open(os.path.join(SCRATCH, 'reg_cache_cred.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(p_cred)
@@ -804,8 +804,8 @@ try:
     # the state dump (write-behind): the cached words + the live setting overrides
     dumpfile = os.path.join(SCRATCH, 'reg_dump.json')
     p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                               '--listen', '127.0.0.1:%d' % (15536 + BASE), '--interval', '1', '--cache-ttl', '30',
-                               '--profile', R, '--control-port', '%d' % (15537 + BASE),
+                               '--listen', '127.0.0.1:%d' % (15536 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                               '--modbus-profile', R, '--control-port', '%d' % (15537 + BASE),
                                '--dump-path', dumpfile],
                               stdout=open(os.path.join(SCRATCH, 'reg_cache_dump.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
@@ -834,7 +834,7 @@ try:
     r = ctl_cmd('request restore', 15537 + BASE)
     check('request restore: the words are back without the device', r.startswith('ok restored 91 word(s)')
           and '0 setting(s)' in r, r[:120])
-    ctl_cmd('set interval 2', 15537 + BASE)
+    ctl_cmd('set modbus-interval 2', 15537 + BASE)
     ctl_cmd('request dump', 15537 + BASE)
     d = _json.load(open(dumpfile))
     check('request dump: the settings-only dump keeps the words out', d.get('registers') == []
@@ -851,8 +851,8 @@ try:
     r = ctl_cmd('request restore', 15537 + BASE)
     check('request restore: the with-cache dump brings the words back',
           r.startswith('ok restored 91 word(s), 1 setting(s)'), r[:120])
-    r = ctl_cmd('show interval', 15537 + BASE)
-    check('request restore: the setting override re-applied', r == 'ok interval=2.00s', r)
+    r = ctl_cmd('show modbus-interval', 15537 + BASE)
+    check('request restore: the setting override re-applied', r == 'ok modbus-interval=2.00s', r)
     r = ctl_cmd('show dump-path', 15537 + BASE)
     check('dump: the dump path shows (the per-setting row)', r == 'ok dump-path=%s' % dumpfile, r[-160:])
     # the F18 restore gates: tampering, a group-writable dump and an unsigned dump all refuse
@@ -882,8 +882,8 @@ try:
     #      encrypted; a restore fails closed on a wrong or missing key
     kdumpfile = os.path.join(SCRATCH, 'reg_dump_sealed.json')
     p_kdump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--cache-ttl', '30',
-                                '--profile', R, '--control-port', '%d' % (15539 + BASE),
+                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                                '--modbus-profile', R, '--control-port', '%d' % (15539 + BASE),
                                 '--dump-path', kdumpfile, '--dump-key', 'seal-key-1'],
                                stdout=open(os.path.join(SCRATCH, 'reg_cache_kdump.log'), 'w'), stderr=subprocess.STDOUT,
                                env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
@@ -924,8 +924,8 @@ try:
     time.sleep(0.4)
     # the wrong key: the sealed dump refuses at start (the mac reads it as tampered content)
     p_wrong = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--cache-ttl', '30',
-                                '--profile', R, '--control-port', '%d' % (15539 + BASE),
+                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                                '--modbus-profile', R, '--control-port', '%d' % (15539 + BASE),
                                 '--dump-path', kdumpfile, '--dump-key', 'seal-key-WRONG',
                                 '--restore-on-start'],
                                stdout=open(os.path.join(SCRATCH, 'reg_cache_kwrong.log'), 'w'), stderr=subprocess.STDOUT,
@@ -945,8 +945,8 @@ try:
     time.sleep(0.4)
     # the missing-key half of the symmetric gate: a keyless daemon refuses the sealed dump
     p_nokey = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--cache-ttl', '30',
-                                '--profile', R, '--control-port', '%d' % (15539 + BASE),
+                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                                '--modbus-profile', R, '--control-port', '%d' % (15539 + BASE),
                                 '--dump-path', kdumpfile, '--restore-on-start'],
                                stdout=open(os.path.join(SCRATCH, 'reg_cache_knokey.log'), 'w'), stderr=subprocess.STDOUT,
                                env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
@@ -965,8 +965,8 @@ try:
     time.sleep(0.4)
     # the right key: the sealed dump restores (the words are back without the device)
     p_right = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--cache-ttl', '30',
-                                '--profile', R, '--control-port', '%d' % (15539 + BASE),
+                                '--listen', '127.0.0.1:%d' % (15538 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                                '--modbus-profile', R, '--control-port', '%d' % (15539 + BASE),
                                 '--dump-path', kdumpfile, '--dump-key', 'seal-key-1',
                                 '--restore-on-start'],
                                stdout=open(os.path.join(SCRATCH, 'reg_cache_kright.log'), 'w'), stderr=subprocess.STDOUT,
@@ -995,8 +995,8 @@ try:
     check('file-key: a dump path without a key warns unsealed at start',
           'is not sealed' in log and 'set dump-key' in log, log[-220:])
     p_file = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                               '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--cache-ttl', '30',
-                               '--profile', R, '--control-port', '%d' % (15539 + BASE),
+                               '--listen', '127.0.0.1:%d' % (15538 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                               '--modbus-profile', R, '--control-port', '%d' % (15539 + BASE),
                                '--dump-path', kdumpfile, '--dump-key', 'file:' + kkeyfile,
                                '--restore-on-start'],
                               stdout=open(os.path.join(SCRATCH, 'reg_cache_kfile.log'), 'w'), stderr=subprocess.STDOUT,
@@ -1015,8 +1015,8 @@ try:
     p_file.kill()
     time.sleep(0.4)
     p_missing = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                                  '--listen', '127.0.0.1:%d' % (15538 + BASE), '--interval', '1', '--cache-ttl', '30',
-                                  '--profile', R, '--control-port', '%d' % (15539 + BASE),
+                                  '--listen', '127.0.0.1:%d' % (15538 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                                  '--modbus-profile', R, '--control-port', '%d' % (15539 + BASE),
                                   '--dump-path', kdumpfile, '--dump-key', 'file:/nonexistent/dump_key',
                                   '--restore-on-start'],
                                  stdout=open(os.path.join(SCRATCH, 'reg_cache_kmissing.log'), 'w'), stderr=subprocess.STDOUT,
@@ -1054,7 +1054,7 @@ try:
           'the periodic dump to /nonexistent-dir-zz/dump.json failed' in dlog, dlog[-200:])
     ctl_cmd('set dump-path ' + dumpfile, 15537 + BASE)
     # the write-behind story: the shutdown dump restores into the next start
-    ctl_cmd('set interval 3', 15537 + BASE)
+    ctl_cmd('set modbus-interval 3', 15537 + BASE)
     r = ctl_cmd('shutdown', 15537 + BASE)
     check('shutdown dump: the stopper wrote the file', r.startswith('bye'), r[:40])
     p_dump.wait(timeout=10)
@@ -1062,8 +1062,8 @@ try:
     check('shutdown dump: settings-only by default (the override is in it, the words stay out)',
           d.get('registers') == [] and d.get('settings', {}).get('modbus/interval') == 3.0, repr(d.get('settings')))
     p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                               '--listen', '127.0.0.1:%d' % (15536 + BASE), '--interval', '1', '--cache-ttl', '30',
-                               '--profile', R, '--control-port', '%d' % (15537 + BASE), '--dump-with-cache',
+                               '--listen', '127.0.0.1:%d' % (15536 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                               '--modbus-profile', R, '--control-port', '%d' % (15537 + BASE), '--dump-with-cache',
                                '--dump-path', dumpfile],
                               stdout=open(os.path.join(SCRATCH, 'reg_cache_dump2.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
@@ -1072,8 +1072,8 @@ try:
     log = open(os.path.join(SCRATCH, 'reg_cache_dump2.log')).read()
     check('restore-on-start: the gate defaults to off — the dump is not loaded', 'not loaded on start' in log
           and 'restored the state dump' not in log.split('state dumps:')[1], log[-200:])
-    r = ctl_cmd('show interval', 15537 + BASE)
-    check('restore-on-start: the override in the file did not leak in', r == 'ok interval=1.00s', r)
+    r = ctl_cmd('show modbus-interval', 15537 + BASE)
+    check('restore-on-start: the override in the file did not leak in', r == 'ok modbus-interval=1.00s', r)
     r = ctl_cmd('request dump', 15537 + BASE)
     check('dump-with-cache: the flag turns the plain request dump full', r.startswith('ok dumped 91 word(s)'),
           r[:120])
@@ -1083,12 +1083,12 @@ try:
           and 'setting(s) from' in r, r[:120])
     r = ctl_cmd('show cache', 15537 + BASE)
     check('restore-on-start: the manual restore loaded the words', '91 word(s) cached' in r, r[:80])
-    ctl_cmd('set interval 3', 15537 + BASE)
+    ctl_cmd('set modbus-interval 3', 15537 + BASE)
     ctl_cmd('shutdown', 15537 + BASE)
     p_dump.wait(timeout=10)
     p_dump = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                               '--listen', '127.0.0.1:%d' % (15536 + BASE), '--interval', '1', '--cache-ttl', '30',
-                               '--profile', R, '--control-port', '%d' % (15537 + BASE), '--dump-with-cache',
+                               '--listen', '127.0.0.1:%d' % (15536 + BASE), '--modbus-interval', '1', '--cache-ttl', '30',
+                               '--modbus-profile', R, '--control-port', '%d' % (15537 + BASE), '--dump-with-cache',
                                '--dump-path', dumpfile, '--restore-on-start'],
                               stdout=open(os.path.join(SCRATCH, 'reg_cache_dump2.log'), 'w'), stderr=subprocess.STDOUT,
                               env={**os.environ, 'CONTROL_TOKEN': 'sekrit'})
@@ -1096,15 +1096,15 @@ try:
     time.sleep(1.5)
     r = ctl_cmd('show cache', 15537 + BASE)
     check('restore-on-start: the gate loads the dump', '91 word(s) cached' in r, r[:80])
-    r = ctl_cmd('show interval', 15537 + BASE)
-    check('restore-on-start: the override came back with the gate', r == 'ok interval=3.00s', r)
-    ctl_cmd('clear interval', 15537 + BASE)
+    r = ctl_cmd('show modbus-interval', 15537 + BASE)
+    check('restore-on-start: the override came back with the gate', r == 'ok modbus-interval=3.00s', r)
+    ctl_cmd('clear modbus-interval', 15537 + BASE)
     ctl_cmd('shutdown', 15537 + BASE)
     p_dump.wait(timeout=10)
 
     # the native metrics endpoint: bearer auth + the cache gauges
     p_metrics = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                                  '--listen', '127.0.0.1:%d' % (15528 + BASE), '--interval', '1', '--profile', R,
+                                  '--listen', '127.0.0.1:%d' % (15528 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
                                   '--control-port', '%d' % (15530 + BASE),
                                   '--metrics-listen', '127.0.0.1:%d' % (15529 + BASE), '--metrics-server', '--metrics-token', 'sekrit',
                                   '--metrics-max-clients', '1'],
@@ -1177,12 +1177,12 @@ try:
     check('metrics client-timeout: clear restores the default cap', r.startswith('ok metrics-client-timeout=5.00s'), r[:90])
     # the read-delay: the poll paces between the upstream blocks (the wire round-trip;
     # the pacing itself shows in the poll-duration gauge when the spec splits)
-    r = ctl_cmd('set read-delay 0.25', 15530 + BASE)
-    check('read-delay: set takes the seconds value', r.startswith('ok read-delay=250.00ms'), r[:90])
-    r = ctl_cmd('show read-delay', 15530 + BASE)
-    check('read-delay: the show renders it', r == 'ok read-delay=250.00ms', r)
-    r = ctl_cmd('clear read-delay', 15530 + BASE)
-    check('read-delay: clear restores the configured default', r.startswith('ok read-delay=50.00ms'), r[:90])
+    r = ctl_cmd('set modbus-read-delay 0.25', 15530 + BASE)
+    check('read-delay: set takes the seconds value', r.startswith('ok modbus-read-delay=250.00ms'), r[:90])
+    r = ctl_cmd('show modbus-read-delay', 15530 + BASE)
+    check('read-delay: the show renders it', r == 'ok modbus-read-delay=250.00ms', r)
+    r = ctl_cmd('clear modbus-read-delay', 15530 + BASE)
+    check('read-delay: clear restores the configured default', r.startswith('ok modbus-read-delay=50.00ms'), r[:90])
     # the live metrics enable switch: off stops the endpoint, on restarts it
     r = ctl_cmd('set metrics-server off', 15530 + BASE)
     check('metrics enable: set off stops the endpoint', r.startswith('ok metrics-server=off'), r[:80])
@@ -1285,7 +1285,7 @@ try:
     # tokenless loopback serve is the auth, the enable dance works without a
     # token, and the pending listen cannot move beyond loopback while it serves
     p_tokless = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                                  '--listen', '127.0.0.1:%d' % (15540 + BASE), '--interval', '1', '--profile', R,
+                                  '--listen', '127.0.0.1:%d' % (15540 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
                                   '--control-port', '%d' % (15542 + BASE),
                                   '--metrics-listen', '127.0.0.1:%d' % (15541 + BASE), '--metrics-server'],
                                  stdout=open(os.path.join(SCRATCH, 'reg_cache_tokless.log'), 'w'), stderr=subprocess.STDOUT,
@@ -1312,20 +1312,20 @@ try:
     # (the scraper's metrics-acl shape) — the inline grammar + the file:
     # chain, checked at accept: a client off the ACL is closed without a reply
     r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
+                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-profile', R,
                         '--metrics-acl', 'file:' + os.path.join(REPO, 'extras', 'examples', 'acl-ip-prefix.json')],
                        capture_output=True, text=True, timeout=60)
     check('metrics acl: the shipped ip-prefix example loads (dry-run)',
           r.returncode == 0 and 'dry-run: configuration and register map are valid' in (r.stdout + r.stderr),
           '%s %r' % (r.returncode, (r.stdout + r.stderr)[-120:]))
     r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
+                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-profile', R,
                         '--metrics-acl', 'file:/nonexistent/acl.json'],
                        capture_output=True, text=True, timeout=60)
     check('metrics acl: a missing acl file refuses the start (rc 1, clean)',
           r.returncode == 1 and 'cannot read acl file' in r.stderr, r.stderr[-100:])
     r = subprocess.run([sys.executable, P, '--dry-run', '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
+                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-profile', R,
                         '--metrics-acl', '10.0.0.0/999'],
                        capture_output=True, text=True, timeout=60)
     check('metrics acl: a bad inline entry refuses the start (rc 1, clean)',
@@ -1599,7 +1599,7 @@ try:
 
     # the Modbus per-IP gate: --max-conn-per-ip 1 refuses the second connection from one peer
     p_pip = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                              '--listen', '127.0.0.1:%d' % (15533 + BASE), '--interval', '1', '--profile', R,
+                              '--listen', '127.0.0.1:%d' % (15533 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
                               '--max-clients', '0', '--max-conn-per-ip', '1', '--control-port', '%d' % (15534 + BASE),
                               '--control-token', 'sekrit'],
                              stdout=open(os.path.join(SCRATCH, 'reg_cache_pip.log'), 'w'), stderr=subprocess.STDOUT)
@@ -1645,13 +1645,13 @@ try:
     ctl_cmd('clear control-log-replies', 15514 + BASE)
 
     r_before = ctl_cmd('inspect', 15514 + BASE)
-    ctl_cmd('set merge-gap 0', 15514 + BASE)
+    ctl_cmd('set modbus-merge-gap 0', 15514 + BASE)
     r_after = ctl_cmd('inspect', 15514 + BASE)
     n_before = r_before.split('poll plan ')[1].split(' block(s)')[0]
     n_after = r_after.split('poll plan ')[1].split(' block(s)')[0]
-    check('set merge-gap: the poll plan rebuilds live', int(n_after) > int(n_before),
+    check('set modbus-merge-gap: the poll plan rebuilds live', int(n_after) > int(n_before),
           '%s -> %s' % (n_before, n_after))
-    ctl_cmd('clear merge-gap', 15514 + BASE)
+    ctl_cmd('clear modbus-merge-gap', 15514 + BASE)
 
     r = ctl_cmd('set allow-write on', 15514 + BASE)
     check('set allow-write: the gate opens', r.startswith('ok allow-write=on'), r[:100])
@@ -1690,9 +1690,9 @@ try:
 
     p_fc4 = start([sys.executable, P, '--config', ini4,
                     '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                   '--listen', '127.0.0.1:%d' % (15521 + BASE), '--interval', '1', '--cache-ttl', '3',
+                   '--listen', '127.0.0.1:%d' % (15521 + BASE), '--modbus-interval', '1', '--cache-ttl', '3',
                    '--allow-write', '--control-port', '%d' % (15522 + BASE),
-                   '--profile', fc4map, '--audit-log', os.path.join(SCRATCH, 'reg_audit_fc4.log')],
+                   '--modbus-profile', fc4map, '--audit-log', os.path.join(SCRATCH, 'reg_audit_fc4.log')],
                   log=os.path.join(SCRATCH, 'reg_fc4.log'), env_extra={'AUDIT_REQUESTS': '1',
                                                      'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2.5)
@@ -1802,25 +1802,25 @@ try:
     # re-execs, the fresh daemon re-resolves the config (the file edit takes
     # effect — the restart-marked style) and re-applies the saved overrides once
     ini_r = os.path.join(SCRATCH, 'reg_reload.conf')
-    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset unit 4\n')
+    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset modbus-unit 4\n')
     p_r = start([sys.executable, P, '--config', ini_r, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                 '--listen', '127.0.0.1:%d' % (15581 + BASE), '--interval', '1', '--cache-ttl', '3',
-                 '--control-port', '%d' % (15582 + BASE), '--profile', fc4map],
+                 '--listen', '127.0.0.1:%d' % (15581 + BASE), '--modbus-interval', '1', '--cache-ttl', '3',
+                 '--control-port', '%d' % (15582 + BASE), '--modbus-profile', fc4map],
                 log=os.path.join(SCRATCH, 'reg_reload.log'), env_extra={'CONTROL_TOKEN': 'sekrit'})
     time.sleep(2)
-    r = ctl_cmd('set interval 7', 15582 + BASE)
-    check('reload: the override lands before the reload', r.startswith('ok interval=7'), r[:120])
+    r = ctl_cmd('set modbus-interval 7', 15582 + BASE)
+    check('reload: the override lands before the reload', r.startswith('ok modbus-interval=7'), r[:120])
     r = ctl_cmd('request reload', 15582 + BASE)
     check('reload: the reply reports the saved override', r.startswith('ok reload: 1 override(s) saved'), r[:120])
     back = None
     for _ in range(100):     # the exec is fast; a connect that lands on the dying daemon (the bye frame, unsigned) retries
         try:
-            back = ctl_cmd('show interval', 15582 + BASE)
+            back = ctl_cmd('show modbus-interval', 15582 + BASE)
             break
         except Exception:
             time.sleep(0.1)
     check('reload: the daemon came back with the override re-applied (above the flag)',
-          back is not None and back.startswith('ok interval=7.00s'), repr((back or '')[-200:]))
+          back is not None and back.startswith('ok modbus-interval=7.00s'), repr((back or '')[-200:]))
     check('reload: the state file is consumed', not os.path.exists(ini_r + '.reload'), ini_r + '.reload')
     # the startup-only override rides the reload: the set records the pending
     # value (the note), the fold lands it in the fresh process before the binds
@@ -1878,7 +1878,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('reload: the state file saves 0600 (F23, the F18 posture) and seals under dump-key',
           r.returncode == 0 and 'mode 0600 ok' in r.stdout and 'state file seals' in r.stdout,
           repr((r.stderr or r.stdout)[-200:]))
-    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset unit 7\n')   # rewrite: a name set twice fails the start
+    open(ini_r, 'w').write('# the reload regtest config: the set grammar\nset modbus-unit 7\n')   # rewrite: a name set twice fails the start
     r = ctl_cmd('request reload', 15582 + BASE)
     back = None
     for _ in range(100):
@@ -1889,7 +1889,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
             time.sleep(0.1)
     check('reload: the fresh resolve takes the config edit (unit=7), the override still rides',
           back is not None and back.startswith('ok unit=7')
-          and ctl_cmd('show interval', 15582 + BASE).startswith('ok interval=7.00s'),
+          and ctl_cmd('show modbus-interval', 15582 + BASE).startswith('ok modbus-interval=7.00s'),
           repr((back or '')[-200:]))
     # the console path: the reload's bye frame rides utf-8 and the notice decodes it (no raw \u escapes)
     p = subprocess.Popen([sys.executable, K, '--control-port', '%d' % (15582 + BASE)], stdin=subprocess.PIPE,
@@ -1917,7 +1917,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # write-registers none — --allow-write alone refuses every write); the
     # connect ACL's none refuses every connection at accept
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-           '--listen', '127.0.0.1:%d' % (15531 + BASE), '--interval', '1', '--profile', R,
+           '--listen', '127.0.0.1:%d' % (15531 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
            '--allow-write', '--control-port', '%d' % (15532 + BASE), '--control-token', 'sekrit'],
           log=os.path.join(SCRATCH, 'reg_none.log'))
     time.sleep(2)
@@ -1975,7 +1975,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15584 + BASE), '--profile', deye,
            '--control-port', '0', '--allow-write'], log=os.path.join(SCRATCH, 'reg_deye_fake.log'))
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-           '--listen', '127.0.0.1:%d' % (15585 + BASE), '--interval', '1', '--profile', 'deye-sg05lp3',
+           '--listen', '127.0.0.1:%d' % (15585 + BASE), '--modbus-interval', '1', '--modbus-profile', 'deye-sg05lp3',
            '--allow-write', '--write-acl', 'any', '--write-registers', 'profile',
            '--control-port', '%d' % (15586 + BASE), '--control-token', 'sekrit'],
           log=os.path.join(SCRATCH, 'reg_profile_acl.log'))
@@ -2039,7 +2039,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     with open(deny_prof, 'w') as fh:
         _json.dump(dj, fh)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-           '--listen', '127.0.0.1:%d' % (15587 + BASE), '--interval', '1', '--profile', deny_prof,
+           '--listen', '127.0.0.1:%d' % (15587 + BASE), '--modbus-interval', '1', '--modbus-profile', deny_prof,
            '--allow-write', '--write-acl', 'any', '--write-registers', 'profile',
            '--control-port', '%d' % (15588 + BASE), '--control-token', 'sekrit'],
           log=os.path.join(SCRATCH, 'reg_profile_deny.log'))
@@ -2075,7 +2075,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
             _json.dump(dj, fh)
         start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
                '--listen', '127.0.0.1:%d' % (15590 if name == 'clean' else 15591),
-               '--interval', '1', '--profile', cp,
+               '--modbus-interval', '1', '--modbus-profile', cp,
                '--allow-write', '--write-acl', 'any', '--write-registers', 'profile'],
               log=os.path.join(SCRATCH, 'reg_profile_%s.log') % name)
     time.sleep(2)
@@ -2092,7 +2092,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 
     # a profile without the acl section refuses the profile value, at start
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-                        '--listen', '127.0.0.1:%d' % (15589 + BASE), '--profile', R,
+                        '--listen', '127.0.0.1:%d' % (15589 + BASE), '--modbus-profile', R,
                         '--write-registers', 'profile', '--dry-run'],
                        capture_output=True, text=True, timeout=60)
     check('profile acl: a profile without the section fails the start',
@@ -2108,7 +2108,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
                               {'type': 'deny', 'range': '148:1', 'desc': 'carved back'}]}, fh)
     os.chmod(aclf, 0o644)   # group/world-readable: the permission warning fires at start and on the set/clear replies
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-           '--listen', '127.0.0.1:%d' % (15600 + BASE), '--interval', '1',
+           '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-interval', '1',
            '--allow-write', '--write-acl', 'any', '--write-registers', 'file:' + aclf,
            '--control-port', '15601', '--control-token', 'sekrit',
            '--audit-log', os.path.join(SCRATCH, 'reg_acl_audit.log')],
@@ -2155,14 +2155,14 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('acl file: clear restores the configured file gate',
           r.startswith('ok write-registers=file:%s' % aclf), r[:100])
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
+                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-profile', R,
                         '--write-registers', 'file:/nonexistent/acl.json', '--dry-run'],
                        capture_output=True, text=True, timeout=60)
     check('acl file: a bad file fails the start',
           p.returncode == 1 and 'cannot read acl file /nonexistent/acl.json' in p.stderr,
           '%s %r' % (p.returncode, p.stderr[-120:]))
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
+                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-profile', R,
                         '--write-registers', 'file:' + os.path.join(REPO, 'extras', 'examples', 'acl-write-registers.json'),
                         '--dry-run'],
                        capture_output=True, text=True, timeout=60)
@@ -2178,7 +2178,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
         with open(badf, 'w') as fh:
             _json.dump({'rules': [{'type': 'allow', 'range': matcher}]}, fh)
         p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-                            '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
+                            '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-profile', R,
                             '--write-registers', 'file:' + badf, '--dry-run'],
                            capture_output=True, text=True, timeout=60)
         check('acl file: %s refuses (a range, a list of ranges, or "any")' % what,
@@ -2187,7 +2187,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 
 
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
-           '--listen', '127.0.0.1:%d' % (15539 + BASE), '--interval', '1', '--profile', R,
+           '--listen', '127.0.0.1:%d' % (15539 + BASE), '--modbus-interval', '1', '--modbus-profile', R,
            '--connect-acl', 'none', '--control-port', '%d' % (15540 + BASE), '--control-token', 'sekrit'],
           log=os.path.join(SCRATCH, 'reg_noconn.log'))
     time.sleep(2)
@@ -2289,7 +2289,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     with open(badk, 'w') as fh:
         _json.dump({'type': 'ip-prefix', 'rules': [{'type': 'allow', 'prefix': '10.0.0.0/8'}]}, fh)
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
+                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-profile', R,
                         '--write-registers', 'file:' + badk, '--dry-run'],
                        capture_output=True, text=True, timeout=60)
     check('acl file: an ip-prefix gate refuses the write-registers reader (the schema check)',
@@ -2297,7 +2297,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
           '%s %r' % (p.returncode, p.stderr[-160:]))
     # and the ip-prefix reader takes it: the connect acl file the example ships
     p = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),
-                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--profile', R,
+                        '--listen', '127.0.0.1:%d' % (15600 + BASE), '--modbus-profile', R,
                         '--connect-acl', 'file:' + os.path.join(REPO, 'extras', 'examples', 'acl-ip-prefix.json'),
                         '--dry-run'],
                        capture_output=True, text=True, timeout=60)
@@ -2344,7 +2344,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     open(tokfile, 'w').write('tokensecret\n')
     os.chmod(tokfile, 0o600)
     p_tok = subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
-                              '--listen', '127.0.0.1:%d' % (15523 + BASE), '--interval', '1', '--profile', fc4map,
+                              '--listen', '127.0.0.1:%d' % (15523 + BASE), '--modbus-interval', '1', '--modbus-profile', fc4map,
                               '--control-port', '%d' % (15524 + BASE), '--control-token', 'file:' + tokfile],
                              stdout=open(os.path.join(SCRATCH, 'reg_tok.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(p_tok)
@@ -2383,25 +2383,25 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # on the loopback default and refuses beyond loopback without a token
     # (the F13 posture — the scraper's golden shape, the cache conformed)
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--dry-run',
-                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--control-port', '%d' % (15599 + BASE), '--profile', R],
+                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--control-port', '%d' % (15599 + BASE), '--modbus-profile', R],
                        capture_output=True, text=True, timeout=15)
     check('control: a TCP control port without a token refuses to start',
           r.returncode != 0 and 'TCP control port' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--dry-run',
-                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--metrics-listen', '127.0.0.1:%d' % (15598 + BASE), '--metrics-server', '--profile', R],
+                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--metrics-listen', '127.0.0.1:%d' % (15598 + BASE), '--metrics-server', '--modbus-profile', R],
                        capture_output=True, text=True, timeout=15)
     check('metrics: the loopback endpoint serves without a token (the F13 shape)',
           r.returncode == 0 and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--dry-run',
-                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--metrics-listen', '0.0.0.0:15598', '--metrics-server', '--profile', R],
+                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--metrics-listen', '0.0.0.0:15598', '--metrics-server', '--modbus-profile', R],
                        capture_output=True, text=True, timeout=15)
     check('metrics: a non-loopback endpoint without a token refuses to start (F13)',
           r.returncode != 0 and 'refusing to expose /metrics beyond loopback' in (r.stderr + r.stdout)
           and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
     r = subprocess.run([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--dry-run',
                         '--listen', '127.0.0.1:%d' % (15599 + BASE), '--metrics-listen', '0.0.0.0:15598', '--metrics-server',
-                        '--metrics-token', 'sekrit', '--profile', R],
+                        '--metrics-token', 'sekrit', '--modbus-profile', R],
                        capture_output=True, text=True, timeout=15)
     check('metrics: a non-loopback endpoint with a token starts',
           r.returncode == 0 and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-160:]))
@@ -2409,7 +2409,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     open(mtc, 'w').write('# the token rides the config layer\n'
                          'set metrics-token sekrit\n')
     r = subprocess.run([sys.executable, P, '--config', mtc, '--upstream', '127.0.0.1:%d' % (15512 + BASE), '--dry-run',
-                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--metrics-listen', '0.0.0.0:15598', '--metrics-server', '--profile', R],
+                        '--listen', '127.0.0.1:%d' % (15599 + BASE), '--metrics-listen', '0.0.0.0:15598', '--metrics-server', '--modbus-profile', R],
                        capture_output=True, text=True, timeout=15)
     check('metrics: a non-loopback endpoint with the config-file token starts (the full ladder)',
           r.returncode == 0 and '(bearer token)' in (r.stderr + r.stdout)
@@ -2440,8 +2440,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
            '--modbus-auth', 'suite', '--modbus-auth-key', UP_KEY])
     time.sleep(0.7)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % AUTH_FAKE,
-           '--listen', '127.0.0.1:%d' % AUTH_PORT, '--profile', R,
-           '--timeout', '1', '--interval', '2',
+           '--listen', '127.0.0.1:%d' % AUTH_PORT, '--modbus-profile', R,
+           '--modbus-timeout', '1', '--modbus-interval', '2',
            '--control-port', str(AUTH_CTL), '--control-token', 'ctok-a',
            '--modbus-auth', 'suite', '--modbus-auth-key', CL_KEY,
            '--modbus-auth-upstream', 'suite', '--modbus-auth-upstream-key', UP_KEY],
@@ -2625,8 +2625,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     GW_KEY = 'gw-pass1'
     ws = WavesharePeer(WS_FAKE, GW_KEY)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
-           '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
-           '--timeout', '2', '--interval', '2',
+           '--listen', '127.0.0.1:%d' % WS_PORT, '--modbus-profile', R,
+           '--modbus-timeout', '2', '--modbus-interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
            '--modbus-auth-upstream', 'waveshare', '--modbus-auth-upstream-key', GW_KEY],
           log=os.path.join(SCRATCH, 'reg_ws_cache.log'))
@@ -2677,8 +2677,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     procs[-1].wait(timeout=10)
     time.sleep(0.5)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
-           '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
-           '--timeout', '2', '--interval', '2',
+           '--listen', '127.0.0.1:%d' % WS_PORT, '--modbus-profile', R,
+           '--modbus-timeout', '2', '--modbus-interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
            '--modbus-auth-upstream', 'waveshare', '--modbus-auth-upstream-key', 'gw-pass2'],
           log=os.path.join(SCRATCH, 'reg_ws_cache_bad.log'))
@@ -2699,8 +2699,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     procs[-1].wait(timeout=10)
     time.sleep(0.5)
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_FAKE,
-           '--listen', '127.0.0.1:%d' % WS_PORT, '--profile', R,
-           '--timeout', '2', '--interval', '2',
+           '--listen', '127.0.0.1:%d' % WS_PORT, '--modbus-profile', R,
+           '--modbus-timeout', '2', '--modbus-interval', '2',
            '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
            '--modbus-auth-upstream', 'waveshare', '--modbus-auth-upstream-key', GW_KEY],
           log=os.path.join(SCRATCH, 'reg_ws_cache.log'))

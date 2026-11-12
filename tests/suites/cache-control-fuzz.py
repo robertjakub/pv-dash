@@ -145,7 +145,7 @@ def main():
                                        '--control-port', '0'], stdout=subprocess.DEVNULL,
                                       stderr=subprocess.DEVNULL))
         procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
-                                       '--listen', '127.0.0.1:%d' % (15964 + BASE), '--interval', '1',
+                                       '--listen', '127.0.0.1:%d' % (15964 + BASE), '--modbus-interval', '1',
                                        '--control-port', '%d' % AUTH_PORT, '--control-token', TOKEN],
                                       stdout=open(os.path.join(SCRATCH, 'cache_ctl_fuzz.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(AUTH_PORT):
@@ -225,7 +225,7 @@ def main():
 
         # 6. the token server: the auth abuse is rejected, the real token works
         procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
-                                       '--listen', '127.0.0.1:%d' % (15966 + BASE), '--interval', '1',
+                                       '--listen', '127.0.0.1:%d' % (15966 + BASE), '--modbus-interval', '1',
                                        '--control-port', '%d' % (15967 + BASE), '--control-token', 'sekrit'],
                                       stdout=open(os.path.join(SCRATCH, 'cache_ctl_fuzz2.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15967 + BASE):
@@ -263,7 +263,7 @@ def main():
         OPS_AUDIT = os.path.join(SCRATCH, 'cache_ctl_fuzz_ops_audit.log')
         open(OPS_AUDIT, 'w').write('')
         procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15960 + BASE),
-                                       '--listen', '127.0.0.1:%d' % (15968 + BASE), '--interval', '1',
+                                       '--listen', '127.0.0.1:%d' % (15968 + BASE), '--modbus-interval', '1',
                                        '--control-port', str(OPS_PORT), '--control-token', 'admintok2',
                                        '--control-ops-token', OPS_TOKEN, '--audit-log', OPS_AUDIT],
                                       stdout=open(os.path.join(SCRATCH, 'cache_ctl_fuzz3.log'), 'w'), stderr=subprocess.STDOUT))
@@ -278,10 +278,10 @@ def main():
         st, tx, macok = ops_roundtrip('request flush cache')
         check('ops: request flush cache honored (the read-only shift may flush)',
               st == 'ok' and 'cache cleared' in tx and macok, '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('set interval 5')
+        st, tx, macok = ops_roundtrip('set modbus-interval 5')
         check('ops: set is forbidden', st == 'fail' and 'forbidden' in tx and 'admin' in tx and macok,
               '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('clear interval')
+        st, tx, macok = ops_roundtrip('clear modbus-interval')
         check('ops: clear is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('request restore')
         check('ops: request restore is forbidden', st == 'fail' and 'forbidden' in tx, '%s %s' % (st, tx))
@@ -296,15 +296,15 @@ def main():
         st, tx, macok = ops_roundtrip('show version', unsigned=True)
         check('ops: an unsigned command is still refused first', st == 'fail' and 'unsigned command' in tx,
               '%s %s' % (st, tx))
-        st, tx, macok = ops_roundtrip('set interval 5', token='admintok2')
+        st, tx, macok = ops_roundtrip('set modbus-interval 5', token='admintok2')
         check('ops: the admin token still steers the same server, mac\'d with the admin key',
               st == 'ok' and macok, '%s %s' % (st, tx))
         st, tx, macok = ops_roundtrip('show version', token='nope')
         check('ops: a bogus token is refused', st == 'auth-fail', '%s %s' % (st, tx))
         try:
             aud = open(OPS_AUDIT).read()
-            ok = ("role=ops cmd='request flush cache'" in aud and "role=admin cmd='set interval 5'" in aud
-                  and "role=ops cmd='shutdown'" in aud and "role=ops cmd='set interval 5' wire=h" in aud
+            ok = ("role=ops cmd='request flush cache'" in aud and "role=admin cmd='set modbus-interval 5'" in aud
+                  and "role=ops cmd='shutdown'" in aud and "role=ops cmd='set modbus-interval 5' wire=h" in aud
                   and 'result=ok' in aud)
         except OSError as e:
             aud, ok = str(e), False

@@ -53,10 +53,10 @@ hardware.
 .BI \-\-upstream " upstream"
 the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502)
 .TP
-.BI \-\-unit " unit"
+.BI \-\-modbus\-unit " modbus-unit"
 Modbus unit id
 .TP
-.BI \-\-timeout " timeout"
+.BI \-\-modbus\-timeout " modbus-timeout"
 Modbus connect/read timeout in seconds
 .TP
 .BI \-\-modbus\-auth " modbus-auth"
@@ -87,14 +87,14 @@ connection password (non\-empty ASCII, the gateway's own rule); the
 value may be `file:<path>` — the first line of an owner\-only 0600 file
 (a systemd LoadCredential rides as file:/run/credentials/...)
 .TP
-.BI \-\-interval " interval"
+.BI \-\-modbus\-interval " modbus-interval"
 seconds between cache polls
 .TP
-.BI \-\-read\-delay " read-delay"
+.BI \-\-modbus\-read\-delay " modbus-read-delay"
 seconds between consecutive inverter reads within a poll cycle, 0 = no
 delay
 .TP
-.BI \-\-merge\-gap " merge-gap"
+.BI \-\-modbus\-merge\-gap " modbus-merge-gap"
 max register gap when merging ranges into block reads, 0 = read ranges
 separately
 .TP
@@ -118,7 +118,7 @@ last matching rule decides, a register no rule decides refuses);
 carries under "acl"/"write", read and compiled at start and on every
 set)
 .TP
-.BI \-\-profile " profile"
+.BI \-\-modbus\-profile " modbus-profile"
 device profile JSON (the shared profiles/ schema)
 .TP
 .BI \-\-selection " selection"
@@ -348,12 +348,12 @@ the ops
 .RS
 .IP \(bu 2
 .B set <setting> <value>
-changes a setting live (interval, cache-ttl, read-delay,
-merge-gap, allow-write, write-registers, max-clients,
-client-timeout, upstream, unit, metrics-server,
+changes a setting live (modbus-interval, cache-ttl, modbus-read-delay,
+modbus-merge-gap, allow-write, write-registers, max-clients,
+client-timeout, upstream, modbus-unit, metrics-server,
 metrics-listen, the metrics caps, metrics-acl,
-audit-requests, dump-interval, log-level, local-time, profile,
-selection, connect-acl, write-acl, timeout, modbus-auth,
+audit-requests, dump-interval, log-level, local-time, modbus-profile,
+selection, connect-acl, write-acl, modbus-timeout, modbus-auth,
 modbus-auth-upstream, control-port, control-ops-verbs, control-trust-uids,
 control-socket-group, audit-log, audit-forward, audit-max-mb,
 no-audit-log, dump-path, dump-with-cache); a SIGHUP \(em or the wire's

@@ -72,8 +72,8 @@ Settings are resolved in this order (first hit wins), mirroring
 
 1. CLI flags (`--upstream`, `--listen`, …)
 2. Environment variables — the same names, bare (no tool prefix):
-   `UPSTREAM`, `UNIT`, `TIMEOUT`, `LISTEN`, `INTERVAL`, `READ_DELAY`,
-   `MERGE_GAP`, `PROFILE`, `SELECTION`, `TTL`, `ALLOW_WRITE`, … —
+   `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_TIMEOUT`, `LISTEN`, `MODBUS_INTERVAL`, `MODBUS_READ_DELAY`,
+   `MODBUS_MERGE_GAP`, `MODBUS_PROFILE`, `SELECTION`, `TTL`, `ALLOW_WRITE`, … —
    `show knobs` prints every knob with its env twin
 3. Config file (the set grammar: every line a `set <name> <value>` in the
    CLI spelling) — `--config` picks the file (default:
@@ -88,13 +88,13 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 |---|---|---|
 | **Upstream** | | |
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
-| `--unit` | `1` | Modbus unit id (1–247) |
-| `--timeout` | `3` | Modbus connect/read timeout, seconds |
-| `--profile` | the bundled `sun2000` profile | device profile JSON to cache (see [Register map](#register-map-device-profile)) |
-| `--interval` | `10` | seconds between cache polls |
+| `--modbus-unit` | `1` | Modbus unit id (1–247) |
+| `--modbus-timeout` | `3` | Modbus connect/read timeout, seconds |
+| `--modbus-profile` | the bundled `sun2000` profile | device profile JSON to cache (see [Register map](#register-map-device-profile)) |
+| `--modbus-interval` | `10` | seconds between cache polls |
 | `--cache-ttl` | `30` | per-register cache TTL in seconds (`0` = never expire) |
-| `--read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle |
-| `--merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
+| `--modbus-read-delay` | `0.05` | seconds between consecutive inverter reads within a poll cycle |
+| `--modbus-merge-gap` | `8` | max register gap when merging ranges into block reads (`0` = read separately) |
 | **Auth** | | |
 | `--modbus-auth` / `--modbus-auth-key` | `none` | the auth scheme the cache's **own Modbus clients** must speak + the shared key (**min 16 characters**) — see [Modbus auth](#modbus-auth); the value may be `file:<path>` |
 | `--modbus-auth-upstream` / `--modbus-auth-upstream-key` | `none` | the auth scheme **toward the upstream inverter** (`suite` or `waveshare`) + the key — see [Modbus auth](#modbus-auth) |
@@ -281,7 +281,7 @@ shared schema the [fake inverter](../inverter/README.md) serves and the
 [scraper](../scraper/README.md) scrapes; the shipped profiles live in the
 suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
 The format is documented in [profiles/README.md](../profiles/README.md).
-Resolution: `--profile` flag, env `PROFILE`, config `set modbus profile`,
+Resolution: `--modbus-profile` flag, env `MODBUS_PROFILE`, config `set modbus profile`,
 then the bundled copy; the file is re-read on `SIGHUP`.
 
 - Entry `type` gives the width and the space: `i16`/`u16` (one word),
@@ -307,7 +307,7 @@ monitoring set. The
 65000-65003 diagnostics block is never fetched — the cache synthesizes it.
 
 For slow dongles the poller reads the map in as **few transactions as
-possible**: ranges closer together than `--merge-gap` registers are merged
+possible**: ranges closer together than `--modbus-merge-gap` registers are merged
 into one block read (never across a function-code boundary); a block that
 fails is split in halves and the pieces are retried — the plan converges to
 the largest blocks the device actually answers.

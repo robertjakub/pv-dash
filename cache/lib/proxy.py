@@ -153,7 +153,7 @@ class Proxy:
             sel = self.config.get('selection')
             if sel == 'none':
                 return [], {}, {}      # cache nothing: an empty map
-            ranges, names, ttls = load_registers_file(self.config['profile'])
+            ranges, names, ttls = load_registers_file(self.config['modbus_profile'])
             if sel:
                 ranges, names, ttls = load_selection(sel, names, ttls)
         except SystemExit as e:
@@ -169,7 +169,7 @@ class Proxy:
         self.generation += 1
         self.blocks = build_blocks(ranges, self.merge_gap)
         logger.info('map reloaded: %d range(s) from %s%s, merge gap %d',
-                    len(ranges), self.config['profile'],
+                    len(ranges), self.config['modbus_profile'],
                     ' (selection: %s)' % self.config['selection'] if self.config.get('selection') else '',
                     self.merge_gap)
         self.log_map()
@@ -184,17 +184,17 @@ class Proxy:
         metrics_acl = self._resolve_ip_acl(self.config.get('metrics_acl'), 'metrics')
         self.upstream.host = self.config['host']
         self.upstream.port = self.config['port']
-        self.upstream.unit = self.config['unit']
-        self.upstream.timeout = self.config['timeout']
+        self.upstream.unit = self.config['modbus_unit']
+        self.upstream.timeout = self.config['modbus_timeout']
         self.upstream.auth = self.config['modbus_auth_upstream']
         self.upstream.auth_key = self.config['modbus_auth_upstream_key']
         with self.upstream.lock:
             self.upstream.close()
         ranges, names, ttls = self.load_map()
         self.no_cache = self.config.get('selection') == 'none'
-        self.read_delay = self.config['read_delay']
-        self.merge_gap = self.config['merge_gap']
-        self.interval = self.config['interval']
+        self.read_delay = self.config['modbus_read_delay']
+        self.merge_gap = self.config['modbus_merge_gap']
+        self.interval = self.config['modbus_interval']
         self.allow_write = bool(self.config.get('allow_write', False))
         self.set_write_registers(self.config.get('write_registers'))
         self.log_access = bool(self.config.get('log_access', False))
@@ -208,9 +208,9 @@ class Proxy:
         self.cache.cache_ttl = self.config['cache_ttl']
         self.cache.update_map(ranges, names, ttls)
         self.generation += 1
-        self.blocks = build_blocks(ranges, self.config['merge_gap'])
+        self.blocks = build_blocks(ranges, self.config['modbus_merge_gap'])
         logger.info('SIGHUP: reloaded %d range(s) from %s (upstream %s:%d unit %d, interval %gs, cache ttl %gs, merge gap %d)',
-                    len(ranges), self.config['profile'], self.upstream.host, self.upstream.port,
+                    len(ranges), self.config['modbus_profile'], self.upstream.host, self.upstream.port,
                     self.upstream.unit, self.interval, self.cache.cache_ttl, self.merge_gap)
         self.log_map()
         self.poll_wake.set()
@@ -401,7 +401,7 @@ class Proxy:
         suffix all carry it (the file is config trust: chmod 0600)."""
         try:
             if val == 'profile':
-                desc, rules = load_profile_write_gate(self.config.get('profile'))
+                desc, rules = load_profile_write_gate(self.config.get('modbus_profile'))
                 self.write_gate_warn = None
             elif isinstance(val, str) and val.startswith('file:'):
                 desc, rules = load_write_gate_file(val[5:])

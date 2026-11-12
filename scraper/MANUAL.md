@@ -60,20 +60,20 @@ The kinds — every row of the tables below carries one:
 
 | command | kind | description |
 |---|---|---|
-| `help` | command (internal) |  |
+| `help` | command (internal) | describe a word (help \<setting>) or map every knob (help config) |
 | `inspect` | command | one pretty dump of everything (the state, the counters, the caps) |
-| `ping` | command (internal) |  |
-| `quit` | command |  |
+| `ping` | command (internal) | keep-alive: answers pong |
+| `quit` | command | close the session |
 | `request` | namespace | the state machinery: the dump written and restored, the config re-read, the poll woken, the session dropped |
-| `request dump` | command (hidden) |  |
+| `request dump` | command (hidden) | write the state dump: the live setting overrides, sealed (when the daemon has a dump path) |
 | `request poll` | namespace | the poll loop's manual wake |
 | `request poll now` | command | wake the poll loop immediately |
 | `request reload` | command | save the live overrides and restart the whole daemon (the config file and the flags are re-resolved) |
-| `request reload-config` | command |  |
+| `request reload-config` | command | re-read the config file (the SIGHUP path) |
 | `request restart` | command | drop the Modbus session (reconnects on the next poll) |
-| `request restore` | command (hidden) |  |
+| `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
 | `set` | command | configure a setting (set metrics interval 5, set log-access on) |
-| `show` | command |  |
+| `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the scraper (asks to confirm) |
 | `clear` | command | restore a setting to its configured value (clear modbus interval, clear system log-level) |
 

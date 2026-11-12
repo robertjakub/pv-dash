@@ -36,8 +36,9 @@ or \\fBERR\\fR and the connection fails (the poller keeps retrying).
 Empty auth = no auth at all.
 .PP
 The exposition endpoint is the tool's serving surface: the connection caps
-(\\fB--max-clients\\fR total, \\fB--max-conn-per-ip\\fR per peer, extras
-get an immediate 503), the idle keep-alive kick (\\fB--client-timeout\\fR)
+(\\fB--metrics-max-clients\\fR total, \\fB--metrics-max-conn-per-ip\\fR per peer,
+extras get an immediate 503), the idle keep-alive kick
+(\\fB--metrics-client-timeout\\fR)
 and the bearer token (\\fB--auth-token\\fR, the value a token or a
 \\fBfile:<path>\\fR reference). A
 non-loopback listen without a token refuses to start (F13 in

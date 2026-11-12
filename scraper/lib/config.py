@@ -77,12 +77,12 @@ def validate_config(cfg):
         fail('max_kwp', 'must be 0 (checks off) or a positive kW value')
     if cfg['level'] not in LOG_LEVELS:
         fail('log_level', 'must be one of %s' % ', '.join(LOG_LEVELS))
-    if cfg['max_clients'] < 0:
-        fail('max_clients', 'must be >= 0 (0 = unlimited)')
-    if cfg['client_timeout'] < 0:
-        fail('client_timeout', 'must be >= 0 (0 = off)')
-    if cfg['max_conn_per_ip'] < 0:
-        fail('max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
+    if cfg['metrics_max_clients'] < 0:
+        fail('metrics_max_clients', 'must be >= 0 (0 = unlimited)')
+    if cfg['metrics_client_timeout'] < 0:
+        fail('metrics_client_timeout', 'must be >= 0 (0 = off)')
+    if cfg['metrics_max_conn_per_ip'] < 0:
+        fail('metrics_max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
     if cfg['modbus_read_delay'] < 0:
         fail('modbus_read_delay', 'must be >= 0')
     if cfg['modbus_merge_gap'] < 0:
@@ -92,7 +92,7 @@ def validate_config(cfg):
              % (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
     if not (AUDIT_FILES_MIN <= cfg['audit_files'] <= AUDIT_FILES_MAX):
         fail('audit_files', 'must be %d..%d' % (AUDIT_FILES_MIN, AUDIT_FILES_MAX))
-    for key in ('modbus_timeout', 'modbus_interval', 'max_kwp', 'max_grid_kw', 'client_timeout'):
+    for key in ('modbus_timeout', 'modbus_interval', 'max_kwp', 'max_grid_kw', 'metrics_client_timeout'):
         if not math.isfinite(cfg[key]):
             fail(key, 'must be a finite number (nan/inf are nonsense here)')
     if cfg['dump_interval'] < 0:
@@ -250,13 +250,13 @@ def resolve_config(args, script_dir=None):
         'listen': resolve(args.listen, 'LISTEN', 'listen', DEFAULTS['listen'], str),
         'modbus_interval': resolve(args.modbus_interval, 'MODBUS_INTERVAL', 'modbus_interval',
                                    DEFAULTS['modbus_interval'], float, row=OPT['modbus-interval']),
-        'max_clients': resolve(args.max_clients, 'MAX_CLIENTS', 'max_clients',
-                               DEFAULTS['max_clients'], int, row=OPT['max-clients']),
-        'client_timeout': resolve(args.client_timeout, 'CLIENT_TIMEOUT', 'client_timeout',
-                                  DEFAULTS['client_timeout'], float, row=OPT['client-timeout']),
-        'max_conn_per_ip': resolve(getattr(args, 'max_conn_per_ip', None), 'MAX_CONN_PER_IP',
-                                   'max_conn_per_ip', DEFAULTS['max_conn_per_ip'], int,
-                                   row=OPT['max-conn-per-ip']),
+        'metrics_max_clients': resolve(getattr(args, 'metrics_max_clients', None), 'METRICS_MAX_CLIENTS', 'metrics_max_clients',
+                                       DEFAULTS['metrics_max_clients'], int, row=OPT['metrics-max-clients']),
+        'metrics_client_timeout': resolve(getattr(args, 'metrics_client_timeout', None), 'METRICS_CLIENT_TIMEOUT', 'metrics_client_timeout',
+                                          DEFAULTS['metrics_client_timeout'], float, row=OPT['metrics-client-timeout']),
+        'metrics_max_conn_per_ip': resolve(getattr(args, 'metrics_max_conn_per_ip', None), 'METRICS_MAX_CONN_PER_IP',
+                                           'metrics_max_conn_per_ip', DEFAULTS['metrics_max_conn_per_ip'], int,
+                                           row=OPT['metrics-max-conn-per-ip']),
         'metrics_acl': (resolve(getattr(args, 'metrics_acl', None), 'METRICS_ACL',
                                 'metrics_acl', DEFAULTS['metrics_acl'], str) or '').strip() or 'any',
         'local_time': resolve(args.local_time or None, 'LOCAL_TIME', 'local_time', DEFAULTS['local_time'], str_to_bool),

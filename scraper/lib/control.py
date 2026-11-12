@@ -243,20 +243,13 @@ class ControlServer(_ControlServer):
             s.client.auth = v
             s.client.close()   # the next poll reconnects — and handshakes when suite is on
             return v or 'none'
-        if key == 'max-clients':   # the F13 cap: the one httpd's client gate (the metrics-max-clients row shares the cfg key)
+        if key == 'metrics-max-clients':   # the F13 cap: the one httpd's client gate
             v = numi(val, 'max-clients', 'clients')
             self._gate_range(key, v)
             if not self.httpd:
                 raise ValueError('no http server attached')
             with s.lock:
-                s.cfg['max_clients'] = v
-            self.httpd.gate.max_total = v
-            return '%d' % v
-        if key == 'metrics-max-clients':
-            v = numi(val, 'max-clients', 'clients')
-            self._gate_range(key, v)
-            if not self.httpd:
-                raise ValueError('no http server attached')
+                s.cfg['metrics_max_clients'] = v
             self.httpd.gate.max_total = v
             return '%d' % v
         if key == 'metrics-client-timeout':
@@ -265,7 +258,7 @@ class ControlServer(_ControlServer):
             if not self.httpd:
                 raise ValueError('no http server attached')
             with s.lock:
-                s.cfg['client_timeout'] = v
+                s.cfg['metrics_client_timeout'] = v
             self.httpd.RequestHandlerClass.timeout = v or None
             return secs(v)
         if key == 'metrics-max-conn-per-ip':
@@ -273,6 +266,8 @@ class ControlServer(_ControlServer):
             self._gate_range(key, v)
             if not self.httpd:
                 raise ValueError('no http server attached')
+            with s.lock:
+                s.cfg['metrics_max_conn_per_ip'] = v
             self.httpd.gate.max_per_ip = v
             return '%d' % v
         if key == 'metrics-acl':
@@ -382,12 +377,12 @@ class ControlServer(_ControlServer):
         if key == 'modbus-timeout':
             return secs(cfg['modbus_timeout'])
         if key == 'metrics-max-clients':
-            return '%d' % (self.httpd.gate.max_total if self.httpd else cfg['max_clients'])
+            return '%d' % (self.httpd.gate.max_total if self.httpd else cfg['metrics_max_clients'])
         if key == 'metrics-client-timeout':
-            ct = self.httpd.RequestHandlerClass.timeout if self.httpd else cfg['client_timeout'] or None
+            ct = self.httpd.RequestHandlerClass.timeout if self.httpd else cfg['metrics_client_timeout'] or None
             return 'off' if not ct else secs(ct)
         if key == 'metrics-max-conn-per-ip':
-            return '%d' % (self.httpd.gate.max_per_ip if self.httpd else cfg['max_conn_per_ip'])
+            return '%d' % (self.httpd.gate.max_per_ip if self.httpd else cfg['metrics_max_conn_per_ip'])
         if key == 'metrics-acl':
             return acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any')
         if key == 'log-access':
@@ -439,9 +434,9 @@ class ControlServer(_ControlServer):
             'metrics-prefix': cfg['metrics_prefix'],
             'max-kwp': cfg['max_kwp'],
             'max-grid-kw': cfg['max_grid_kw'],
-            'metrics-max-clients': cfg['max_clients'],
-            'metrics-client-timeout': cfg['client_timeout'],
-            'metrics-max-conn-per-ip': cfg['max_conn_per_ip'],
+            'metrics-max-clients': cfg['metrics_max_clients'],
+            'metrics-client-timeout': cfg['metrics_client_timeout'],
+            'metrics-max-conn-per-ip': cfg['metrics_max_conn_per_ip'],
             'metrics-acl': acl_value_text(self.httpd.metrics_acl) if self.httpd else (cfg['metrics_acl'] or 'any'),
             'log-access': 'on' if cfg['log_access'] else 'off',
             'log-level': logging.getLevelName(logging.getLogger().getEffectiveLevel()),
@@ -622,9 +617,9 @@ class ControlServer(_ControlServer):
             'values    %s' % ('; '.join('%s=%g' % (k, v) for k, v in sorted(values.items())) or 'none yet'),
             'clients   %d active (limit %s, timeout %s, per-ip %s)'
             % (gate.total() if gate else 0,
-               (gate.max_total if gate else cfg['max_clients']) or 'none',
-               secs(cfg['client_timeout']) if cfg['client_timeout'] else 'off',
-               (gate.max_per_ip if gate else cfg['max_conn_per_ip']) or 'none'),
+               (gate.max_total if gate else cfg['metrics_max_clients']) or 'none',
+               secs(cfg['metrics_client_timeout']) if cfg['metrics_client_timeout'] else 'off',
+               (gate.max_per_ip if gate else cfg['metrics_max_conn_per_ip']) or 'none'),
             'auth      %s, log access %s' % ('bearer' if cfg['auth_token'] else 'none',
                                              'on' if cfg['log_access'] else 'off'),
             'audit     %s' % ('off' if self.audit is None

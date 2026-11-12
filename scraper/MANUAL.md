@@ -143,9 +143,9 @@ the /metrics serving limits (the client caps and the idle timeouts)
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `max-clients` | `set metrics limits max-clients` | settable | `N` | `--max-clients` / `MAX_CLIENTS` | simultaneous HTTP clients on /metrics; extras get an immediate 503 |
-| `client-timeout` | `set metrics limits timeout` | settable | `s` | `--client-timeout` / `CLIENT_TIMEOUT` | kick idle keep-alive HTTP clients after this long |
-| `max-conn-per-ip` | `set metrics limits max-conn-per-ip` | settable | `N` | `--max-conn-per-ip` / `MAX_CONN_PER_IP` | simultaneous HTTP connections from one peer IP |
+| `metrics-max-clients` | `set metrics limits max-clients` | settable | `N` | `--metrics-max-clients` / `METRICS_MAX_CLIENTS` | simultaneous HTTP clients on /metrics; extras get an immediate 503 |
+| `metrics-client-timeout` | `set metrics limits timeout` | settable | `s` | `--metrics-client-timeout` / `METRICS_CLIENT_TIMEOUT` | kick idle keep-alive HTTP clients after this long |
+| `metrics-max-conn-per-ip` | `set metrics limits max-conn-per-ip` | settable | `N` | `--metrics-max-conn-per-ip` / `METRICS_MAX_CONN_PER_IP` | simultaneous HTTP connections from one peer IP |
 
 ### control
 

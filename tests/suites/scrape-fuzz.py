@@ -56,7 +56,7 @@ try:
     time.sleep(0.7)
     with open(os.path.join(SCRATCH, 'scr_fuzz.ini'), 'w') as fh:
         fh.write('# the set grammar (the ini format is gone)\nset modbus-interval 1\nset modbus-timeout 1\n'
-                 'set client-timeout 2\nset max-clients 16\nset log-level DEBUG\n')
+                  'set metrics-client-timeout 2\nset metrics-max-clients 16\nset log-level DEBUG\n')
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_fuzz.ini'),
                                    '--upstream', '127.0.0.1:%d' % INV_PORT,
                                    '--listen', '127.0.0.1:%d' % PORT],

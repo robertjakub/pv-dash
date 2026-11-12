@@ -1398,8 +1398,9 @@ try:
           r.returncode == 1 and b'0600' in r.stderr and b'Traceback' not in r.stderr,
           repr(r.stderr[-140:]))
 
-    # 3e. resource limits: --max-clients 503s the overflow, --client-timeout kicks idle keep-alives
-    write_ini(os.path.join(SCRATCH, 'scr_lim.ini'), 'set max-clients 1\nset client-timeout 1\nset max-conn-per-ip 1')
+    # 3e. resource limits: --metrics-max-clients 503s the overflow, --metrics-client-timeout kicks idle keep-alives
+    write_ini(os.path.join(SCRATCH, 'scr_lim.ini'),
+              'set metrics-max-clients 1\nset metrics-client-timeout 1\nset metrics-max-conn-per-ip 1')
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_lim.ini'),
                                    '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % (19448 + BASE)],
@@ -1411,7 +1412,7 @@ try:
     s2 = socket.create_connection(('127.0.0.1', 19448), timeout=5)
     s2.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\n\r\n')
     reply = s2.recv(64)
-    check('max-clients: overflow connection -> 503 rate limit', reply.startswith(b'HTTP/1.1 503'),
+    check('metrics-max-clients: overflow connection -> 503 rate limit', reply.startswith(b'HTTP/1.1 503'),
           reply.split(b'\r\n')[0].decode())
     s2.close()
     parked.close()  # release the only client slot for the idle test
@@ -1421,17 +1422,18 @@ try:
     buf = b''
     while b'\r\n\r\n' not in buf:
         buf += idle.recv(4096)
-    check('client-timeout: served before idle kick', buf.startswith(b'HTTP/1.1 200'))
+    check('metrics-client-timeout: served before idle kick', buf.startswith(b'HTTP/1.1 200'))
     clen = int(next(line.split(b': ')[1] for line in buf.split(b'\r\n')
                     if line.lower().startswith(b'content-length: ')))
     while len(buf) - buf.index(b'\r\n\r\n') - 4 < clen:  # drain the body: keep-alive must go idle
         buf += idle.recv(4096)
     idle.settimeout(6)
     eof = idle.recv(64)  # blocks until the server closes the idle keep-alive socket (~1 s)
-    check('client-timeout: idle keep-alive closed', eof == b'', repr(eof[:40]))
+    check('metrics-client-timeout: idle keep-alive closed', eof == b'', repr(eof[:40]))
 
     # 3e2. the per-IP cap: two simultaneous connections from 127.0.0.1, the second 503s
-    write_ini(os.path.join(SCRATCH, 'scr_pip.ini'), 'set max-conn-per-ip 1\nset max-clients 0')
+    write_ini(os.path.join(SCRATCH, 'scr_pip.ini'),
+              'set metrics-max-conn-per-ip 1\nset metrics-max-clients 0')
     procs.append(subprocess.Popen([sys.executable, P, '--config', os.path.join(SCRATCH, 'scr_pip.ini'),
                                    '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % (19449 + BASE)],
@@ -1443,7 +1445,7 @@ try:
     s2 = socket.create_connection(('127.0.0.1', 19449), timeout=5)
     s2.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\n\r\n')
     reply = s2.recv(64)
-    check('max-conn-per-ip: the second connection from one IP -> 503', reply.startswith(b'HTTP/1.1 503'),
+    check('metrics-max-conn-per-ip: the second connection from one IP -> 503', reply.startswith(b'HTTP/1.1 503'),
           reply.split(b'\r\n')[0].decode())
     s2.close()
     parked.close()
@@ -1854,11 +1856,11 @@ try:
     check('scraper control: clear restores the configured value', r.startswith('ok modbus-interval='), r[:80])
     r = sctl('set log-access on', 15597)
     check('scraper control: set log-access', r.startswith('ok log-access=on'), r[:80])
-    r = sctl('set max-conn-per-ip 2', 15597)
-    check('scraper control: the per-IP cap live (the path form)', r.startswith('ok max-conn-per-ip=2'), r[:80])
-    r = sctl('set max-conn-per-ip 9999', 15597)
+    r = sctl('set metrics-max-conn-per-ip 2', 15597)
+    check('scraper control: the per-IP cap live (the path form)', r.startswith('ok metrics-max-conn-per-ip=2'), r[:80])
+    r = sctl('set metrics-max-conn-per-ip 9999', 15597)
     check('scraper control: the row bounds gate (min/max off the registry row)',
-          r.startswith('fail max-conn-per-ip must be 0..4096'), r[:80])
+          r.startswith('fail metrics-max-conn-per-ip must be 0..4096'), r[:80])
     r = sctl('help modbus', 15597)
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
@@ -2578,7 +2580,7 @@ try:
 
     # the accept ladder's order: the ACL first, then the caps — the cap
     # refusal is only ever answered to a peer the ACL admitted
-    r = acl_ctl('set max-clients 1')
+    r = acl_ctl('set metrics-max-clients 1')
     check('metrics acl order: the cap sets live', r.startswith('ok'), r[:80])
     hold = socket.create_connection(('127.0.0.1', 19465), timeout=5)
     hold.sendall(b'GET /metrics HTTP/1.1\r\nHost: t\r\n')   # the partial request parks the handler thread (the exposition handler has no timeout)
@@ -2592,7 +2594,7 @@ try:
     hold.close()
     time.sleep(0.3)
     acl_ctl('clear metrics-acl')
-    r = acl_ctl('clear max-clients')
+    r = acl_ctl('clear metrics-max-clients')
     check('metrics acl order: the cap unsets back', r.startswith('ok'), r[:80])
     check('metrics acl order: any serves after the ladder', acl_raw().startswith(b'HTTP/1.1 200'))
     os.remove(ACLGATE)

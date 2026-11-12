@@ -109,7 +109,7 @@ set system log-level INFO
 | `--control-log-replies` | off | DEBUG-log the full output of every control command (plainly: the command and its status); live: `set system log-replies` |
 | `--dump-path` / `--dump-key` / `--dump-interval` / `--restore-on-start` | off | the sealed state dump (the live overrides; `request dump`/`restore`, every `--dump-interval` seconds) |
 | `--audit-log` (+ `--audit-max-mb`, `--audit-daily`, `--audit-files`, `--no-audit-log`, `--audit-forward`, `--audit-forward-format`) | XDG state | the SCR audit trail: a file path, `-` for stdout (the docker/journald way) or `none` (no local file — the forward carries the trail); the forward mirrors every line onward (F10) |
-| `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) |
+| `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (overflow gets an immediate `503 # rate limited`) — the cache's `metrics-*` spellings, shared with the cache's /metrics endpoint |
 | `--log-level` / `--log-access` / `--local-time` | `INFO` / off / UTC | the log surface |
 | `--config` / `--dry-run` / `--man` | — | the config file path / validate + print and exit / print the generated man page |
 

@@ -105,7 +105,8 @@ class Handler(BaseHTTPRequestHandler):
 
 class Server(GatedHTTPServer):
     """The exposition server behind the connection caps (F13 round):
-    --max-clients (total) and --max-conn-per-ip — past either, an immediate
+    --metrics-max-clients (total) and --metrics-max-conn-per-ip — past
+    either, an immediate
     503; 0 = unlimited. setup_gate() runs before bind. Ahead of the caps
     the metrics/acl gate checks the peer IP at accept (the modbus-cache
     connect-ACL reading): a client off the ACL is closed without a reply

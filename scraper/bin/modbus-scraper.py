@@ -60,7 +60,7 @@ def parse_args():
 def describe(cfg, args, control_desc):
     caps = (['pv cap %gW' % (cfg['max_kwp'] * 1000.0)] if cfg['max_kwp'] > 0 else []) + \
            (['grid cap %gW' % (cfg['max_grid_kw'] * 1000.0)] if cfg['max_grid_kw'] > 0 else [])
-    limits = limits_words(cfg['max_clients'], cfg['client_timeout'], cfg['max_conn_per_ip']) + \
+    limits = limits_words(cfg['metrics_max_clients'], cfg['metrics_client_timeout'], cfg['metrics_max_conn_per_ip']) + \
              (['metrics-acl %s' % cfg['metrics_acl']] if cfg['metrics_acl'] not in ('any', '') else [])
     listen_host, listen_port = parse_listen(cfg['listen'])
     return ('polling %s:%d unit %d (profile %s, %d registers, positive=%s, modbus auth %s) every %gs; '
@@ -123,7 +123,7 @@ def main():
     Handler.scraper = scraper
     Handler.log_access = cfg['log_access']
     Handler.auth_token = cfg['auth_token']
-    Handler.timeout = cfg['client_timeout'] or None
+    Handler.timeout = cfg['metrics_client_timeout'] or None
     logger.info('%s', describe(cfg, args, control_desc))
     log_state_dumps(cfg['dump_path'], cfg['dump_key'], cfg['restore_on_start'])
     if args.dry_run:
@@ -134,7 +134,7 @@ def main():
     except OSError as e:
         logger.error('cannot bind %s:%d: %s', listen_host, listen_port, e)
         raise SystemExit(1)
-    httpd.setup_gate(cfg['max_clients'], cfg['max_conn_per_ip'])
+    httpd.setup_gate(cfg['metrics_max_clients'], cfg['metrics_max_conn_per_ip'])
     metrics_acl, metrics_acl_warn = resolve_metrics_acl(cfg['metrics_acl'])   # the accept-time gate (validated at resolve_config)
     httpd.metrics_acl = metrics_acl
     if metrics_acl_warn:
@@ -214,9 +214,9 @@ def main():
         scraper.reload(new_cfg)
         Handler.log_access = new_cfg['log_access']
         Handler.auth_token = new_cfg['auth_token']
-        Handler.timeout = new_cfg['client_timeout'] or None
-        httpd.gate.max_total = new_cfg['max_clients']
-        httpd.gate.max_per_ip = new_cfg['max_conn_per_ip']
+        Handler.timeout = new_cfg['metrics_client_timeout'] or None
+        httpd.gate.max_total = new_cfg['metrics_max_clients']
+        httpd.gate.max_per_ip = new_cfg['metrics_max_conn_per_ip']
         metrics_acl, metrics_acl_warn = resolve_metrics_acl(new_cfg['metrics_acl'])   # a bad value or file keeps the previous gate
         httpd.metrics_acl = metrics_acl
         if metrics_acl_warn:

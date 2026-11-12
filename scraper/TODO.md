@@ -5,6 +5,15 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The flat-name unification wave renamed the three /metrics limit knobs to
+the cache's spellings — `metrics-max-clients`/`metrics-client-timeout`/
+`metrics-max-conn-per-ip` (flags, `METRICS_*` envs, config-script keys and
+the internal cfg keys follow; cache is the master). The wire's
+`set metrics limits …` paths, the state-dump keys (which already spoke the
+cache spellings) and the defaults 64/300/0 are unchanged; the duplicate
+`_apply` branch pair (the old wire name + the reload's dump key) collapsed
+into one, and the per-IP branch gained the show-config write-back it was
+missing.
 The console-pager wave put every cli render through one door
 (common/wire/cli.py's page_out): a reply taller than the screen pauses at a
 page (the cbreak `-- more --` reader, the more(1) keys — space/return/q),

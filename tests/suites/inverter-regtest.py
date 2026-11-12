@@ -177,9 +177,11 @@ def main():
         check('help <command>: the row describes itself',
               tx == 'ok restore a setting to its configured value: clear <setting>', tx)
         tx = ctl(A_CTL, 'help request')
-        check('help <command node>: the namespace lists its visible children',
-              tx == 'ok     reload        save the live overrides and restart the whole daemon (the flags and the env are re-resolved)\n'
-                    '    reload-config re-read the config file (the values re-apply over the running machines)', tx)
+        check('help <command node>: the namespace lists its children, the hidden marked (* rule)',
+              tx == 'ok     *dump          write the state dump: the live setting overrides, sealed (when the fake has a dump path)\n'
+                    '    *reload        save the live overrides and restart the whole daemon (the flags and the env are re-resolved)\n'
+                    '    *reload-config re-read the config file (the values re-apply over the running machines)\n'
+                    '    *restore       re-apply a state dump\'s overrides (when the fake has a dump path)', tx)
         tx = ctl(A_CTL, 'help request reload')
         check('help <deep command path>: the row describes itself',
               tx == 'ok save the live overrides and restart the whole daemon (the flags and the env are re-resolved)', tx)

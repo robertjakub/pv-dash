@@ -1,8 +1,10 @@
 #!/bin/sh
 # the dev launcher: the daemon straight from the checkout against the
 # shipped samples — the packaged-root defaults don't exist in a source
-# tree (the loader never reaches into examples/ on its own). Extra
+# tree (the loader never reaches into examples/ on its own). The audit
+# trail rides stdout (-) so the dev terminal streams it. Extra
 # flags/env pass through: inverter/dev --dry-run, inverter/dev --profile sun2000
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
 exec python3 "$DIR/bin/modbus-fake-inverter.py" \
-    --config "$DIR/examples/modbus-fake-inverter.conf" "$@"
+    --config "$DIR/examples/modbus-fake-inverter.conf" \
+    --audit-log - "$@"

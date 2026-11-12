@@ -125,7 +125,6 @@ translate). The namespaces group them.
 | `metrics-max-clients` | — | startup-only | `N` | `--metrics-max-clients` / — | maximum concurrent HTTP clients on the /metrics endpoint; extras get an immediate 503, 0 = unlimited |
 | `metrics-client-timeout` | — | startup-only | `s` | `--metrics-client-timeout` / — | seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap |
 | `metrics-max-conn-per-ip` | — | startup-only | `N` | `--metrics-max-conn-per-ip` / — | maximum concurrent /metrics connections from one peer IP, 0 = no per-IP limit |
-| `dump-interval` | `set dump-interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 
 ### system
 
@@ -220,6 +219,7 @@ the state dump: the live overrides' file, the restore-on-start
 |---|---|---|---|---|---|
 | `dump-path` | `set dump path` | settable | `\<file>` | `--dump-path` / `DUMP_PATH` | the state dump file: the live overrides, written on request dump, the graceful shutdown and every dump-interval |
 | `dump-key` | — | startup-only (secret) | `TEXT` | `--dump-key` / `DUMP_KEY` | the key that seals the state dumps (the reload's state file too) (`file:<path>` reads an owner-only file) *(hidden)* |
+| `dump-interval` | `set dump interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 | `restore-on-start` | `set dump restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
 
 ## Show reports

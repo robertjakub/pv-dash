@@ -29,14 +29,14 @@ from common.runtime.audit import load_audit_tags
 from common.wire import cli
 from common.render.texts import T
 from lib.man import cli_page
-from lib.options import ALIAS_NAMES, COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, NODE_BY_NAME, POOL_NAMES, SETTING_SPELLINGS, SHOW_LIVES
+from lib.options import COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, NODE_BY_NAME, POOL_NAMES, SETTING_SPELLINGS, SHOW_LIVES
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_MAX_LINE_BYTES_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, \
     CLI_TIMEOUT_S, DEFAULT_CONTROL_SOCKET
 
 
-POOL_NAMES, describe_word, command_pool, setting_pool, welcome = cli.pools(
+describe_word, command_pool, setting_pool, welcome = cli.pools(
     COMMANDS, COMMAND_INTERNAL, COMMAND_HIDDEN, SETTING_SPELLINGS, NODE_BY_NAME, COMMAND_HELP,
-    POOL_NAMES, 'fake-inverter')
+    POOL_NAMES, 'fake-inverter', hidden_settings=HIDDEN_SETTINGS)
 
 
 TAGS = load_audit_tags('inverter')

@@ -304,7 +304,7 @@
       "help": "the key that seals the state dumps and the reload's state file: the state rides encrypted (an HMAC-SHA256 counter-mode keystream, authenticated — a restore refuses a wrong or missing key, and a configured key refuses an unsealed dump); the reload re-exec re-resolves the same key, so the state file reads on the other side; no key = the dumps stay 0600 plaintext with the integrity hash; a dump path without a key warns at start and on set; the value may be `file:<path>` — the first line of an owner-only 0600 file (a systemd LoadCredential rides as file:/run/credentials/...)",
       "secret": true, "hidden": true, "restart": true },
     { "name": "dump-interval", "flag": "--dump-interval", "env": "DUMP_INTERVAL", "conv": "float",
-      "live": "dump-interval",
+      "live": "dump/interval",
       "setting-help": "seconds between the automatic state dumps (the live setting overrides)", "values": [ "off" ],
       "hint": "s|off", "value-help": { "off": "only request dump and the shutdown dump" }, "default": 0.0,
       "help": "seconds between the automatic state dumps, 0 = on request (the request dump command and the shutdown)",

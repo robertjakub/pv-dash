@@ -65,12 +65,10 @@ EXEMPT = {
     ('options', 'allow-write'): ('help', 'setting-help', 'value-help',),  # the cache forwards, the fake accepts
     ('options', 'auth-token'): ('help', 'setting-help',),  # the endpoints differ
     ('options', 'connect-acl'): ('help', 'setting-help', 'value-help',),  # the mirror wording stays local (the hint/values aligned)
-    ('options', 'control'): ('setting-help',),  # the cache's control plane names the target first
     ('options', 'control-log-replies'): ('env',),  # the dashboard's env twin; the daemons read none
     ('options', 'control-ops-token'): ('help', 'setting-help',),  # the cache's show,flush policy
-    ('options', 'control-port'): ('help', 'setting-help',),  # the inverter's unix-only wording; the helps carry the tool's ctl name
+    ('options', 'control-port'): ('setting-help',),  # the inverter's unix-only wording
     ('options', 'control-socket-group'): ('help', 'setting-help',),  # the fake's why-tail
-    ('options', 'control-trust-uids'): ('help', 'setting-help',),  # the fake's env note tail
     ('options', 'control/ops'): ('setting-help',),  # the cache's ops role names the second token
     ('options', 'dump'): ('setting-help',),  # the cache's dump words (the cached knobs' prose names the cache)
     ('options', 'dump-interval'): ('setting-help',),  # the cache's dump words

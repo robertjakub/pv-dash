@@ -125,6 +125,27 @@ mechanically; no hand edits there.
 
 ## The landed ledger
 
+    67 canon blocks (46 family-wide, 0 dead) after the mechanical fold-up.
+
+### The mechanical fold-up — the eleven, flown at review (Nov 12)
+
+| knob | move |
+|---|---|
+| metrics-client-timeout | the block carries default 5.0; the scraper keeps 300 inline |
+| modbus-auth-key | the block speaks the generic setting-help; the cache's "for the cache's clients" stays inline |
+| log-access | the block speaks the connects/disconnects prose; scraper/dashboard keep the HTTP texts |
+| show connections | a show block speaks "connected clients: peer, age, requests served"; scraper/dashboard keep the gate-counter spell |
+| metrics-listen | the dashboard's bare help gains the F13 bind note |
+| control-port | the ctl-name tails dropped — the helps fold; the exempt keeps the inverter's unix-only setting-help |
+| control-log-replies | the env twin folds; the daemons' no-env refusals win |
+| connect-acl | a new canon block carries the identity + the values vocab (the inverter gains it); the prose stays local |
+| control | the block adopts the cache's superset ("the target, the tokens, …"); the exempt retired |
+| control-trust-uids | the fake's "(env …)" duplication tails dropped — the row thin-ref'd; the exempt retired |
+| control-ops-token | the fake's "(env …)" tails dropped (the policy prose stays inline) |
+| local-time | the block gains the generic on/off value-help |
+
+Declined at fly: control-socket-group's inverter tail is the fake's why-reasoning, not duplication — the exempt stands.
+
 Flown as proposed, with the corrections the tables above carry. The drift
 report after the wave:
 

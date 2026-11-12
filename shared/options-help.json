@@ -99,11 +99,23 @@
       "min": 0,
       "max": 86400
     },
+    "connect-acl": {
+      "flag": "--connect-acl",
+      "env": "CONNECT_ACL",
+      "conv": "str",
+      "values": [
+        "any",
+        "none"
+      ],
+      "hint": "any|none|IP,...|file:<path>",
+      "default": "any"
+    },
     "control": {
-      "setting-help": "the control plane: the tokens, the ops role's RBAC policy, the trusted peers"
+      "setting-help": "the control plane: the target, the tokens, the ops role's RBAC policy, the trusted peers"
     },
     "control-log-replies": {
       "flag": "--control-log-replies",
+      "env": "CONTROL_LOG_REPLIES",
       "conv": "bool",
       "setting-help": "DEBUG-log the full output of every control command (plainly: the command and its status log)",
       "values": [
@@ -232,6 +244,10 @@
         "on",
         "off"
       ],
+      "value-help": {
+        "on": "log timestamps in the system time zone",
+        "off": "log timestamps in UTC (the default)"
+      },
       "default": false,
       "help": "log timestamps in the system time zone instead of UTC"
     },
@@ -239,11 +255,13 @@
       "flag": "--log-access",
       "env": "LOG_ACCESS",
       "conv": "bool",
+      "setting-help": "log client connects/disconnects at INFO instead of DEBUG",
       "values": [
         "on",
         "off"
       ],
-      "default": false
+      "default": false,
+      "help": "log client connects/disconnects at INFO instead of DEBUG"
     },
     "log-level": {
       "flag": "--log-level",
@@ -303,6 +321,7 @@
       "conv": "float",
       "setting-help": "seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap",
       "hint": "s",
+      "default": 5.0,
       "help": "seconds an idle /metrics client is kept before the socket times out, 0 = the built-in 5 s cap",
       "min": 0,
       "max": 86400
@@ -388,6 +407,7 @@
       "flag": "--modbus-auth-key",
       "env": "MODBUS_AUTH_KEY",
       "conv": "str",
+      "setting-help": "the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file)",
       "hint": "KEY",
       "secret": true,
       "hidden": true,
@@ -498,6 +518,7 @@
     }
   },
   "show": {
+    "connections": "connected clients: peer, age, requests served",
     "config": {
       "setting-help": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)",
       "hidden": true

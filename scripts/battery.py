@@ -435,17 +435,18 @@ for i, s in enumerate(SUITES, 1):
     rc = r.returncode
     ds = int(time.time() - t0)
     dur = fmt(ds)
-    # the history row lands per-suite, right away — an interrupted run
-    # keeps its finished suites (the row updates in place, but only when
-    # the new actual EXCEEDS the old: the eta predicts, a warm-cache fast
-    # run must not shrink it and under-estimate the batch — a slow run
-    # raising it is the safe direction)
-    old = ETAFILE.read_text().splitlines() if ETAFILE.exists() else []
-    prev = next((int(x.split()[1]) for x in old if x.split() and x.split()[0] == s), None)
-    rows = [x for x in old if x.split() and x.split()[0] != s]
-    rows.append('%s %d' % (s, ds if prev is None or ds > prev else prev))
-    ETAFILE.write_text('\n'.join(rows) + '\n')
     if rc == 0:
+        # the history row lands per-suite on a PASS only — a failed leg's
+        # duration is noise (a hang or a crash predicts nothing); the row
+        # updates in place, but only when the new actual EXCEEDS the old:
+        # the eta predicts, a warm-cache fast run must not shrink it and
+        # under-estimate the batch — a slow run raising it is the safe
+        # direction
+        old = ETAFILE.read_text().splitlines() if ETAFILE.exists() else []
+        prev = next((int(x.split()[1]) for x in old if x.split() and x.split()[0] == s), None)
+        rows = [x for x in old if x.split() and x.split()[0] != s]
+        rows.append('%s %d' % (s, ds if prev is None or ds > prev else prev))
+        ETAFILE.write_text('\n'.join(rows) + '\n')
         say('%s SUITE %d/%d %s: PASS (%s)' % (time.strftime('%H:%M:%S'), n, total, s, dur))
     else:
         say('%s SUITE %d/%d %s: FAILED (%s)' % (time.strftime('%H:%M:%S'), n, total, s, dur))

@@ -26,7 +26,7 @@ synthetic data only, no state worth protecting beyond its LAN segment.
 The startup surface is the family's: the flags, the bare env twins and
 the set-grammar config file (\\fB--config\\fR, every line a
 `set <name> <value>` \\(em the bundled sample is
-\\fBinverter/examples/inverter.conf\\fR) \\(em flag > env > config >
+\\fBinverter/examples/modbus-fake-inverter.conf\\fR) \\(em flag > env > config >
 default.
 .PP
 It simulates a sunny day: a double-shouldered PV curve over
@@ -167,10 +167,10 @@ the clients' TCP token and idle-ping interval.
 the config script when \\fB--config\\fR is unset."""
     files = """.SH FILES
 .TP
-.I inverter.conf
+.I modbus-fake-inverter.conf
 the config script (the set grammar) \\(em next to the binary when
 \\fB--config\\fR is unset (the image ships it at
-/pv\\-suite/inverter/inverter.conf).
+/pv\\-suite/inverter/modbus\\-fake\\-inverter.conf).
 .TP
 .I /tmp/fake-inverter-<port>.socket
 the control socket used when \\fB--control-port\\fR is unset.

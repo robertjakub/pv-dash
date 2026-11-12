@@ -5,4 +5,4 @@
 # flags/env pass through: inverter/dev --dry-run, inverter/dev --profile sun2000
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
 exec python3 "$DIR/bin/modbus-fake-inverter.py" \
-    --config "$DIR/examples/inverter.conf" "$@"
+    --config "$DIR/examples/modbus-fake-inverter.conf" "$@"

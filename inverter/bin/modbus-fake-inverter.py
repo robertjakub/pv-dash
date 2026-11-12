@@ -23,7 +23,7 @@ values / freeze time / tune chaos at runtime, and
 seeded chaos injection (--chaos) that answers requests hostile. The
 startup surface is the family's: flag > env > config script (--config, the
 set grammar — every line a `set <name> <value>`; the bundled sample is
-inverter/examples/inverter.conf) > the built-in defaults. Signals
+inverter/examples/modbus-fake-inverter.conf) > the built-in defaults. Signals
 mirror the family: SIGHUP re-applies the environment layer
 (CHAOS/MAX_KWP/STRICT/TIME/TIME_SCALE/
 LOG_LEVEL, keep-last-good), SIGUSR1 resets the scenario (releases pins
@@ -209,8 +209,8 @@ def main():
         print(version_string())
         raise SystemExit(0)
     p = build_parser(OPTIONS, description='Fake Inverter Simulator: a Modbus TCP server with demo values. Simulates different inverter/battery/meter devices through inverter profiles — the shipped default profile is the sun2000 (Huawei SUN2000) map, a Deye hybrid map is included as well.')
-    p.add_argument('--config', default=default_config_path(SCRIPT_DIR, 'inverter.conf'),
-                   help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then inverter.conf next to this script, then the subproject root)')
+    p.add_argument('--config', default=default_config_path(SCRIPT_DIR, 'modbus-fake-inverter.conf'),
+                   help='config file — the set grammar: every line a `set <name> <value>`, comments start with # ($CONFIG, then modbus-fake-inverter.conf next to this script, then the subproject root)')
     p.add_argument('--dry-run', action='store_true', help='validate the configuration, print the effective settings and exit (nothing is bound or connected)')
     p.add_argument('--man', action='store_true', help='print the man page (roff) to stdout and exit (modbus-fake-inverter --man | man -l -)')
     args = p.parse_args()

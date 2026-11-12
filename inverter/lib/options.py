@@ -11,7 +11,8 @@ loads the JSON into the
 common Option rows and keeps the Python-side wiring: the control-grammar
 vocabulary and the choice vocabularies (log-level from defaults.json, the
 timezone from the settings registry's values). The fake takes the family's
-config file now (--config, the set grammar — inverter/examples/inverter.conf
+config file now (--config, the set grammar —
+inverter/examples/modbus-fake-inverter.conf
 is the bundled sample): the CLI defaults stay out of the parser (a
 static-wired default would shadow the env/config layers — the flag never
 looks unset) and ladder flag > env > config > static in lib/config.py like

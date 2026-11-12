@@ -96,8 +96,8 @@ the running writer now (it updated the params but not the writer
 before).
 
 The config-file wave: the fake takes the family's set-grammar config
-(`--config`/`$CONFIG`, then `inverter.conf` next to the script; the
-bundled sample `examples/inverter.conf`) — `inverter/lib/config.py`
+(`--config`/`$CONFIG`, then `modbus-fake-inverter.conf` next to the script; the
+bundled sample `examples/modbus-fake-inverter.conf`) — `inverter/lib/config.py`
 `resolve_args` ladders flag > env > config > the static defaults onto
 the args namespace and the CLI defaults left the parser (a static-wired
 default shadowed the env/config layers); the demo twins

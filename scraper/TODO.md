@@ -5,6 +5,19 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The help-canon wave moved the registry's family-wide texts to
+shared/options-help.json: 44 rows reference their canon block and the
+loader folds the block under the row's own fields. The alignment is the
+scraper's biggest: the /metrics cap trio (metrics-max-clients,
+metrics-client-timeout, metrics-max-conn-per-ip) speaks the cache's
+spellings, the metrics-acl long help gains the "checked at accept — a
+client off the ACL is closed without a reply" tail (the accept behavior
+verified first), the audit/rotate node names the UTC-midnight trigger its
+own audit-daily row implements, the audit rotation rows speak "the audit
+trail", modbus-unit and the max-kwp hint (kW) settle, the control-port
+setting-help matches the TCP tools, and the dump-key help recovers its
+lost semicolon. The gates and the editor's canon face ride the family.
+
 The flat-name unification wave renamed the three /metrics limit knobs to
 the cache's spellings — `metrics-max-clients`/`metrics-client-timeout`/
 `metrics-max-conn-per-ip` (flags, `METRICS_*` envs, config-script keys and

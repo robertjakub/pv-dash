@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The help-canon wave moved the registry's family-wide texts to
+shared/options-help.json: 49 rows reference their canon block and the
+loader folds the block under the row's own fields. The alignment: the
+fake's connect-acl takes the full value grammar (the cache's
+any|none|IP,...|file:<path> hint and the any/none words — the TAB pool
+completes now), the client-timeout 0 note says "never disconnect idle
+clients", the show config/knobs rows speak the family's wordings, and the
+audit rotation rows speak "the audit trail". The per-tool env:null rows
+(the fake reads no env twins) stay inline; the gates and the editor's
+canon face ride the family.
+
 The profile knob wears the family's `modbus-` prefix (breaking):
 `profile`/`--profile`/`PROFILE` become `modbus-profile`/`--modbus-profile`/
 `MODBUS_PROFILE` — the registry row, the wire's set/clear/show dispatch

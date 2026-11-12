@@ -1,8 +1,15 @@
 # The help-canon wave — the shared options-help texts
 
-Status: DRAFT (Nov 12, 2026) — nothing landed, nothing committed. This file is
-the wave's plan; it dies when the wave lands (the record moves to the per-tool
-TODOs and the CHANGELOG).
+Status: LANDED (Nov 12, 2026) — the canon file, the loader fold, the four
+registry flips (50/44/49/47 rows), the three lint passes (the resolution,
+the must-ref, the drift with the 58 named exemptions), the family_drift
+canon-coverage subsection and the editor's canon face. The phases fused in
+execution: the refs and the aligned wording landed together (the
+byte-neutrality of the bare flip proven off-tree against git HEAD — 0
+effective-text diffs — before the alignment went on; 29 diffs, each an
+alignment-list item). The phase-1/phase-2 commit split died here; the
+static proof replaced it. This file dies when the wave lands (the record
+moves to the per-tool TODOs and the CHANGELOG).
 
 ## The finding
 
@@ -339,3 +346,22 @@ updated with the canon); `python3 scripts/gen_man.py` + `mandoc -Tlint` clean;
   family_drift gains the canon-coverage sweep type for the report.
 - The ≥3-identical rule — RULED Nov 12: enforced (the must-ref pass; the
   exempt list applies).
+
+## The execution notes
+
+- The upstream `values` gap resolved to EXEMPT: the scraper's `[":5502"]`
+  list is its own (a port-shorthand the other tools' semantics do not
+  share), the cache/dashboard rows carry no `values` (a gap does not
+  drift).
+- `control-port`: the three TCP tools' setting-help aligned to the cache's
+  spelling (the block); the inverter's unix-only wording stays (exempt),
+  and the helps carry each tool's ctl name (exempt).
+- `dump-key`: the scraper's missing semicolon was a typo — the help
+  aligned to the inverter/dashboard text and rides the block; the cache's
+  "the words and the settings" phrasing stays (its dump carries the cached
+  words).
+- The two-tool alignments stay inline (no block): `modbus-unit` (the
+  scraper adopts the cache's spelling), `max-kwp`'s `kW` hint, the
+  inverter's `connect-acl` hint + `values` (the TAB pool completes now).
+- The audit-max-mb canon restores "keeping N backups" family-wide — the
+  cache's lost tail was the drift the wave's census caught.

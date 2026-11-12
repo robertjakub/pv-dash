@@ -41,6 +41,25 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   the confirm guards, the pager); the one-shot/batch keep the raw bytes
   and audit CONNECT/DISCONNECT only.
 
+- **the registry texts wear one canon** — the family-wide option texts
+  (`setting-help`, `help`, `value-help`, `hint`, `values`, and the wiring
+  that agrees: `flag`, `env`, `min`/`max`, the marks) move to
+  `shared/options-help.json`; a registry row references its block with
+  `"shared": "<name>"` and the loader folds the block under the row's own
+  fields (the inline field wins — the per-tool override). One edit updates
+  every tool's --help, man page, wire help and docs. The accidental
+  wording drift aligns to one canon per knob (the audit rotation rows
+  speak "the audit trail", the scraper's /metrics caps speak the cache's
+  spellings, the fake's `connect-acl` takes the full value grammar, the
+  `modbus-unit`/`max-kwp` hints settle). `lint_options --check` gates it
+  three ways — every ref resolves (and every block referenced), a
+  ≥3-tool byte-identical text must ref, and the gated fields compare
+  byte-for-byte across the four registries (the intentional drift rides
+  the lint's named exemption list); `family_drift` reports the coverage,
+  and `editor.py options` speaks the canon (the ref edits, the
+  block-carried fields show marked `(canon)`, the `p` walk proposes the
+  ref).
+
 - **the docker names speak the daemon** — the fake inverter's image,
   compose service and env file rename to the daemon's own:
   `Dockerfile.modbus-fake-inverter`, service/image `modbus-fake-inverter`

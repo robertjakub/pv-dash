@@ -5,6 +5,16 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The help-canon wave moved the registry's family-wide texts to
+shared/options-help.json: 47 rows reference their canon block and the
+loader folds the block under the row's own fields. The alignment: the
+control-port setting-help matches the TCP tools, the metrics-max-clients
+spelling settles on the /metrics form with its help on the endpoint form,
+and the client-timeout 0 note says "never disconnect idle clients". The
+upstream Prometheus rows stay the dashboard's own (the env, the URL hint
+— the intentional drift, exempt). The gates and the editor's canon face
+ride the family.
+
 The console-pager wave put every cli render through one door
 (common/wire/cli.py's page_out): a reply taller than the screen pauses at a
 page (the cbreak `-- more --` reader, the more(1) keys — space/return/q),

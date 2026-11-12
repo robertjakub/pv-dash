@@ -175,16 +175,16 @@ knob+field, the tools grouped by the value each carries:
 | `control-log-replies` | `env` | *absent* (cache, scraper, inverter) · `CONTROL_LOG_REPLIES` (dashboard) |
 | `control-ops-verbs` | `default` | `show,flush` (cache) · `show` (scraper, inverter, dashboard) |
 | `listen` | `default` | `127.0.0.1:15502` (cache) · `127.0.0.1:9350` (scraper) · `127.0.0.1:5502` (inverter) · `127.0.0.1:8080` (dashboard) |
-| `local-time` | `env` | `LOCAL_TIME` (cache, scraper, dashboard) · *absent* (inverter) |
-| `log-access` | `env` | `LOG_ACCESS` (cache, scraper, dashboard) · *absent* (inverter) |
+| `local-time` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
+| `log-access` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
 | `log-access` | `hidden` | `True` (cache) · `·` (scraper, inverter, dashboard) |
-| `metrics-client-timeout` | `env` | `METRICS_CLIENT_TIMEOUT` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-client-timeout` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
 | `metrics-client-timeout` | `live` | `metrics/limits/timeout` (cache, scraper) · `·` (inverter, dashboard) |
 | `metrics-client-timeout` | `default` | `5.0` (cache, inverter, dashboard) · `300.0` (scraper) |
-| `metrics-max-clients` | `env` | `METRICS_MAX_CLIENTS` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-max-clients` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
 | `metrics-max-clients` | `live` | `metrics/limits/max-clients` (cache, scraper) · `·` (inverter, dashboard) |
 | `metrics-max-clients` | `default` | `64` (cache, scraper, inverter) · `16` (dashboard) |
-| `metrics-max-conn-per-ip` | `env` | `METRICS_MAX_CONN_PER_IP` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-max-conn-per-ip` | `env` | `·` (cache, scraper, dashboard) · *absent* (inverter) |
 | `metrics-max-conn-per-ip` | `live` | `metrics/limits/max-conn-per-ip` (cache, scraper) · `·` (inverter, dashboard) |
 
 **The command vocabularies** (the wire words per tool):
@@ -226,6 +226,19 @@ The findings:
 The landed knob legs (the audit rotation bounds family-wide, the
 `audit-daily` one shape, the env-or-note completion):
 [history/family-drift.md](history/family-drift.md).
+
+**The canon coverage** (shared/options-help.json — the registry
+texts the rows ref; the drift and must-ref gates live in
+`lint_options --check`, the exempt names ride it):
+
+| section | blocks | cache refs | scraper refs | inverter refs | dashboard refs |
+|---|---|---|---|---|---|
+| options | 41 | 41 | 35 | 40 | 38 |
+| show | 2 | 2 | 2 | 2 | 2 |
+| commands | 7 | 7 | 7 | 7 | 7 |
+
+The exempt (intentionally per-tool) names: **58** —
+each with its reason in `scripts/lint_options.py`.
 
 ## The wire-text sweep — the log/audit canon
 
@@ -425,8 +438,8 @@ published port not backed by a registry default is a lie.
 | file | env vars | published ports |
 |---|---|---|
 | `docker/Dockerfile.dashboard` | `AUTH_TOKEN`, `CONFIG_JS`, `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `PROM_URL`, `README`, `REQUIRED`, `SO_PEERCRED`, `VOLUME`, `WORKDIR` | 8080 |
-| `docker/Dockerfile.fake-inverter` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `SO_PEERCRED`, `VOLUME`, `WORKDIR` | 5502 |
 | `docker/Dockerfile.modbus-cache` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `README`, `REQUIRED`, `SELECTION`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME`, `WORKDIR` | 15502 |
+| `docker/Dockerfile.modbus-fake-inverter` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `SO_PEERCRED`, `VOLUME`, `WORKDIR` | 5502 |
 | `docker/Dockerfile.modbus-scraper` | `AUTH`, `AUTH_TOKEN`, `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `METRICS_SPEC`, `MODBUS_AUTH_KEY`, `README`, `REQUIRED`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME` … | 9350 |
 | `docker/Dockerfile.prometheus` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `VOLUME` | — |
 | `docker/README.md` | `AUTH_TOKEN`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `GENERATED`, `HEALTHCHECK`, `HMAC`, `HOST`, `JSON`, `LICENSE`, `LOG_LEVEL` … | 15502, 5502, 8080, 9350 |
@@ -436,7 +449,7 @@ published port not backed by a registry default is a lie.
 | `docker/entrypoints/entrypoint.sh` | `JSON`, `README`, `REQUIRED`, `SECURITY` | — |
 | `docker/env/cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUDIT_REQUESTS`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP` … | — |
 | `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_LOG_REPLIES`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP` … | — |
-| `docker/env/fake.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
+| `docker/env/modbus-fake-inverter.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
 | `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS`, `DUMP_INTERVAL` … | — |
 | `docker/prod/README.md` | `EDITOR`, `HOST`, `JSON`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `PORT`, `PROM_URL`, `README`, `SECURITY`, `UPSTREAM`, `YOUR` | 8080, 9350 |
@@ -449,7 +462,7 @@ sweep exists for):
 
 | port | the knobs backing it | where the docker surface names it |
 |---|---|---|
-| 5502 | inverter:listen | docker/Dockerfile.fake-inverter EXPOSE |
+| 5502 | inverter:listen | docker/Dockerfile.modbus-fake-inverter EXPOSE |
 | 8080 | dashboard:listen | docker/Dockerfile.dashboard EXPOSE; docker/demo/compose.yaml ports:; docker/prod/compose.yaml ports: |
 | 9350 | scraper:listen | docker/Dockerfile.modbus-scraper EXPOSE; docker/prod/compose.yaml ports: |
 | 9351 | cache:metrics-listen | — |
@@ -603,17 +616,12 @@ tool is the visible gap). The secret-posture markers (`parse_secret`,
 the `SECRET_REMOVED` placeholder, the `file:` scheme) across the
 tree.
 
-23 secret-marked row(s) across 9 knob(s), consolidated by posture:
+5 secret-marked row(s) across 4 knob(s), consolidated by posture:
 
 | knob | tools | live | restart | hidden |
 |---|---|---|---|---|
 | `auth-token` | dashboard, scraper | yes | yes | yes |
 | `config-js` | dashboard | yes | yes | yes |
-| `control-ops-token` | all four | yes | yes | yes |
-| `control-token` | all four | yes | yes | yes |
-| `dump-key` | all four | yes | yes | yes |
-| `metrics-token` | cache, dashboard, inverter | yes | yes | yes |
-| `modbus-auth-key` | cache, inverter, scraper | yes | yes | yes |
 | `modbus-auth-upstream-key` | cache | yes | yes | yes |
 | `static-dir` | dashboard | yes | yes | yes |
 

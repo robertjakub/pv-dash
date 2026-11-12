@@ -5,6 +5,18 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The help-canon wave moved the registry's family-wide texts to
+shared/options-help.json: 50 rows reference their canon block (`shared`:
+"<name>") and the loader folds the block under the row's own fields —
+the per-tool prose (the dump family's cached words, the ops role's
+show,flush policy) stays inline as the override. The alignment restored
+the audit-max-mb "keeping N backups" tail and adopted the trail wording;
+the metrics-max-clients spelling settles on the /metrics form. lint_options
+--check gates the fold three ways (the resolution, the must-ref, the
+byte-for-byte drift with the named exemptions) and the editor speaks the
+canon (the ref edits, the block-carried fields show marked (canon), the
+p walk proposes the ref).
+
 The console-pager wave put every cli render through one door
 (common/wire/cli.py's page_out): a reply taller than the screen pauses at a
 page (the cbreak `-- more --` reader, the more(1) keys — space/return/q),

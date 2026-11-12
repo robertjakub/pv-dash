@@ -24,8 +24,10 @@ history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
   `ln -h` spellings go (os.symlink's atomic grab, datetime stamps) —
   the runner is NixOS-portable now. The START rows carry the suite's
   OWN historical eta (`eta 3m27s`, its own finish clock) — the batch
-  estimate stays on the `estimate:` row; the eta history files keep
-  their raw-seconds rows for the predictions. release.py's battery leg
+  estimate stays on the `estimate:` row; the eta history is one JSON
+  home, `pvbattery/eta.json` (profile → suite → the slowest observed
+  seconds, updated on a PASS only — a failed leg's duration is noise),
+  the per-profile `.txt` files the sh runner kept migrate into it once. release.py's battery leg
   invokes the python runner; the suites-side contracts (PV_RUN_DIR,
   SUITE_PORT_BASE, PV_SUITE_PROFILE, the zz_ copy's pgrep tell) are
   unchanged.

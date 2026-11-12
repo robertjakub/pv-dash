@@ -34,8 +34,9 @@ outright (SIGKILL, no handler) gets its link swept and its status.txt
 NOTE'd by the next start's housekeeping. Four port slots: four
 concurrent batteries max. The run dirs keep the newest 8 — the four a
 live battery can hold plus the newest history (the newest finished run
-is simply the newest dir) — and the eta history lives in
-eta/<profile>.txt.
+is simply the newest dir) — and the eta history is one JSON home,
+eta.json: profile -> suite -> the slowest observed seconds (the
+per-profile .txt files the sh runner kept migrate into it once).
 
 One suite at a time within a run; a suite's verdict = its own ALL PASS
 with no FAIL lines; the tally lands at the end of the status file, and
@@ -46,6 +47,7 @@ post-mortem)."""
 import datetime
 import atexit
 import glob
+import json
 import os
 import pathlib
 import re
@@ -280,21 +282,45 @@ TOTAL = len(SUITES)
 BT0 = time.time()
 
 # the eta: the prior history of the same profile predicts the whole
-# batch; a suite without history goes partial instead of zeroing the
-# whole batch, and every finished suite's actual lands in the file right
-# away — an interrupted run keeps its finished suites
-ETAFILE = LOGROOT / 'eta' / ('%s.txt' % PROFILE)
+# batch — one JSON home (eta.json: profile -> suite -> the slowest
+# observed seconds), migrated once from the per-profile eta/*.txt files
+# the sh runner kept. A suite without history goes partial instead of
+# zeroing the whole batch, and every finished suite's actual lands in
+# the file right away — an interrupted run keeps its finished suites.
+ETAFILE = LOGROOT / 'eta.json'
+
+
+def _load_etas():
+    if ETAFILE.exists():
+        try:
+            data = json.loads(ETAFILE.read_text())
+            if isinstance(data, dict):
+                return data
+        except ValueError:
+            pass
+    etas = {}
+    eta_dir = LOGROOT / 'eta'
+    if eta_dir.is_dir():
+        for f in sorted(eta_dir.glob('*.txt')):
+            for row in f.read_text().splitlines():
+                parts = row.split()
+                if len(parts) == 2 and parts[1].isdigit():
+                    cur = etas.setdefault(f.stem, {})
+                    v = int(parts[1])
+                    if v > cur.get(parts[0], 0):
+                        cur[parts[0]] = v
+        if etas:
+            ETAFILE.write_text(json.dumps(etas, indent=1, sort_keys=True) + '\n')
+            shutil.rmtree(eta_dir, ignore_errors=True)   # the one-time migration: the JSON is the home
+    return etas
+
+
+ETAS = _load_etas()
 
 
 def eta_of(suite):
     """the suite's own historical wall time (seconds) — None without a row"""
-    if not ETAFILE.exists():
-        return None
-    for row in ETAFILE.read_text().splitlines():
-        parts = row.split()
-        if parts and parts[0] == suite:
-            return int(parts[1])
-    return None
+    return ETAS.get(PROFILE, {}).get(suite)
 
 
 remain = {s: eta_of(s) for s in SUITES}
@@ -442,11 +468,9 @@ for i, s in enumerate(SUITES, 1):
         # the eta predicts, a warm-cache fast run must not shrink it and
         # under-estimate the batch — a slow run raising it is the safe
         # direction
-        old = ETAFILE.read_text().splitlines() if ETAFILE.exists() else []
-        prev = next((int(x.split()[1]) for x in old if x.split() and x.split()[0] == s), None)
-        rows = [x for x in old if x.split() and x.split()[0] != s]
-        rows.append('%s %d' % (s, ds if prev is None or ds > prev else prev))
-        ETAFILE.write_text('\n'.join(rows) + '\n')
+        prev = ETAS.get(PROFILE, {}).get(s)
+        ETAS.setdefault(PROFILE, {})[s] = ds if prev is None or ds > prev else prev
+        ETAFILE.write_text(json.dumps(ETAS, indent=1, sort_keys=True) + '\n')
         say('%s SUITE %d/%d %s: PASS (%s)' % (time.strftime('%H:%M:%S'), n, total, s, dur))
     else:
         say('%s SUITE %d/%d %s: FAILED (%s)' % (time.strftime('%H:%M:%S'), n, total, s, dur))

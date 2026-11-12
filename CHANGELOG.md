@@ -12,6 +12,14 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **BREAKING: the scraper's three /metrics limit knobs speak the cache's
+  spellings** — `max-clients`/`client-timeout`/`max-conn-per-ip` become
+  `metrics-max-clients`/`metrics-client-timeout`/`metrics-max-conn-per-ip`
+  (flags, `$METRICS_*` env twins and the config-script keys follow; the
+  wire's `set metrics limits …` paths, the state-dump keys and the defaults
+  64/300/0 are unchanged). One flat name per knob across the two tools —
+  the cache is the master.
+
 - **BREAKING: the four `*-ctl` clients retire into `*-cli`** — one client
   per tool, the invocation shape picks the mode: command words one-shot
   (`modbus-cache-cli show config` — the raw verdict head prints, exit

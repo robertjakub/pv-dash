@@ -110,16 +110,19 @@ they name the wire.
   (`scraper/lib/control.py:306`) while start refuses `<1`. Outcome:
   one name, one flag, one env, live everywhere, the row bounds = the
   shared tree's range (the NixOS `unitId`/`modbusUnit` renames follow).
-- **the listener caps, three console schemes** `[all]` —
-  `max-clients`/`client-timeout`/`max-conn-per-ip` console as
-  `limits/*` on the cache, `metrics/limits/*` on the scraper, and bare
-  on the inverter and dashboard (`cache/lib/options.json:102-114`,
-  `scraper:64-79`, `inverter:149-158`, `dashboard:21-30`); the cache's
-  own metrics leaf is `metrics/limits/timeout` while its socket leaf
-  is `limits/client-timeout` (one family, two leaves, `:186` vs
-  `:107`). The wire speaks the bare flat names on every tool, so the
-  drift hides behind the console spellings. Outcome:
-  `<surface>/limits/{max-clients,client-timeout,max-conn-per-ip}`; the
+- **the listener caps, the console schemes** `[all]` — the flat names
+  unified where the surfaces meet: the cache's metrics trio and the
+  scraper's /metrics trio speak the same
+  `metrics-max-clients`/`metrics-client-timeout`/`metrics-max-conn-per-ip`
+  flat names (the cache is the master; the scraper's old bare spellings
+  retired). The console paths still split: `limits/*` on the cache's
+  Modbus listener vs `metrics/limits/*` on both metrics surfaces
+  (`cache/lib/options.json:102-114`, `scraper:75-92`), and the inverter
+  and dashboard keep the bare scheme (`inverter:149-158`,
+  `dashboard:21-30`); the cache's own metrics leaf is
+  `metrics/limits/timeout` while its socket leaf is
+  `limits/client-timeout` (one family, two leaves, `:186` vs `:107`).
+  Outcome: `<surface>/limits/{max-clients,client-timeout,max-conn-per-ip}`; the
   leaf is `client-timeout` everywhere.
 - **the /metrics caps, four postures** `[scraper]` `[inverter]`
   `[dashboard]` — the cache has the full trio (defaults 64/5.0/0,

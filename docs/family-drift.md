@@ -76,7 +76,7 @@ design); the top non-man pairs:
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
 | 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
-| 0.78 | `cache/lib/control.py:798` `uplink_report` <-> `scraper/lib/control.py:479` `uplink_report` |
+| 0.78 | `cache/lib/control.py:798` `uplink_report` <-> `scraper/lib/control.py:474` `uplink_report` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
 | 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
 | 0.76 | `scraper/lib/control.py:119` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
@@ -155,32 +155,37 @@ so a drifted row travels wide.
 **The shape**: 236 knob rows across the
 four registries; 34 names carry in all four:
 
-`audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-instance`, `audit-log`, `audit-max-mb`, `audit/rotate`, `client-timeout`, `control`, `control-log-replies`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `local-time`, `log-access`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
+`audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-instance`, `audit-log`, `audit-max-mb`, `audit/rotate`, `control`, `control-log-replies`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `local-time`, `log-access`, `log-level`, `metrics`, `metrics-acl`, `metrics-client-timeout`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `no-audit-log`, `restore-on-start`, `system`
 
 **The tool-specific remainder** (by nature):
 
 | tool | only-there knobs |
 |---|---|
-| cache | `acl`, `allow-write`, `audit-requests`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `limits`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-auth-upstream`, `modbus-auth-upstream-key`, `modbus-interval`, `modbus-merge-gap`, `modbus-profile`, `modbus-read-delay`, `modbus-timeout`, `modbus-unit`, `selection`, `upstream`, `write`, `write-acl`, `write-registers` |
+| cache | `acl`, `allow-write`, `audit-requests`, `cache-ttl`, `client-timeout`, `connect-acl`, `dump-with-cache`, `limits`, `max-clients`, `max-conn-per-ip`, `metrics-listen`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-auth-upstream`, `modbus-auth-upstream-key`, `modbus-interval`, `modbus-merge-gap`, `modbus-profile`, `modbus-read-delay`, `modbus-timeout`, `modbus-unit`, `selection`, `upstream`, `write`, `write-acl`, `write-registers` |
 | scraper | `auth-token`, `grid-positive-import`, `max-grid-kw`, `max-kwp`, `metrics-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-interval`, `modbus-merge-gap`, `modbus-offset`, `modbus-profile`, `modbus-read-delay`, `modbus-timeout`, `modbus-unit`, `modbus/caps`, `upstream` |
-| inverter | `allow-write`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `modbus-auth-key`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
-| dashboard | `auth`, `auth-token`, `config-js`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
+| inverter | `allow-write`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `client-timeout`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-clients`, `max-conn-per-ip`, `max-kwp`, `metrics-listen`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `modbus-auth-key`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
+| dashboard | `auth`, `auth-token`, `client-timeout`, `config-js`, `log-queries`, `max-clients`, `max-conn-per-ip`, `metrics-listen`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
 **The shared knobs whose fields disagree** (8 of
-34 knobs, 9 drifted field(s)) — one row per
+34 knobs, 14 drifted field(s)) — one row per
 knob+field, the tools grouped by the value each carries:
 
 | knob | field | the values (the tools carrying each) |
 |---|---|---|
-| `client-timeout` | `live` | `limits/client-timeout` (cache) · `metrics/limits/timeout` (scraper) · `client-timeout` (inverter, dashboard) |
 | `control-log-replies` | `env` | *absent* (cache, scraper, inverter) · `CONTROL_LOG_REPLIES` (dashboard) |
 | `control-ops-verbs` | `default` | `show,flush` (cache) · `show` (scraper, inverter, dashboard) |
 | `listen` | `default` | `127.0.0.1:15502` (cache) · `127.0.0.1:9350` (scraper) · `127.0.0.1:5502` (inverter) · `127.0.0.1:8080` (dashboard) |
 | `local-time` | `env` | `LOCAL_TIME` (cache, scraper, dashboard) · *absent* (inverter) |
 | `log-access` | `env` | `LOG_ACCESS` (cache, scraper, dashboard) · *absent* (inverter) |
 | `log-access` | `hidden` | `True` (cache) · `·` (scraper, inverter, dashboard) |
-| `max-clients` | `live` | `limits/max-clients` (cache) · `metrics/limits/max-clients` (scraper) · `max-clients` (inverter, dashboard) |
-| `max-conn-per-ip` | `live` | `limits/max-conn-per-ip` (cache) · `metrics/limits/max-conn-per-ip` (scraper) · `max-conn-per-ip` (inverter, dashboard) |
+| `metrics-client-timeout` | `env` | `METRICS_CLIENT_TIMEOUT` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-client-timeout` | `live` | `metrics/limits/timeout` (cache, scraper) · `·` (inverter, dashboard) |
+| `metrics-client-timeout` | `default` | `5.0` (cache, inverter, dashboard) · `300.0` (scraper) |
+| `metrics-max-clients` | `env` | `METRICS_MAX_CLIENTS` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-max-clients` | `live` | `metrics/limits/max-clients` (cache, scraper) · `·` (inverter, dashboard) |
+| `metrics-max-clients` | `default` | `64` (cache, scraper, inverter) · `16` (dashboard) |
+| `metrics-max-conn-per-ip` | `env` | `METRICS_MAX_CONN_PER_IP` (cache, scraper, dashboard) · *absent* (inverter) |
+| `metrics-max-conn-per-ip` | `live` | `metrics/limits/max-conn-per-ip` (cache, scraper) · `·` (inverter, dashboard) |
 
 **The command vocabularies** (the wire words per tool):
 
@@ -433,7 +438,7 @@ published port not backed by a registry default is a lie.
 | `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_LOG_REPLIES`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP` … | — |
 | `docker/env/fake.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
-| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS` … | — |
+| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS`, `DUMP_INTERVAL` … | — |
 | `docker/prod/README.md` | `EDITOR`, `HOST`, `JSON`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `PORT`, `PROM_URL`, `README`, `SECURITY`, `UPSTREAM`, `YOUR` | 8080, 9350 |
 | `docker/prod/compose.yaml` | `AUTH`, `AUTH_TOKEN`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `MODBUS_AUTH`, `MODBUS_AUTH_KEY`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `ONLY`, `PORT` … | 8080, 9350 |
 | `docker/prometheus.yml` | `SECURITY` | — |

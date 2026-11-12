@@ -232,7 +232,7 @@ the intended demo feature, gated by control-server access only.
 - **Scraper request surface** — a missing/invalid bearer answers 401 with
   `WWW-Authenticate: Bearer`, compared constant-time, logged at WARNING;
   exactly two GET routes, everything else a 404; `Cache-Control: no-store`;
-  `--max-clients` sheds excess clients with 503; the fixed-rate poll loop
+  `--metrics-max-clients` sheds excess clients with 503; the fixed-rate poll loop
   means request floods cannot reach the device.
 - **Dashboard HTTP surface** — GET-only and closed by construction: the
   static tree served from one realpath-checked root (403 on escape), the

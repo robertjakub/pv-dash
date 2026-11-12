@@ -12,6 +12,21 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **The key-alignment wave (docs/options-align.md)** — the four option
+  registries align on the canon blocks: the audit helps de-tagged (the
+  CACHE/SCR/INV/DSH prefixes and the spelled state-home paths drop), the
+  client caps speak the cache's generic forms, the metrics-server prose
+  names "the tool's own" endpoint (its `$METRICS_SERVER` env twin folds —
+  the fake's no-env refusal stays), modbus-auth speaks one scheme text,
+  modbus-profile gains the `values` vocab ("the shipped sun2000 profile"),
+  restore-on-start loses the daemon/fake/server nouns, control-port and
+  dump-path fold the generic forms (the per-tool ctl-name hints stay
+  inline). Two new canon blocks: `modbus-interval`, `modbus-timeout` —
+  their rows thin-ref. `show config`/`show knobs` hide family-wide. The
+  dashboard's `metrics-max-clients` caps at the family 64 (was 16). Twelve
+  dead exemptions retired; the block gaps fall 35 → 16, the canon grows to
+  60 blocks (42 family-wide, 0 dead).
+
 - The registry's `only` mark — a row may name its one tool
   (`"only": "scraper"`) to pin the knob tool-exclusive: the lint gates
   the mark to a known tool in the file's own registry, refuses it beside

@@ -10,7 +10,50 @@ This file keeps **Unreleased and the current release** only — the release
 history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
 
 ## Unreleased
+### Added
+
+- **scraper** — **`show uplink` + the cache's block poll plan**: the
+  profile's source ranges merge into as few Modbus reads as possible
+  (`--merge-gap` / `MERGE_GAP`, live `modbus/merge-gap`, default 8,
+  `0` = read each range separately — the planner hoisted from the cache to
+  `common/modbus/blocks.py`, the cache imports it back unchanged; a failed
+  block splits to its leaves so one bad register cannot starve its pooled
+  neighbors, and the plan rebuilds live on `set modbus profile`,
+  `metrics filter`/`prefix` and `modbus merge-gap`), and the wire gains
+  `show uplink` — the cache's gold inverter-link report over the
+  scraper's fetch: the session counters (connects, exchanges, bytes,
+  errors — the `ModbusTCP` client now keeps the cache's `Upstream`
+  counter block) plus one row per poll block with status, latency
+  (last/mean/max), failures and last error; **`show uplink-sources`**
+  (both tools) widens the table — the sources column rides right after
+  the range, naming the profile registers the block pools (one name,
+  comma-separated when pooled) — while plain `show uplink` stays the
+  lean health table; `inspect` carries the poll plan. Also fixes the
+  fresh-start dump crash:
+  the read-delay wave left `read_delay` unresolved in the startup config,
+  so any `request dump`/reload state save killed the control session
+  (KeyError) — the knob resolves now and `show read-delay`/`clear
+  read-delay` answer the configured value.
+
 ### Changed
+
+- **cache, scraper, fake inverter — BREAKING: the suite-auth knobs rename**
+  (the flag/env twins follow the knob names, the family's `--modbus-*`
+  shape): `auth-key` → `modbus-auth-key` (`--auth-key`/`AUTH_KEY` →
+  `--modbus-auth-key`/`MODBUS_AUTH_KEY`), and the cache's upstream pair
+  `auth-upstream` → `modbus-auth-upstream` (`--auth-upstream`/`AUTH_UPSTREAM`
+  → `--modbus-auth-upstream`/`MODBUS_UPSTREAM_AUTH`) and
+  `auth-upstream-key` → `modbus-auth-upstream-key`
+  (`--auth-upstream-key`/`AUTH_UPSTREAM_KEY` →
+  `--modbus-auth-upstream-key`/`MODBUS_UPSTREAM_AUTH_KEY`). The live paths
+  stay (`modbus auth key`, `modbus auth-upstream{,-key}` — the console
+  spellings parse); the config file, the dumps and the reload state file
+  key the new names — **a stored dump's `auth-upstream` override restores
+  skipped** (the secrets never ride a dump); the NixOS credential options
+  rename with them (`authKeyFile` → `modbusAuthKeyFile`,
+  `authUpstreamKeyFile` → `modbusAuthUpstreamKeyFile`, the LoadCredential
+  names follow). The flags/envs/config keys re-spell across the three
+  registries, the bins, the docker env/compose files and the docs.
 
 - **everywhere** — **the dev launchers stream the audit trail**: every
   `dev` script passes `--audit-log -` — the audit trail rides the dev

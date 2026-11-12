@@ -53,14 +53,17 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 **The exact pass**: 0 duplicate group(s) in >= 2 files.
 
 
-**The similarity pass**: 49 cross-file pair(s) over the ratio
+**The similarity pass**: 54 cross-file pair(s) over the ratio
 floor (30 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
+| 0.99 | `cache/lib/proxy.py:240` `_block_stat` <-> `scraper/lib/poller.py:106` `_block_stat` |
 | 0.98 | `scraper/lib/options.py:28` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
+| 0.96 | `cache/lib/upstream.py:30` `_exchange` <-> `scraper/lib/protocol.py:78` `_exchange` |
 | 0.94 | `cache/lib/options.py:25` `_load_options` <-> `scraper/lib/options.py:28` `_load_options` |
+| 0.94 | `cache/lib/upstream.py:14` `__init__` <-> `scraper/lib/protocol.py:28` `__init__` |
 | 0.93 | `scraper/bin/modbus-scraper.py:46` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.92 | `cache/lib/options.py:25` `_load_options` <-> `dashboard/lib/options.py:25` `_load_options` |
 | 0.90 | `scraper/bin/modbus-scraper.py:241` `graceful_stop` <-> `dashboard/bin/dashboard.py:474` `graceful_stop` |
@@ -73,11 +76,9 @@ design); the top non-man pairs:
 | 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1378` `run_dump_interval` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
 | 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
-| 0.76 | `scraper/lib/control.py:117` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
+| 0.76 | `scraper/lib/control.py:119` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
 | 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `scraper/lib/control.py:117` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
-| 0.74 | `cache/lib/config.py:127` `load_profile_write_gate` <-> `common/settings/config.py:444` `load_write_gate_file` |
-| 0.72 | `common/settings/config.py:14` `resolve_target` <-> `common/runtime/daemon.py:44` `default_config_path` |
+| 0.75 | `scraper/lib/control.py:119` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -149,7 +150,7 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 235 knob rows across the
+**The shape**: 236 knob rows across the
 four registries; 34 names carry in all four:
 
 `audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-instance`, `audit-log`, `audit-max-mb`, `audit/rotate`, `client-timeout`, `control`, `control-log-replies`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `local-time`, `log-access`, `log-level`, `max-clients`, `max-conn-per-ip`, `metrics`, `metrics-acl`, `no-audit-log`, `restore-on-start`, `system`
@@ -158,9 +159,9 @@ four registries; 34 names carry in all four:
 
 | tool | only-there knobs |
 |---|---|
-| cache | `acl`, `allow-write`, `auth-key`, `auth-upstream`, `auth-upstream-key`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
-| scraper | `auth-key`, `auth-token`, `grid-positive-import`, `interval`, `max-grid-kw`, `max-kwp`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/caps`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-offset`, `modbus-unit`, `profile`, `read-delay`, `timeout`, `upstream` |
-| inverter | `allow-write`, `auth-key`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
+| cache | `acl`, `allow-write`, `cache-ttl`, `connect-acl`, `dump-with-cache`, `interval`, `limits`, `merge-gap`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-auth-upstream`, `modbus-auth-upstream-key`, `profile`, `read-delay`, `requests-audit`, `selection`, `timeout`, `unit`, `upstream`, `write`, `write-acl`, `write-registers` |
+| scraper | `auth-token`, `grid-positive-import`, `interval`, `max-grid-kw`, `max-kwp`, `merge-gap`, `metric-prefix`, `metrics-spec`, `metrics/auth`, `metrics/caps`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-offset`, `modbus-unit`, `profile`, `read-delay`, `timeout`, `upstream` |
+| inverter | `allow-write`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-kwp`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `modbus-auth-key`, `mppt`, `profile`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth`, `auth-token`, `config-js`, `log-queries`, `metrics-client-timeout`, `metrics-listen`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
 
 **The shared knobs whose fields disagree** (8 of
@@ -236,8 +237,8 @@ canon the operators grep for.
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 24 log phrase(s) shared by >= 2 tools;
-89 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 25 log phrase(s) shared by >= 2 tools;
+90 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -258,6 +259,7 @@ canon the operators grep for.
 | `control: state restored from` | cache, common |
 | `control: request poll now the loop wakes immedia` | cache, scraper |
 | `control: the dump to` | cache, common |
+| `poll plan:` | cache, scraper |
 | `sighup: reloaded` | cache, inverter |
 | `poll cycle crashed ` | cache, scraper |
 | `state dumps:` | cache, common |
@@ -379,8 +381,8 @@ type/default left to drift; the check is structural.
 
 | tool | module options declared |
 |---|---|
-| cache | `authKeyFile`, `authUpstreamKeyFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `metricsTokenFile`, `openFirewall`, `package`, `settings` |
-| scraper | `authKeyFile`, `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `openFirewall`, `package`, `settings` |
+| cache | `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `metricsTokenFile`, `modbusAuthKeyFile`, `modbusAuthUpstreamKeyFile`, `openFirewall`, `package`, `settings` |
+| scraper | `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `modbusAuthKeyFile`, `openFirewall`, `package`, `settings` |
 | inverter | no module.nix |
 | dashboard | `authTokenFile`, `controlOpsTokenFile`, `controlTokenFile`, `dumpKeyFile`, `enable`, `metricsTokenFile`, `openFirewall`, `package`, `settings`, `solarConfig`, `staticDir` |
 
@@ -418,20 +420,20 @@ published port not backed by a registry default is a lie.
 | `docker/Dockerfile.dashboard` | `AUTH_TOKEN`, `CONFIG_JS`, `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `PROM_URL`, `README`, `REQUIRED`, `SO_PEERCRED`, `VOLUME`, `WORKDIR` | 8080 |
 | `docker/Dockerfile.fake-inverter` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `SO_PEERCRED`, `VOLUME`, `WORKDIR` | 5502 |
 | `docker/Dockerfile.modbus-cache` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `README`, `REQUIRED`, `SELECTION`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME`, `WORKDIR` | 15502 |
-| `docker/Dockerfile.modbus-scraper` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `METRICS_SPEC`, `README`, `REQUIRED`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME` … | 9350 |
+| `docker/Dockerfile.modbus-scraper` | `AUTH`, `AUTH_TOKEN`, `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `METRICS_SPEC`, `MODBUS_AUTH_KEY`, `README`, `REQUIRED`, `SO_PEERCRED`, `UPSTREAM`, `VOLUME` … | 9350 |
 | `docker/Dockerfile.prometheus` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `VOLUME` | — |
-| `docker/README.md` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `GENERATED`, `HEALTHCHECK`, `HMAC`, `HOST` … | 15502, 5502, 8080, 9350 |
+| `docker/README.md` | `AUTH_TOKEN`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `GENERATED`, `HEALTHCHECK`, `HMAC`, `HOST`, `INTERVAL`, `JSON`, `LICENSE` … | 15502, 5502, 8080, 9350 |
 | `docker/demo/README.md` | `DEMO`, `HOST`, `JSON`, `PROM_URL`, `README`, `TSDB`, `UPSTREAM` | 8080, 9090 |
-| `docker/demo/compose.yaml` | `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `MODBUS_AUTH`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
+| `docker/demo/compose.yaml` | `AUTH_TOKEN`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `MODBUS_AUTH`, `MODBUS_AUTH_KEY`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
 | `docker/entrypoints/entrypoint-prometheus.sh` | `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `SECURITY`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
 | `docker/entrypoints/entrypoint.sh` | `JSON`, `README`, `REQUIRED`, `SECURITY` | — |
-| `docker/env/cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN` … | — |
+| `docker/env/cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN` … | — |
 | `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_LOG_REPLIES`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP` … | — |
-| `docker/env/fake.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN` … | — |
+| `docker/env/fake.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
-| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_KEY`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN` … | — |
-| `docker/prod/README.md` | `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `EDITOR`, `HOST`, `JSON`, `PORT`, `PROM_URL`, `README`, `SECURITY`, `UPSTREAM`, `YOUR` | 8080, 9350 |
-| `docker/prod/compose.yaml` | `AUTH`, `AUTH_KEY`, `AUTH_TOKEN`, `AUTH_UPSTREAM`, `AUTH_UPSTREAM_KEY`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `MODBUS_AUTH`, `ONLY`, `PORT` … | 8080, 9350 |
+| `docker/env/scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS` … | — |
+| `docker/prod/README.md` | `EDITOR`, `HOST`, `JSON`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `PORT`, `PROM_URL`, `README`, `SECURITY`, `UPSTREAM`, `YOUR` | 8080, 9350 |
+| `docker/prod/compose.yaml` | `AUTH`, `AUTH_TOKEN`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `MODBUS_AUTH`, `MODBUS_AUTH_KEY`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `ONLY`, `PORT` … | 8080, 9350 |
 | `docker/prometheus.yml` | `SECURITY` | — |
 
 **The port map 1:1** — the registries back every port the docker
@@ -598,14 +600,14 @@ tree.
 
 | knob | tools | live | restart | hidden |
 |---|---|---|---|---|
-| `auth-key` | cache, inverter, scraper | yes | yes | yes |
 | `auth-token` | dashboard, scraper | yes | yes | yes |
-| `auth-upstream-key` | cache | yes | yes | yes |
 | `config-js` | dashboard | yes | yes | yes |
 | `control-ops-token` | all four | yes | yes | yes |
 | `control-token` | all four | yes | yes | yes |
 | `dump-key` | all four | yes | yes | yes |
 | `metrics-token` | cache, dashboard, inverter | yes | yes | yes |
+| `modbus-auth-key` | cache, inverter, scraper | yes | yes | yes |
+| `modbus-auth-upstream-key` | cache | yes | yes | yes |
 | `static-dir` | dashboard | yes | yes | yes |
 
 **The markers per tool** (the F-trust surface: the loader parses,

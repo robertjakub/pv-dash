@@ -63,7 +63,7 @@
     "log_level_invalid": "log-level must be one of %s",
     "ops_policy_invalid": "the ops policy needs at least one verb the grammar speaks%s: %s",
     "acl_table_value": "\"table\" is not a %s value — the table is the show: show %s",
-    "suite_auth_needs_key": "the suite auth needs a key: pass auth-key by flag/env/config (min %d characters) and restart",
+    "suite_auth_needs_key": "the suite auth needs a key: pass modbus-auth-key by flag/env/config (min %d characters) and restart",
     "interval_range": "interval must be 0 < N <= 86400 seconds",
     "timeout_range": "timeout must be 0 < N <= 60 seconds",
     "audit_forward_grammar": "audit-forward must be %s",

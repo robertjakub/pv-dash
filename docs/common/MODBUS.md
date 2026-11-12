@@ -109,10 +109,10 @@ independently):
 
 | Tool | Knobs | Role |
 |---|---|---|
-| scraper | `modbus-auth` + `auth-key` | client toward the inverter |
-| cache | `modbus-auth` + `auth-key` | server: its own clients must prove |
-| cache | `auth-upstream` + `auth-upstream-key` | client toward the inverter |
-| fake inverter | `modbus-auth` + `auth-key` | server: its clients must prove |
+| scraper | `modbus-auth` + `modbus-auth-key` | client toward the inverter |
+| cache | `modbus-auth` + `modbus-auth-key` | server: its own clients must prove |
+| cache | `modbus-auth-upstream` + `modbus-auth-upstream-key` | client toward the inverter |
+| fake inverter | `modbus-auth` + `modbus-auth-key` | server: its clients must prove |
 
 Security properties, stated plainly: the key is symmetric and the client
 proves only — the server proves nothing to the client; the `OK`/`ERR`
@@ -130,8 +130,8 @@ never rendered back, loadable via `file:<path>` from an owner-only
 Implemented once in `common/modbus/protocol.py` (`waveshare_handshake_client`,
 beside the suite pair). A Waveshare RS485-to-TCP gateway guards its serial
 side with an optional connection password, and the cache's upstream leg
-speaks it (`--auth-upstream waveshare`): after the TCP connect and before
-any Modbus frame, the cache sends the shared auth-upstream-key as the
+speaks it (`--modbus-auth-upstream waveshare`): after the TCP connect and before
+any Modbus frame, the cache sends the shared modbus-auth-upstream-key as the
 password itself — **raw ASCII bytes, no framing, no length prefix** — and
 waits for the gateway's verdict:
 
@@ -470,9 +470,9 @@ either way).
 | Knob | Flag | Env | Console spelling | Tools |
 |---|---|---|---|---|
 | `modbus-auth` | `--modbus-auth suite\|none` | `MODBUS_AUTH` | `modbus auth` | all three |
-| `auth-key` *(secret)* | `--auth-key` | `AUTH_KEY` | `modbus auth key` | all three |
-| `auth-upstream` | `--auth-upstream suite\|waveshare\|none` | `AUTH_UPSTREAM` | `modbus auth-upstream` | cache |
-| `auth-upstream-key` *(secret)* | `--auth-upstream-key` | `AUTH_UPSTREAM_KEY` | `modbus auth upstream-key` | cache |
+| `modbus-auth-key` *(secret)* | `--modbus-auth-key` | `MODBUS_AUTH_KEY` | `modbus auth key` | all three |
+| `modbus-auth-upstream` | `--modbus-auth-upstream suite\|waveshare\|none` | `MODBUS_UPSTREAM_AUTH` | `modbus auth-upstream` | cache |
+| `modbus-auth-upstream-key` *(secret)* | `--modbus-auth-upstream-key` | `MODBUS_UPSTREAM_AUTH_KEY` | `modbus auth upstream-key` | cache |
 | `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `modbus upstream` | cache, scraper |
 | `unit` / `modbus-unit` | `--unit` / `--modbus-unit` | `UNIT` / `MODBUS_UNIT` | `modbus unit` | cache, scraper, fake (flag only) |
 | `timeout` | `--timeout` | `TIMEOUT` | `modbus timeout` | cache, scraper |

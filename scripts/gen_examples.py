@@ -87,11 +87,11 @@ ENV_TOOLS = (
       'listen': CMD_PIN,
       'audit-log': CMD_PIN,
       'modbus-auth': SUITE_KEY_STACK,
-      'auth-key': SUITE_KEY_STACK,
-      'auth-upstream': ('the demo stack pins this to the stack\'s suite '
+      'modbus-auth-key': SUITE_KEY_STACK,
+      'modbus-auth-upstream': ('the demo stack pins this to the stack\'s suite '
                         'key; in prod the upstream credential is the '
                         'device\'s — this file is its edit surface'),
-      'auth-upstream-key': ('the demo stack pins this to the stack\'s '
+      'modbus-auth-upstream-key': ('the demo stack pins this to the stack\'s '
                             'suite key; in prod the upstream credential '
                             'is the device\'s — this file is its edit '
                             'surface')},
@@ -110,7 +110,7 @@ ENV_TOOLS = (
       'modbus-auth': ('both compose stacks pin this to the stack\'s '
                       'suite key (the scraper proves it to the cache — '
                       'environment beats env_file)'),
-      'auth-key': ('both compose stacks pin this to the stack\'s suite '
+      'modbus-auth-key': ('both compose stacks pin this to the stack\'s suite '
                    'key (the scraper proves it to the cache — '
                    'environment beats env_file)'),
       'auth-token': ('the compose stacks pin AUTH_TOKEN to the generated '
@@ -125,7 +125,7 @@ ENV_TOOLS = (
      {'listen': CMD_PIN,
       'audit-log': CMD_PIN,
       'modbus-auth': SUITE_KEY_DEMO,
-      'auth-key': SUITE_KEY_DEMO,
+      'modbus-auth-key': SUITE_KEY_DEMO,
       'profile': BOTH_LAYERS,
       'log-level': BOTH_LAYERS,
       'chaos': SIGHUP_LIVE,
@@ -440,8 +440,9 @@ def render_conf(tool, daemon, name, intro, demo, rows):
     out.append('')
     text = '\n'.join(out)
     for no, line in enumerate(text.splitlines(), 1):
-        if len(line.encode('utf-8')) > 88:
-            raise SystemExit('%s/examples/%s:%d: line over 88 bytes: %r'
+        if len(line.encode('utf-8')) > 96:   # a set line cannot wrap (the renamed
+            # auth knobs' file: credential paths need the room); prose wraps at 74
+            raise SystemExit('%s/examples/%s:%d: line over 96 bytes: %r'
                              % (tool, name, no, line))
     return text
 

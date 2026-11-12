@@ -39,7 +39,7 @@ All three modules behave the same way:
 - **One `settings` option renders the unit's environment.** A freeform
   attrset: every entry goes verbatim as `NAME=value` into a store file wired
   as the service's systemd `EnvironmentFile`. The keys are the daemon's bare
-  env twins (UPSTREAM, LISTEN, INTERVAL, DUMP_PATH, ... — the generated
+  env twins (UPSTREAM, LISTEN, MODBUS_INTERVAL, DUMP_PATH, ... — the generated
   `docker/env/<tool>.env.example` files document the key list; lift lines
   straight from one), the values are strings the daemon's own conv parses
   (`"true"`/`"false"`, `"10.0"`); an absent key leaves the daemon default.
@@ -113,7 +113,7 @@ services.modbus-scraper = {
 
 | Option | Meaning |
 |---|---|
-| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, PROFILE, METRICS_SPEC, METRIC_PREFIX, MAX_KWP, DUMP_PATH, CTL, AUDIT_LOG, LOG_LEVEL, ...; `docker/env/scraper.env.example` is the key list) |
+| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, PROFILE, METRICS_SPEC, METRICS_PREFIX, MAX_KWP, DUMP_PATH, CTL, AUDIT_LOG, LOG_LEVEL, ...; `docker/env/scraper.env.example` is the key list) |
 | `authKeyFile` / `authTokenFile` | the suite-handshake key / the `/metrics` bearer token, from a file outside the store (LoadCredential) |
 | `controlTokenFile` / `controlOpsTokenFile` | the control plane's admin / read-only ops tokens, from a file |
 | `dumpKeyFile` | the seal key for the state dump (needs settings `DUMP_PATH`) |

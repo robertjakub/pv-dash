@@ -37,6 +37,40 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **cache, scraper** — **breaking: the five poll knobs wear the modbus-
+  prefix on the flat spellings** (the flag, the env twin, the config-file
+  key, the raw-wire `set <name>` spelling and the resolved key follow;
+  the live paths are already `modbus/...`, so the console spellings —
+  `set modbus interval`, `set modbus read-delay` — are unchanged):
+  `--interval` is `--modbus-interval` (env `INTERVAL` -> `MODBUS_INTERVAL`),
+  `--timeout` is `--modbus-timeout` (`TIMEOUT` -> `MODBUS_TIMEOUT`),
+  `--read-delay` is `--modbus-read-delay` (`READ_DELAY` ->
+  `MODBUS_READ_DELAY`), `--merge-gap` is `--modbus-merge-gap`
+  (`MERGE_GAP` -> `MODBUS_MERGE_GAP`) and `--profile` is
+  `--modbus-profile` (`PROFILE` -> `MODBUS_PROFILE`) — the flat spellings
+  join their `modbus-*` siblings (`modbus-unit`, `modbus-offset`,
+  `modbus-auth`); the resolved keys `interval`/`timeout`/`read_delay`/
+  `merge_gap`/`profile` -> `modbus_interval`/`modbus_timeout`/
+  `modbus_read_delay`/`modbus_merge_gap`/`modbus_profile`, the dump/state
+  keys follow the flat names. Anything scripting the old spellings must
+  follow; a stored dump carrying an old name's override restores skipped,
+  never fatal.
+- **cache** — **breaking: `--unit` is `--modbus-unit`** (env `UNIT` →
+  `MODBUS_UNIT`, config `set modbus-unit`, the resolved `unit` →
+  `modbus_unit`, the dump/state keys follow): the Modbus unit id wears
+  the modbus- prefix its siblings on the flag line already carry — the
+  cache joins the scraper's spelling (the docs/TODO item's console
+  spelling is one knob now). Anything scripting `--unit`/`UNIT`/
+  `set unit` must follow.
+- **scraper** — **the metrics prefix knob respells plural**:
+  `metric-prefix` -> `metrics-prefix` (the flag `--metric-prefix` ->
+  `--metrics-prefix`, the env `METRIC_PREFIX` -> `METRICS_PREFIX`, the
+  config-file key and the resolved `metric_prefix` -> `metrics_prefix`) —
+  the flat spellings follow the live node's own plural (the sibling
+  `metrics-spec`, the live path `metrics/prefix`: `set metrics prefix`
+  unchanged, the default `huawei` unchanged). A stored dump carrying the
+  old name's override restores skipped, never fatal.
+
 - **everywhere** — **`show knobs` renders one flattened table**: the
   group sections (`# --- group ---`) retire — the rows sort by knob name
   under a `knob / flag / env / change` header, and the columns pad to the

@@ -108,8 +108,8 @@ copy-name the files per stack: the demo reads `env/<tool>.env`, prod reads
 `env/<tool>-production.env` (the cache's and the scraper's — the cache's
 required there), so one checkout runs both stacks without the copies
 colliding on knobs like `UPSTREAM`. The names are
-**bare env twins** the tool's own docs speak (`UPSTREAM`, `INTERVAL`,
-`TTL`, `PROFILE`, `METRIC_PREFIX`, `LOG_LEVEL`, …) — one file per tool,
+**bare env twins** the tool's own docs speak (`UPSTREAM`, `MODBUS_INTERVAL`,
+`TTL`, `PROFILE`, `METRICS_PREFIX`, `LOG_LEVEL`, …) — one file per tool,
 so no namespacing is needed (the Prometheus file is the exception: its
 `PROM_*` knobs belong to `entrypoint-prometheus.sh`, not a pv-suite
 tool). Every line starts commented; the defaults live in the image.

@@ -97,23 +97,19 @@ they name the wire.
 
 ### The knob plane — the same knob everywhere
 
-- **the unit id, three spellings** `[cache]` `[scraper]` `[inverter]`
-  — cache `unit`/`--unit`/`UNIT` (`cache/lib/options.json:11`),
-  scraper `modbus-unit`/`--modbus-unit`/`MODBUS_UNIT` (`:8`), the
-  inverter `unit` with no env twin and no live at all
+- **the unit id, two spellings** `[scraper]` `[inverter]`
+  — the cache joined the scraper's spelling (the `modbus-unit`/
+  `--modbus-unit`/`MODBUS_UNIT` row, `cache/lib/options.json:11`),
+  the inverter stays `unit` with no env twin and no live at all
   (`inverter/lib/options.json:50` — startup-only by absence). The
   range half landed: one shared tree gates every tool with a unit knob
   (`common/modbus/protocol.json` — 1..247, `unit_in_range`; start and
   reload validate, the Modbus servers refuse out-of-range ids in-band,
   `check_options.py` gates the check). What remains: the scraper's row
   still declares `min: 0, max: 255` and only its live set gates on it
-  (`scraper/lib/control.py:306`) while start refuses `<1`; the cache's
-  live `set unit` is ungated entirely (`cache/lib/control.py:244`);
-  the registries still name `modbus-unit` (scraper) and `unit` (cache,
-  inverter) as two knobs — both rendering the same console spelling
-  `set modbus unit`. Outcome: one name, one flag, one env, live
-  everywhere, the row bounds = the shared tree's range (the NixOS
-  `unitId`/`modbusUnit` renames follow).
+  (`scraper/lib/control.py:306`) while start refuses `<1`. Outcome:
+  one name, one flag, one env, live everywhere, the row bounds = the
+  shared tree's range (the NixOS `unitId`/`modbusUnit` renames follow).
 - **the listener caps, three console schemes** `[all]` —
   `max-clients`/`client-timeout`/`max-conn-per-ip` console as
   `limits/*` on the cache, `metrics/limits/*` on the scraper, and bare
@@ -592,7 +588,7 @@ re-open — is the history half:
   `profiles/profiles/demo-fc4.json` for it.
 - **the dongle latency profile** — a persistent slow-reply
   mode (the laggy-modem character: every response delayed, not dropped) to
-  exercise read-delay and poll pacing against a realistic SDongle — the
+  exercise modbus-read-delay and poll pacing against a realistic SDongle — the
   chaos `stall` is a one-shot, a real dongle is a lifestyle.
 
 ### DASHBOARD

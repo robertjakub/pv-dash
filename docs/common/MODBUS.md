@@ -411,7 +411,7 @@ register ranges, and its `show write-registers-table` answers back as
 the chain; `--write-registers file:<path>` reads the same gate object
 from a standalone acl file instead.
 
-The cache merges adjacent ranges up to `merge-gap` addresses and 125
+The cache merges adjacent ranges up to `modbus-merge-gap` addresses and 125
 registers (2000 bits) per block, caches the four spaces in **separate
 `(fc, addr)` maps**, and on a failed block bisects it in half within the
 same cycle (single-leaf blocks are marked failed and their exception
@@ -432,7 +432,7 @@ no knob.
 | `max_pdu` | 253 | 253 | 253 |
 | `max_count` | 125 | 125 | 125 |
 | register space | 65536 | 65536 | 65536 |
-| unit id | 1..247, validated at start (`modbus unit`) | 1..247, validated at start (`modbus unit`) | 1 default, 1..247 validated at start (`--unit`) |
+| unit id | 1..247, validated at start (`modbus unit`) | 1..247, validated at start (`modbus unit`) | 1 default, 1..247 validated at start (`--modbus-unit`) |
 | socket timeout | 3.0 s (`modbus timeout`) | 3.0 s (`modbus timeout`) | — |
 | client idle timeout | 300 s (`limits client-timeout`) | — | 300 s (`client-timeout`) |
 | max clients | 64 (`limits max-clients`) | — | 64 (`max-clients`) |
@@ -448,7 +448,7 @@ hand-copy no number. The fake is a server: its accepted sockets carry the
 client idle timeout, no socket timeout.
 
 Pacing and caps, not rate limiting: one serialized upstream connection;
-`read-delay` sleeps between consecutive device reads in a healthy cycle
+`modbus-read-delay` sleeps between consecutive device reads in a healthy cycle
 (after a failure the sweep runs unpaced); pass-through reads wait for a
 free slot between poll reads; `max_clients` / per-IP caps gate the
 listeners (`common/serve/connlimit.py`); the connect ACL (`connect-acl`,
@@ -474,8 +474,8 @@ either way).
 | `modbus-auth-upstream` | `--modbus-auth-upstream suite\|waveshare\|none` | `MODBUS_UPSTREAM_AUTH` | `modbus auth-upstream` | cache |
 | `modbus-auth-upstream-key` *(secret)* | `--modbus-auth-upstream-key` | `MODBUS_UPSTREAM_AUTH_KEY` | `modbus auth upstream-key` | cache |
 | `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `modbus upstream` | cache, scraper |
-| `unit` / `modbus-unit` | `--unit` / `--modbus-unit` | `UNIT` / `MODBUS_UNIT` | `modbus unit` | cache, scraper, fake (flag only) |
-| `timeout` | `--timeout` | `TIMEOUT` | `modbus timeout` | cache, scraper |
+| `modbus-unit` | `--modbus-unit` | `MODBUS_UNIT` | `modbus unit` | cache, scraper, fake (flag only) |
+| `modbus-timeout` | `--modbus-timeout` | `MODBUS_TIMEOUT` | `modbus timeout` | cache, scraper |
 | `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus offset` | scraper |
 | `allow-write` | `--allow-write` | `ALLOW_WRITE` | `write allow` | cache, fake |
 | `write-registers` | `--write-registers` | `WRITE_REGISTERS` | `write registers` (`show write-registers-table` answers the acl-chain report) | cache |

@@ -12,6 +12,76 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **everywhere** — **the dev launchers stream the audit trail**: every
+  `dev` script passes `--audit-log -` — the audit trail rides the dev
+  terminal's stdout (the scraper's led the shape; the cache's, fake's and
+  dashboard's follow).
+
+- **scraper** — **the cache's read-delay paces the poll, and the poll
+  interval joins modbus**: the scraper learns `read-delay`
+  (`--read-delay` / `READ_DELAY`, live `modbus/read-delay` — the cache's
+  gold shape: seconds between consecutive device reads within a poll
+  cycle, the wait before every read but the first, a failed read sweeps
+  the next one unpaced; default 0.05, range 0..60, `0` = no wait) and the
+  poll interval's live path re-keys `metrics/interval` ->
+  `modbus/interval` (`set modbus interval 10` — the query interval is a
+  modbus affair; the flat `interval` spelling still resolves). THE
+  STATE-FILE MIGRATION: the dump/reload settings key the console
+  spellings — a stored dump's `metrics/interval` override restores
+  SKIPPED (the reply names it); re-set it once. The README's flag row +
+  conf example + set/clear row, the man prose and the suite pins follow.
+
+- **scraper** — **the caps namespace joins metrics**: the display caps'
+  live paths re-key `caps/max-pv` -> `metrics/caps/max-pv` and
+  `caps/max-grid` -> `metrics/caps/max-grid` (`set metrics caps max-pv 7`,
+  `show metrics caps` walks the node — the old `caps` spelling answers
+  unknown setting; the flat names `max-kwp`/`max-grid-kw` and the
+  flags/env/config keys stay) — the caps clamp the /metrics percentages,
+  so the exposition namespace owns them; the `caps` node retires, the
+  `metrics/caps` node lands, the metrics node's help names the display
+  caps. The README's conf example + set/clear row, the man prose (its
+  stale `set/unset` verb spelling fixed to `set/clear` — a leftover from
+  the family's unset->clear rename) and the generated surfaces follow.
+
+- **everywhere** — **the ?/TAB pools speak the cache's golden shape**: the
+  shared cli `pools()` gains the dump gate — `request dump`, `request
+  restore` and the `dump-interval` knob list only while a dump path is
+  configured (the welcome probes `show dump-path` first; the cache's
+  `request/dump/with-cache` rides the gate's extras param, and the gate
+  now keys the console spelling `dump/interval` — the cache's own pool had
+  gated the flat name its pool never carried). The cache's cli adopts the
+  shared implementation (its private pools retire); the scraper's, fake's
+  and dashboard's gain the gate; the scraper's and dashboard's
+  `request-dump`/`request-restore` rows take the hidden flag (the fake's
+  already rode it) so the wire's `help request` lists the visible children
+  only; the spine's `show_root_hidden` default carries the
+  dump-interval gate (the cache's override retires); the three simple
+  clis' dead `ALIAS_NAMES` imports prune. The suite pins follow (the
+  scraper's and the dashboard-fuzz's `help request` expectations).
+
+- **everywhere** — **the dump-interval knob speaks the wire path**: the
+  scraper's, fake's and dashboard's `dump-interval` rows take the cache's
+  golden live path `dump/interval` (`set dump interval 30` / `show dump
+  interval` — the flat `dump-interval` spelling still resolves; the cache
+  already rode the path); the MANUALs' wire column, the bundled confs' set
+  lines and the generated surfaces re-render. The cache's `dump/with-cache`
+  pair (the knob + the hidden `request dump with-cache`) stays cache-only
+  by design — the only modbus-cache feature.
+
+- **scraper + cache** — **the poll-now nudge joins the request namespace**:
+  the scraper's `poll now` becomes `request poll now` (the registry row's
+  live path `poll/now` re-keys to `request/poll/now` — the flat name
+  `poll-now` and the RBAC verb `poll` stay, the orphan `poll` node retires,
+  the old spelling answers unknown command) and the cache learns the same
+  command: `request poll now` sets the proxy's poll-wake event (the handle
+  the flush/restart branches already set — the wait between the cycles
+  fires now). The `request/poll` node rows land on both registries (the
+  lint's auto-node ask, the real help prose in), the ops-token prose names
+  the excluded verb, the ctl/cli help strings + the man/MANUAL surfaces +
+  the regtest pins follow (the scraper's suite pins the renamed wire call
+  and the ops refusal, the cache's suite pins the new command + the canon
+  log line both tools speak).
+
 - **scraper** — **the shipped `metrics.token` placeholder retires**:
   `scraper/examples/metrics.token` is gone — the docker image creates the
   placeholder in `config-defaults/` with the same `RUN echo` the suite key

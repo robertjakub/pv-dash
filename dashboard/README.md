@@ -185,6 +185,12 @@ printf 'set log-queries on\nshow config\n' | python3 bin/dashboard-ctl.py
 python3 bin/dashboard-cli.py                        # the console: TAB completion, ?, reconnect
 ```
 
+The console prints through a pager: a reply taller than the screen pauses
+(`-- more --`) — space walks a page, return a line, `q` stops the rest
+(`--page-size`/`CLI_PAGE_SIZE` set the size, 0 = off; the session-local
+`page` command retunes it live; a terminal under 20 rows or 64 columns
+refuses to start).
+
 | Command | Effect |
 |---|---|
 | `set` / `clear` | the live settings: the caps, `system log-access`, `log-queries`, `system log-level`, `metrics acl`, `control port` (rebinds the listener live), `control ops verbs`/`trust-uids`/`socket-group` — `system listen` (the serve address, `show listen` answers it) is startup-only and answers the restart note like the tokens (`control token`, `control ops token`, `metrics token`, `auth token`): pass them by flag/env/config |

@@ -212,7 +212,7 @@
       "help": "the state machinery: the dump written and restored, the fake restarted", "node": true },
     { "name": "request-dump", "shared": "request-dump", "live": "request/dump",
       "help": "write the state dump: the live setting overrides, sealed (when the fake has a dump path)" },
-    { "name": "request-reload", "live": "request/reload",
+    { "name": "request-reload", "shared": "request-reload", "live": "request/reload",
       "help": "save the live overrides and restart the whole daemon (the flags and the env are re-resolved)" },
     { "name": "request-reload-config", "shared": "request-reload-config", "live": "request/reload-config",
       "help": "re-read the config file (the values re-apply over the running machines)" },

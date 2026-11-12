@@ -37,6 +37,18 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **cache, scraper** — **the register map consoles as words**: the
+  `uplink-sources` show row's live path re-keys to `uplink/sources` —
+  `show uplink sources` spells the register map from the ctl/cli (the
+  translate layer resolves the words beside the lean `show uplink`
+  report; the flat wire word `show uplink-sources` and the
+  `ok uplink-sources` replies stay, and the root ? listing folds the
+  word into `uplink`'s walk-on — the `cache/all` and `inputs/metrics`
+  precedent). The two regtests' root-listing pins drop the dashed word,
+  the ctl words-spelling pins land and the caps pins' raw-wire spellings
+  go flat (the wire takes the flat names; the words spellings are the
+  ctl/cli's translate layer).
+
 - **scraper** — **the sanity caps re-home under modbus**: the live paths
   re-key `metrics/caps/max-pv` -> `modbus/caps/max-pv` and
   `metrics/caps/max-grid` -> `modbus/caps/max-grid` (`set modbus caps

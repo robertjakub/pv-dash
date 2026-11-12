@@ -6,7 +6,7 @@ stay in each tool's `schema/` dir
 (`cache/schema/` for the metrics selection schema,
 `scraper/schema/` for the metrics spec). A schema lives here when the
 file it describes is shared: today that is the standalone acl file's
-two gates — the [ip-prefix](../extras/examples/README.md) connect gate and the
+two gates — the [ip-prefix](../../extras/examples/README.md) connect gate and the
 write-registers gate — whose `$id`s point here.
 
 ## The contract

@@ -7,7 +7,7 @@ the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
 This file keeps **Unreleased and the current release** only — the release
-history (0.4.0 and older) lives in [docs/CHANGELOG.md](docs/CHANGELOG.md).
+history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
 
 ## Unreleased
 ### Changed
@@ -1811,7 +1811,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
 - **docs** — **AUDIT.md condensed to the current state (rev. 24)**: the
   revision history (rev. 1–24), the closed findings' fix/verification
   detail and the per-finding evidence move to the new
-  [AUDIT-history.md](docs/AUDIT-history.md); AUDIT.md keeps the posture,
+   [AUDIT-history.md](docs/history/AUDIT.md); AUDIT.md keeps the posture,
   the trust boundaries, the controls, the open findings, the closed
   registry and the NIS2/DORA mapping — the docs/TODO pointer re-pointed.
 - **everywhere** — **the four `<tool>/MANUAL.md` pages land**: every
@@ -1833,7 +1833,7 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   provenance, the `huawei_` metric-prefix default stays.
 
 - **everywhere** — **the docs restructure**: all Nix/NixOS documentation
-  moved out of the per-tool READMEs into [docs/NIXOS.md](docs/NIXOS.md)
+  moved out of the per-tool READMEs into [nixos/README.md](nixos/README.md)
   (the flake and its outputs, the shared module story — the set-grammar
   render, the reload/restart split, the LoadCredential secrets, the
   control-socket paths, the hardening — the three modules' option maps
@@ -1845,13 +1845,13 @@ off the ACL is closed without a reply — nothing was parsed to answer — and
   control → the feature sections → security → testing → nix → source
   layout → license) and shortened — the family-wide stories (the ACL
   grammar, the Modbus handshake, the audit chain mechanics) now point at
-  [docs/ACL.md](docs/ACL.md) / [docs/MODBUS.md](docs/MODBUS.md) /
-  [docs/AUDIT.md](docs/AUDIT.md) instead of re-running them, the fake and
+   [docs/common/ACL.md](docs/common/ACL.md) / [docs/common/MODBUS.md](docs/common/MODBUS.md) /
+   [docs/history/AUDIT.md](docs/history/AUDIT.md) instead of re-running them, the fake and
   the dashboard gain the Testing sections they never had; the profiles
   README tightened on the same shape. The **CHANGELOG split**: the root
   file keeps Unreleased + the current release (0.4.2), the release
   history (0.4.0 and older) moved verbatim to
-  [docs/CHANGELOG.md](docs/CHANGELOG.md) (the book's changelog page
+  [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md) (the book's changelog page
   includes both); `scripts/release.py` maintains the split — a release
   moves the superseded release section(s) to the archive and the
   version-sweep's pathspec excludes it.

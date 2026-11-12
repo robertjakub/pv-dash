@@ -559,7 +559,7 @@ random PDUs, pipelined bursts, trickled frames), `tests/cache-stress.py`
 ---
 
 *Credits: the suite auth handshake is MK's design — see
-[CONTRIBUTORS.md](CONTRIBUTORS.md). The per-tool behavior prose lives in
+[CONTRIBUTORS.md](../CONTRIBUTORS.md). The per-tool behavior prose lives in
 the [cache](../../cache/README.md), [scraper](../../scraper/README.md) and
 [inverter](../../inverter/README.md) READMEs; the knobs live in the
 per-tool registries (`<tool>/lib/options.json`), tabled by the MANUALs.*

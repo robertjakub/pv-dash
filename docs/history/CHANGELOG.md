@@ -1,7 +1,7 @@
 # Changelog — the release history
 
 The pv-suite's release history: **0.4.0 and older**. The current release
-and Unreleased live in the root [CHANGELOG.md](../CHANGELOG.md); this file
+and Unreleased live in the root [CHANGELOG.md](../../CHANGELOG.md); this file
 is the archive, moved over verbatim. Dates are the tagged commits'. The
 early tags (before 0.1.0) carried per-tool versions — the dashboard, the
 scraper and the cache each numbered their own releases before the repo

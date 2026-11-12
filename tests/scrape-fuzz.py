@@ -13,34 +13,19 @@ import sys
 import time
 import urllib.request
 
-if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
-    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
-             'a standalone run shares /tmp scratch and collides across sessions)')
-SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
-os.makedirs(SCRATCH, exist_ok=True)   # the CI legs set a fixed path the battery never made
-print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+from harness import *   # the boot: the gate, SCRATCH, BASE, the NOTE stamp — the shared check accumulator (PROFILE rebinds below: the fuzz argv leads with the rounds)
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRAPER_DIR = os.path.join(REPO, 'scraper')
 P = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 # the suite's spec — via the env; examples/ is never a loader default
 os.environ['METRICS_SPEC'] = os.path.join(SCRAPER_DIR, 'examples', 'metrics.json')
-BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
 INV_PORT, PORT = 15545 + BASE, 19455 + BASE
 ROUNDS = int(sys.argv[1]) if len(sys.argv) > 1 else 300
 PROFILE = sys.argv[2] if len(sys.argv) > 2 else os.environ.get('PV_SUITE_PROFILE', 'quick')
 # quick: the basic HTTP shapes plus a small raw-junk sample; full: the whole
-# hostile spread (the nightly depth — scripts/battery.sh full passes it)
+# hostile spread (the nightly depth — the battery full passes it)
 KIND_POOL = ([3, 4, 3, 4, 0] if PROFILE == 'quick' else [0, 1, 2, 3, 4])
-
-failures = []
-
-
-def check(name, cond, detail=''):
-    print('%s %s%s' % ('PASS' if cond else 'FAIL', name, (' — ' + detail) if detail else ''))
-    if not cond:
-        failures.append(name)
 
 
 def get(path, timeout=5):

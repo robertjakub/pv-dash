@@ -95,14 +95,14 @@ the inverter Modbus settings
 | `upstream` | `set modbus upstream` | settable | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus endpoint |
 | `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | the Modbus unit id the session speaks |
 | `modbus-offset` | `set modbus offset` | settable | `N` | `--modbus-offset` / `MODBUS_OFFSET` | added to register addresses |
-| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token) |
+| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the Modbus auth scheme: suite (the crypt handshake) or none |
 | `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
-| `modbus-timeout` | `set modbus timeout` | settable | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | Modbus connect/read timeout |
+| `modbus-timeout` | `set modbus timeout` | settable | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | Modbus connect/read timeout in seconds |
 | `modbus-read-delay` | `set modbus read-delay` | settable | `s` | `--modbus-read-delay` / `MODBUS_READ_DELAY` | seconds between consecutive device reads within a poll cycle |
 | `modbus-merge-gap` | `set modbus merge-gap` | settable | `registers` | `--modbus-merge-gap` / `MODBUS_MERGE_GAP` | max register gap when merging the profile's source ranges into block reads; the plan rebuilds |
-| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON: the registers the metrics read (a bare name resolves in profiles/profiles/) |
+| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON (a bare name resolves in profiles/profiles/) |
 | `grid-positive-import` | `set modbus grid-positive-import` | settable | `on\|off` | `--grid-positive-import` / `GRID_POSITIVE_IMPORT` | grid register positive when importing |
-| `modbus-interval` | `set modbus interval` | settable | `s` | `--modbus-interval` / `MODBUS_INTERVAL` | seconds between polls of the inverter |
+| `modbus-interval` | `set modbus interval` | settable | `s` | `--modbus-interval` / `MODBUS_INTERVAL` | seconds between polls of the upstream |
 
 ### metrics
 
@@ -178,15 +178,15 @@ the /metrics bearer auth: the token the exposition endpoint requires
 
 ### audit
 
-the SCR audit trail: the sink, the forwarding, the rotation, the kill switch
+the audit trail: the sink, the forwarding, the rotation, the kill switch
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | SCR audit trail: a file path or - for stdout (the docker/journald way); `none` = no local file (the forward carries the trail); default: the XDG state home (~/.local/state/modbus-scraper/audit.log) |
+| `audit-log` | `set audit log-file` | settable | `PATH\|-\|none` | `--audit-log` / `AUDIT_LOG` | the audit trail's file: a path, - for stdout, none = no local file (the forward carries the trail), empty = the XDG state home |
 | `audit-forward` | `set audit forward` | settable | `none\|syslog\|syslog:/PATH\|udp://HOST\|tcp://HOST` | `--audit-forward` / `AUDIT_FORWARD` | also forward every audit line: the local syslog mirror or a remote collector (the off-box copy) |
 | `audit-forward-format` | `set audit forward format` (the console also takes `set audit forward-format`) | settable | `rfc5424\|cef` | `--audit-forward-format` / `AUDIT_FORWARD_FORMAT` | the remote forward's envelope: RFC5424 (the default) or CEF — the local syslog forms keep the verbatim send |
 | `audit-instance` | `set audit instance` | settable | `ID` | `--audit-instance` / `AUDIT_INSTANCE` | the audit lines' instance word: the writer daemon's identity — the control port when unset, the override when spelled |
-| `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the SCR audit trail |
+| `no-audit-log` | `set audit disable` | settable | `on\|off` | `--no-audit-log` / `NO_AUDIT_LOG` | disable the audit trail entirely |
 
 ### audit/rotate
 
@@ -218,8 +218,8 @@ the state dump: the live overrides' file, the restore-on-start
 | `show uplink` | show-only | the inverter link: session counters, per-block latency and errors |
 | `show uplink-sources` | show-only | the register map: one row per polled register — fc, register, the range that fetches it, source |
 | `show version` | show-only | the modbus-scraper version |
-| `show config` | show-only | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
-| `show knobs` | show-only | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
+| `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
+| `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
 | `show inputs` | show-only | the declared compute expression inputs (the reserved four and the spec's declared entries), each bracketed with the metric whose value it carries |
 | `show inputs-metrics` | show-only | the exported metrics: one [section]-bracketed line per metric the exposition serves (the built-in scraper_* block included), sorted by name |
 | `show metrics-acl-table` | show-only | the metrics ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs |

@@ -466,7 +466,7 @@ The findings:
 ## The suite-coverage sweep — the promises x the tests
 
 Every live knob name, command word and canon log phrase grepped
-against `tests/*.py` (word-bounded). Word-match honesty: the suites
+against `tests/suites/*.py` (word-bounded). Word-match honesty: the suites
 are prose too — a name inside another word counts as covered; the
 list is the TODO seed, not a verdict.
 
@@ -553,24 +553,24 @@ shipped example re-parsed through the tool's own set-grammar reader
 
 | tool | schema files |
 |---|---|
-| cache | `selection.schema.json` |
+| cache | none |
 | scraper | `metrics.schema.json` |
 | inverter | none |
 | dashboard | none |
-| shared | `acl-ip-prefix.schema.json`, `acl-write-registers.schema.json` |
+| shared | `acl-ip-prefix.schema.json`, `acl-write-registers.schema.json`, `modbus-cache-filter.schema.json` |
 
 **The shipped examples re-parsed** through the tools' own readers:
 
 | example | the read |
 |---|---|
 | `cache/examples/modbus-cache.conf` | ok (0 setting line(s)) |
-| `cache/examples/selection.json` | json ok |
 | `scraper/examples/metrics.json` | json ok |
 | `scraper/examples/modbus-scraper.conf` | ok (0 setting line(s)) |
 | `inverter/examples/modbus-fake-inverter.conf` | ok (0 setting line(s)) |
 | `dashboard/examples/dashboard.conf` | ok (0 setting line(s)) |
 | `extras/examples/acl-ip-prefix.json` | json ok |
 | `extras/examples/acl-write-registers.json` | json ok |
+| `extras/examples/modbus-cache-filter.json` | json ok |
 
 The findings:
 

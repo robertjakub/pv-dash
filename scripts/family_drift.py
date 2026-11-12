@@ -55,7 +55,7 @@ The sweep types — what we are sweeping:
    binds. A knob without its env twin cannot be set from an env
    file; a published port not in the registries is a lie.
 9. THE SUITE-COVERAGE SWEEP (promises x tests). Every live knob,
-   command word and canon phrase grepped against tests/*.py — the
+   command word and canon phrase grepped against tests/suites/*.py — the
    uncovered-promise list. Word-match honesty: a name inside another
    word counts, the suites are prose too.
 10. THE F-LEDGER SWEEP. docs/SECURITY.md's F-numbers vs the tree: which
@@ -480,13 +480,13 @@ def docker_env():
 
 def coverage(rows, cmds, canon):
     """Every live knob / command word / canon phrase grepped against
-    tests/*.py -> the uncovered list. The knob's spellings are the
+    tests/suites/*.py -> the uncovered list. The knob's spellings are the
     dashed name, the live path and the spaced live path (the wire's
     set/show form — the suites speak `set control ops verbs`, not the
     dashed row name); the command's are the /-path and the spaced
     words."""
     tests = []
-    td = os.path.join(REPO, 'tests')
+    td = os.path.join(REPO, 'tests', 'suites')
     for f in sorted(os.listdir(td)):
         if f.endswith('.py') and not f.startswith('zz_'):
             tests.append((f, open(os.path.join(td, f), encoding='utf-8', errors='replace').read()))
@@ -677,7 +677,7 @@ COVER_HEAD = """\
 ## The suite-coverage sweep — the promises x the tests
 
 Every live knob name, command word and canon log phrase grepped
-against `tests/*.py` (word-bounded). Word-match honesty: the suites
+against `tests/suites/*.py` (word-bounded). Word-match honesty: the suites
 are prose too — a name inside another word counts as covered; the
 list is the TODO seed, not a verdict."""
 

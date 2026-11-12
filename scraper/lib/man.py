@@ -3,7 +3,7 @@
 sections render from the tools' argparse parsers, the prose sections live
 here as roff. scripts/gen_man.py writes the shipped man/*.1 from these;
 `modbus-scraper --man` (and the ctl/cli's --man) prints the same page."""
-from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
+from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.3'
@@ -44,7 +44,7 @@ non-loopback listen without a token refuses to start (F13 in
 docs/SECURITY.md).
 .PP
 The JSON-lines control server (\\fB--control-port\\fR, talked to with
-\\fBmodbus-scraper-ctl\\fR(1) and \\fBmodbus-scraper-cli\\fR(1)) inspects
+\\fBmodbus-scraper-cli\\fR(1)) inspects
 and steers the running exporter: the live settings, an immediate poll, the
 config reload, the Modbus session restart, the graceful shutdown. With a
 control token configured the wire is HMAC-signed: every command and reply
@@ -94,8 +94,6 @@ refuses a wrong or missing key; \\fB--restore-on-start\\fR loads it at
 start, \\fB--dump-interval\\fR rewrites it on a timer),
 \\fBrequest restart\\fR, \\fBshutdown\\fR,
 \\fBquit\\fR. See
-.BR modbus-scraper-ctl (1)
-and
 .BR modbus-scraper-cli (1)."""
     security = """.SH SECURITY
 The scraper reads an open Modbus device (no auth, no TLS — the inverter's
@@ -154,45 +152,17 @@ prefix); the flag wins over the env, the env over the config script."""
         options_section(parser),
         extra_sections=(signals, control, security, environment, files, exit_status),
         kind='daemon',
-        see_also='.BR modbus-scraper-ctl (1),\n.BR modbus-scraper-cli (1),\n.BR modbus-cache (1),\n.BR modbus-fake-inverter (1)\n.PP\nscraper/README.md in the suite checkout \\(em the full documentation.')
+        see_also='.BR modbus-scraper-cli (1),\n.BR modbus-cache (1),\n.BR modbus-fake-inverter (1)\n.PP\nscraper/README.md in the suite checkout \\(em the full documentation.')
 
-
-def ctl_page(parser):
-    description = """\
-Sends one command (or a batch from stdin) to modbus-scraper's JSON-lines
-control server over TCP or a unix socket, prints the replies, exits. The
-one-shot sibling of \\fBmodbus-scraper-cli\\fR(1): no session, no
-completion — the scriptable surface (the exit codes, one reply per
-command). With a control token configured the wire is HMAC-signed: the
-client signs every command and verifies every reply (the full sha256 of
-the frame, keyed by the token)."""
-    examples = """.SH EXAMPLES
-.RS
-.IP \\(bu 2
-.B modbus-scraper-ctl request poll now
-.IP \\(bu 2
-.B modbus-scraper-ctl show version
-.IP \\(bu 2
-.B printf 'inspect\\enrequest poll now\\en' | modbus-scraper-ctl
-.RE"""
-    environment = """.SH ENVIRONMENT
-.TP
-.B CTL ", " CONTROL_TOKEN
-the control target and the TCP token when the flags are unset."""
-    exit_status = EXIT_STATUS_CTL
-    return page(
-        "send commands to the modbus-scraper control server (one-shot / batch)",
-        'modbus-scraper-ctl', 1, DATE, VERSION, MANUAL,
-        '.B modbus-scraper-ctl\n.RI [ options ] " [command ...]"',
-        description,
-        options_section(parser),
-        extra_sections=(examples, environment, exit_status),
-        kind='ctl',
-        see_also='.BR modbus-scraper-cli (1),\n.BR modbus-scraper (1)')
 
 
 def cli_page(parser):
     description = """\
+One client, three modes by the invocation shape: command words one-shot
+(\\fBmodbus-scraper-cli\\fR show config\\fR \\(em the raw verdict head prints,
+exit 0 ok, 1 connection error, 2 misuse), piped stdin batch (the script lines
+run in order, the same raw faces), a bare terminal the interactive console.
+.PP
 A session front-end on top of modbus-scraper's JSON-lines control socket:
 prompt with the connected port, TAB completion and \\fB?\\fR in every
 position (with the short descriptions from the shared command registry),
@@ -226,9 +196,9 @@ terminal height."""
     return page(
         "console-style session on the modbus-scraper control server",
         'modbus-scraper-cli', 1, DATE, VERSION, MANUAL,
-        '.B modbus-scraper-cli\n.RI [ options ]',
+        '.B modbus-scraper-cli\n.RI [ options ]\n.IB command " [args ...]"',
         description,
         options_section(parser),
         extra_sections=(env, exit_status),
         kind='cli',
-        see_also='.BR modbus-scraper-ctl (1),\n.BR modbus-scraper (1)')
+        see_also='.BR modbus-scraper (1)')

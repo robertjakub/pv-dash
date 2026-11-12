@@ -37,7 +37,7 @@ non-loopback listen without a token refuses to start (F13 in
 docs/SECURITY.md).
 .PP
 The JSON-lines control server (\fB--control-port\fR, talked to with
-\fBmodbus-scraper-ctl\fR(1) and \fBmodbus-scraper-cli\fR(1)) inspects
+\fBmodbus-scraper-cli\fR(1)) inspects
 and steers the running exporter: the live settings, an immediate poll, the
 config reload, the Modbus session restart, the graceful shutdown. With a
 control token configured the wire is HMAC-signed: every command and reply
@@ -295,8 +295,6 @@ refuses a wrong or missing key; \fB--restore-on-start\fR loads it at
 start, \fB--dump-interval\fR rewrites it on a timer),
 \fBrequest restart\fR, \fBshutdown\fR,
 \fBquit\fR. See
-.BR modbus-scraper-ctl (1)
-and
 .BR modbus-scraper-cli (1).
 
 .SH SECURITY
@@ -362,7 +360,6 @@ invalid configuration or a failed bind (reason on stderr).
 command-line misuse.
 
 .SH SEE ALSO
-.BR modbus-scraper-ctl (1),
 .BR modbus-scraper-cli (1),
 .BR modbus-cache (1),
 .BR modbus-fake-inverter (1)

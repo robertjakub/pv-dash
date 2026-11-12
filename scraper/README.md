@@ -145,13 +145,13 @@ in flags:
 The scraper runs the family's JSON-lines control server — **by default on
 the unix socket `/tmp/modbus-scraper-<listen-port>.socket`** (`0` switches
 it off, a TCP port number binds `127.0.0.1:PORT` instead). Talk to it with
-**`modbus-scraper-ctl`** (one-shot / batch) or **`modbus-scraper-cli`**
-(the console session):
+**`modbus-scraper-cli`** — one client, three modes (command words
+one-shot, piped stdin batch, a bare terminal the console):
 
 ```bash
-python3 scraper/bin/modbus-scraper-ctl.py show upstream
-printf 'set interval 5\nrequest poll now\n' | python3 scraper/bin/modbus-scraper-ctl.py
-python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
+python3 scraper/bin/modbus-scraper-cli.py show upstream
+printf 'set interval 5\nrequest poll now\n' | python3 scraper/bin/modbus-scraper-cli.py
+python3 scraper/bin/modbus-scraper-cli.py            # bare on a terminal: TAB completes, ? lists
 ```
 
 The console prints through a pager: a reply taller than the screen pauses
@@ -384,7 +384,6 @@ Every scenario must end with the exporter serving correct metrics and
 scraper/
 ├── bin/
 │   ├── modbus-scraper.py  # CLI, logging setup, signal handling, the control wiring
-│   ├── modbus-scraper-ctl.py     # one-shot / batch control client
 │   └── modbus-scraper-cli.py     # console-style control session
 ├── examples/
 │   ├── modbus-scraper.conf  # sample config in the set grammar

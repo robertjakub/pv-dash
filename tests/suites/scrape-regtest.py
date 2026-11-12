@@ -297,7 +297,7 @@ try:
     check('modbus offset: the poll reads the map true (pv 4000, up)',
           m.get('huawei_pv_generation_watts') == 4000 and m.get('scraper_up') == 1,
           str({k: m.get(k) for k in ('huawei_pv_generation_watts', 'scraper_up')}))
-    r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
+    r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-cli.py'),
                         '--control-port', '15610', '--control-token', 'offstok',
                         'set', 'modbus-offset', '20000'], capture_output=True, text=True, timeout=15)
     check('modbus offset: the live set answers the typed value', r.stdout.startswith('ok modbus-offset=20000'),
@@ -310,7 +310,7 @@ try:
     check('modbus offset: the shift moves the window off the map (the poll fails loudly)',
           m.get('scraper_up') == 0 and m.get('scraper_modbus_errors_total', 0) >= 1,
           str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
-    r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
+    r = subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-cli.py'),
                         '--control-port', '15610', '--control-token', 'offstok',
                         'clear', 'modbus-offset'], capture_output=True, text=True, timeout=15)
     check('modbus offset: clear restores the configured zero', r.stdout.startswith('ok modbus-offset=0'),
@@ -323,7 +323,7 @@ try:
     check('modbus offset: the restore reads the map true again',
           m.get('huawei_pv_generation_watts') == 4000 and m.get('scraper_up') == 1,
           str({k: m.get(k) for k in ('huawei_pv_generation_watts', 'scraper_up')}))
-    subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py'),
+    subprocess.run([sys.executable, os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-cli.py'),
                     '--control-port', '15610', '--control-token', 'offstok', 'shutdown'],
                    capture_output=True, text=True, timeout=15)
 
@@ -519,8 +519,8 @@ try:
     check('control: soc stays pinned (the pin reads 30)', ctl('show soc', 15571).startswith('ok soc=30'),
           ctl('show soc', 15571))
 
-    # 2d. modbus-fake-ctl.py: the CLI tool speaks TCP and unix-socket control servers
-    C = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
+    # 2d. modbus-fake-cli.py: the client tool speaks TCP and unix-socket control servers
+    C = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py')
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'pv', '2700'], capture_output=True, text=True)
     check('fake_ctl: TCP pin via tool', r.returncode == 0 and r.stdout.startswith('ok pv=2700 '), r.stdout.strip())
     time.sleep(1.5)
@@ -901,32 +901,31 @@ try:
                               input=stdin, capture_output=True, text=True, timeout=30)
 
     r = cli('set pv 3000\n')
-    check('fake_cli: set prints only the confirmation', r.returncode == 0
-          and r.stdout.rstrip() == '\nfake-inverter:15571 > % changed\n\nfake-inverter:15571 >', repr(r.stdout))
+    check('fake_cli: the piped batch prints the set verdict raw', r.returncode == 0
+          and r.stdout.startswith('ok pv=3000'), repr(r.stdout))
     check('fake_cli: set reply really carried no status tail',
           'load=' not in r.stdout and 'pinned' not in r.stdout, repr(r.stdout))
     time.sleep(1.5)
     m = metrics_dict(get('/metrics', 19455 + BASE)[1])
     check('fake_cli: pinned value reaches /metrics', m.get('huawei_pv_generation_watts') == 3000,
           str(m.get('huawei_pv_generation_watts')))
-    r = cli('shutdown\nn\n')
-    check('fake_cli: shutdown refuses without confirming', r.returncode == 0
-          and 'Proceed with shutdown? [confirm]' in r.stdout and '% Aborted.' in r.stdout, repr(r.stdout))
+    r = cli('shutdown\n')
+    check('fake_cli: the piped shutdown stops the fake (the confirm guard is console-only)',
+          r.returncode == 0 and 'bye shutdown' in r.stdout, repr(r.stdout))
     ctl('show version', 15571)
     r = cli('show pv\ninspect\nquit\n')
-    lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: show prints the bare value, inspect dumps the state', r.returncode == 0
-          and '3000' in lines
+    lines = [l.strip() for l in r.stdout.splitlines() if l.strip()]
+    check('fake_cli: the batch keeps the raw bodies (show, inspect)', r.returncode == 0
+          and 'ok pv=3000' in lines
           and any(l.startswith('power') and 'pv 3000 W' in l for l in lines)
           and any(l == 'pinned    pv=3000.0' for l in lines), repr(r.stdout))
     r = cli('help soc\nshow registers\ninspect\nquit\n')
-    lines = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
-    check('fake_cli: the help rides bare, the registers table prints bare, inspect dumps',
+    lines = [l.strip() for l in r.stdout.splitlines() if l.strip()]
+    check('fake_cli: the batch keeps the wire help, the registers table, inspect',
           r.returncode == 0
-          and any(l == 'soc - pin the state of charge (seeds the machine), or auto (values: %|auto)' for l in lines)
+          and any('soc - pin the state of charge' in l for l in lines)
           and any(l == 'registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
-          and any('0.4.3' in l and 'version' in l for l in lines)
-          and not any(l.startswith('% ok inspect') for l in lines), repr(r.stdout[:120]))
+          and any('0.4.3' in l and 'version' in l for l in lines), repr(r.stdout[:120]))
 
     # 2g3. the audit trail: the UTC stamp, the CLI/CTL prefix, the who-when-what,
     # ping/pong never logged, --no-audit-log switches it off
@@ -948,34 +947,41 @@ try:
         os.unlink(AUD2)
     r = cli('show version\nping\nquit\n', audit=AUD2)
     cli_rows = open(AUD2).read()
-    check('audit: cli logs the session + the local commands; the wire commands = the server trail',
+    check('audit: the piped batch logs CONNECT/DISCONNECT only (the per-command rows are the console\'s; the wire commands = the server trail)',
           'application=INV tag=cli instance=15571 type=connect' in cli_rows and 'target=' in cli_rows
-          and 'application=INV tag=cli' in cli_rows and 'type=command' in cli_rows and "cmd='quit' result=local" in cli_rows
-          and 'type=disconnect' in cli_rows and "message='show" not in cli_rows
-          and 'ping' not in cli_rows and 'pong' not in cli_rows, cli_rows)
+          and 'type=disconnect' in cli_rows
+          and 'type=command' not in cli_rows and "cmd='quit' result=local" not in cli_rows
+          and "message='show" not in cli_rows, cli_rows)
     r = cli('inspect\nquit\n')
-    rows = [l.strip() for l in r.stdout.replace('fake-inverter:15571 > ', '').splitlines() if l.strip()]
+    rows = [l.strip() for l in r.stdout.splitlines() if l.strip()]
     check('fake_cli: inspect dumps the state bare', r.returncode == 0
           and len(rows) >= 10 and any(r2.startswith('power') for r2 in rows)
           and any(r2.startswith('pinned') for r2 in rows), repr(r.stdout))
-    r = cli('set ?\n')
-    check('fake_cli: ? lists the options for the position', r.returncode == 0
-          and 'scenario' in r.stdout and 'max-kwp' in r.stdout
-          and not any(line.startswith('ok') for line in r.stdout.splitlines()),
-          repr(r.stdout[:400]))   # the token rows' prose carries the letters 'ok' — the check
-                                  # anchors the ok-REPLY to the line head, not the substring
-    p = subprocess.Popen([sys.executable, K, '--control-port', '15571'],
-                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                         text=True, env={**os.environ, 'CLI_KEEPALIVE': '0.2'})
-    time.sleep(1.2)          # the CLI idles, pinging every 0.2s
-    p.stdin.write('show max-kwp\n')
-    p.stdin.flush()
-    time.sleep(0.4)
-    p.stdin.write('quit\n')
-    p.stdin.flush()
-    out, _ = p.communicate(timeout=15)
-    check('fake_cli: keepalive keeps an idle session alive (pongs absorbed)',
-          p.returncode == 0 and 'fake-inverter:15571 > 6' in out and 'ok pong' not in out, repr(out[-120:]))
+    # the console-only furniture rides the pty now (the piped stdin is the
+    # batch): the set-position ? listing and the idle keepalive
+    m_pty, p_pty = pty_cli(K, 24, 80, port=15571)
+    pty_read(m_pty)
+    pty_send(m_pty, 'set ?\n')
+    out = pty_read(m_pty)
+    check('fake_console: ? lists the options for the position', 'scenario' in out and 'max-kwp' in out
+          and not any(line.startswith('ok') for line in out.splitlines()),
+          repr(out[:400]))   # the token rows' prose carries the letters 'ok' — the check
+                             # anchors the ok-REPLY to the line head, not the substring
+    pty_send(m_pty, 'quit\n')
+    pty_read(m_pty)
+    p_pty.wait(timeout=10)
+    os.close(m_pty)
+    m_pty, p_pty = pty_cli(K, 24, 80, port=15571, env_extra={'CLI_KEEPALIVE': '0.2'})
+    pty_read(m_pty)
+    time.sleep(1.2)         # the console idles, pinging every 0.2s
+    pty_send(m_pty, 'show max-kwp\n')
+    out = pty_read(m_pty)
+    pty_send(m_pty, 'quit\n')
+    pty_read(m_pty)
+    p_pty.wait(timeout=10)
+    os.close(m_pty)
+    check('fake_console: keepalive keeps an idle session alive (pongs absorbed)',
+          p_pty.returncode == 0 and '6' in out and 'ok pong' not in out, repr(out[-160:]))
     fake_k = subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15586 + BASE),
                                '--control-port', '15587'],
                               stdout=open(os.path.join(SCRATCH, 'scr_cli.log'), 'w'), stderr=subprocess.STDOUT)
@@ -2222,7 +2228,7 @@ try:
     time.sleep(0.6)
 
     # 7. scraper_ctl + scraper_cli (the family clients) + the F5 refusal
-    CTLB = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-ctl.py')
+    CTLB = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-cli.py')
     CLIB = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper-cli.py')
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % (19457 + BASE), '--modbus-interval', '1',
@@ -2239,7 +2245,7 @@ try:
           and 'ok modbus-scraper' in r.stdout, repr(r.stdout[:120]))
     r = subprocess.run([sys.executable, CLIB, '--control-port', '15597', '--control-token', STOK],
                        input='set log-access off\nshow modbus interval\nquit\n', capture_output=True, text=True, timeout=15)
-    check('scraper_cli: the console session', r.returncode == 0 and '5' in r.stdout
+    check('scraper_cli: the piped batch session', r.returncode == 0 and '5' in r.stdout
           and 'Welcome to the modbus-scraper console' not in r.stdout, repr(r.stdout[:120]))
     stok_file = os.path.join(SCRATCH, 'scr_ctl_fuzz_token')
     open(stok_file, 'w').write(STOK + '\n')
@@ -2591,7 +2597,7 @@ try:
     check('metrics acl order: any serves after the ladder', acl_raw().startswith(b'HTTP/1.1 200'))
     os.remove(ACLGATE)
 
-    for tool, title in ((P, 'MODBUS-SCRAPER'), (CTLB, 'MODBUS-SCRAPER-CTL'), (CLIB, 'MODBUS-SCRAPER-CLI')):
+    for tool, title in ((P, 'MODBUS-SCRAPER'), (CLIB, 'MODBUS-SCRAPER-CLI')):
         r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
         check('--man: %s prints the page' % os.path.basename(tool),
               r.returncode == 0 and r.stdout.startswith('.TH %s 1' % title), r.stdout[:40] or r.stderr[-80:])

@@ -125,7 +125,13 @@ mechanically; no hand edits there.
 
 ## The landed ledger
 
-    67 canon blocks (46 family-wide, 0 dead) after the mechanical fold-up.
+    69 canon blocks (48 family-wide, 0 dead) after the inspect/request floor blocks.
+
+Declined at fly: control-socket-group's inverter tail is the fake's why-reasoning, not duplication — the exempt stands.
+
+### The floor blocks — inspect, request (Nov 12)
+
+The two NOBLOCK commands gained canon blocks speaking the family floor: `inspect` = "one pretty dump of everything (the state, the counters, the caps)" (the scraper/dashboard form — those two thin-ref'd), `request` = "the state machinery: the dump written and restored, the daemon reloaded" (the dashboard thinned). The cache and the fake keep their richer inline tails (the map/write-gate, the machines/overlay, the verb lists) — the ('commands','inspect'/'request') help exemptions already stood.
 
 ### The mechanical fold-up — the eleven, flown at review (Nov 12)
 

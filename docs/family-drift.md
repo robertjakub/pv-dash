@@ -234,7 +234,7 @@ texts the rows ref; the drift and must-ref gates live in
 |---|---|---|---|---|---|
 | options | 48 | 48 | 41 | 42 | 39 |
 | show | 7 | 7 | 6 | 5 | 4 |
-| commands | 12 | 12 | 12 | 10 | 10 |
+| commands | 14 | 14 | 14 | 12 | 12 |
 
 The exempt (intentionally per-tool) names: **39** —
 each with its reason in `scripts/lint_options.py`.

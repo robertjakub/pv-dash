@@ -538,12 +538,14 @@
       "help": "describe a word (help <setting>) or map every knob (help config)",
       "internal": true
     },
+    "inspect": "one pretty dump of everything (the state, the counters, the caps)",
     "ping": {
       "help": "keep-alive: answers pong",
       "internal": true
     },
     "quit": "close the session",
     "set": "configure a setting live: set <setting> <value>",
+    "request": "the state machinery: the dump written and restored, the daemon reloaded",
     "request-dump": {
       "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)",
       "hidden": true

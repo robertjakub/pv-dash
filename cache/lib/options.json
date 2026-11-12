@@ -167,10 +167,11 @@
   ],
   "commands": [
     { "name": "help", "shared": "help" },
-    { "name": "inspect", "help": "one pretty dump of everything (the status, the map, the counters, the write gate)" },
+    { "name": "inspect", "shared": "inspect",
+      "help": "one pretty dump of everything (the status, the map, the counters, the write gate)" },
     { "name": "ping", "shared": "ping" },
     { "name": "quit", "shared": "quit" },
-    { "name": "request",
+    { "name": "request", "shared": "request",
       "help": "the state machinery: the dump written and restored, the cache dropped, the poll woken, the daemon reloaded",
       "node": true },
     { "name": "request/flush", "help": "drop the cached registers and repoll now", "node": true },

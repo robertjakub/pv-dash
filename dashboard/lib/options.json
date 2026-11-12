@@ -120,7 +120,7 @@
     { "name": "request-restore", "shared": "request-restore", "live": "request/restore" },
     { "name": "set", "help": "configure a setting (set log-queries on, set metrics enable on)" },
     { "name": "show", "shared": "show" },
-    { "name": "shutdown", "help": "stop the dashboard server (asks to confirm)" },
+    { "name": "shutdown", "shared": "shutdown" },
     { "name": "clear",
       "help": "restore a setting to its configured value (clear log-queries, clear system log-level)" }
   ]

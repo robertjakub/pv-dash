@@ -251,7 +251,7 @@
     { "name": "reset", "help": "clear all pins + the write overlay" },
     { "name": "set", "help": "configure a setting (set soc auto, set scenario noon)" },
     { "name": "show", "shared": "show" },
-    { "name": "shutdown", "help": "stop the fake inverter (asks to confirm)" },
+    { "name": "shutdown", "shared": "shutdown" },
     { "name": "clear", "help": "restore a setting to its configured value (clear pv, clear seed)" }
   ]
 }

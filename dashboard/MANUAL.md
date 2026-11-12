@@ -71,7 +71,7 @@ The kinds — every row of the tables below carries one:
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
 | `set` | command | configure a setting (set log-queries on, set metrics enable on) |
 | `show` | command | print a setting's live value, or a report |
-| `shutdown` | command | stop the dashboard server (asks to confirm) |
+| `shutdown` | command | stop the server (asks to confirm) |
 | `clear` | command | restore a setting to its configured value (clear log-queries, clear system log-level) |
 
 ## Knobs

@@ -368,6 +368,31 @@
       "hint": "<file>",
       "default": "sun2000"
     },
+    "modbus-read-delay": {
+      "flag": "--modbus-read-delay",
+      "env": "MODBUS_READ_DELAY",
+      "conv": "float",
+      "setting-help": "seconds between consecutive device reads within a poll cycle",
+      "hint": "s",
+      "value-help": {
+        "0": "no wait between reads"
+      },
+      "default": 0.05,
+      "help": "seconds between consecutive inverter reads within a poll cycle, 0 = no delay",
+      "min": 0,
+      "max": 60
+    },
+    "modbus-unit": {
+      "flag": "--modbus-unit",
+      "env": "MODBUS_UNIT",
+      "conv": "int",
+      "setting-help": "the Modbus unit id the session speaks",
+      "hint": "ID",
+      "default": 1,
+      "help": "Modbus unit id",
+      "min": 1,
+      "max": 247
+    },
     "no-audit-log": {
       "flag": "--no-audit-log",
       "env": "NO_AUDIT_LOG",
@@ -397,7 +422,9 @@
   },
   "show": {
     "config": "the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***)",
-    "knobs": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes"
+    "knobs": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes",
+    "uplink": "the inverter link: session counters, per-block latency and errors",
+    "uplink-sources": "the register map: one row per polled register — fc, register, the range that fetches it, source"
   },
   "commands": {
     "help": {
@@ -413,11 +440,14 @@
       "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)",
       "hidden": true
     },
+    "request-poll-now": "wake the poll loop immediately",
+    "request/poll": "the poll loop's manual wake",
     "request-reload-config": "re-read the config file (the SIGHUP path)",
     "request-restore": {
       "help": "re-apply a state dump's overrides (when the daemon has a dump path)",
       "hidden": true
     },
-    "show": "print a setting's live value, or a report"
+    "show": "print a setting's live value, or a report",
+    "shutdown": "stop the server (asks to confirm)"
   }
 }

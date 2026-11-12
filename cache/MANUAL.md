@@ -78,8 +78,8 @@ The kinds — every row of the tables below carries one:
 | `request restart` | command (hidden) | restart the upstream session: connection + cache dropped, repoll |
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
 | `set` | command | configure a setting live: set \<setting> \<value> |
-| `show` | command | runtime state: show \<setting\|connections\|cache\|uplink\|version\|knobs> |
-| `shutdown` | command | stop the proxy gracefully (asks to confirm) |
+| `show` | command | print a setting's live value, or a report |
+| `shutdown` | command | stop the server (asks to confirm) |
 | `clear` | command | restore a setting to its configured value: clear \<setting> |
 
 ## Knobs

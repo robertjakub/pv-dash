@@ -64,7 +64,6 @@ EXEMPT = {
     ('commands', 'request-restore'): ('help',),  # the daemon vs the fake noun
     ('commands', 'set'): ('help',),  # the tool's own set examples
     ('commands', 'show'): ('help',),  # the cache's report list
-    ('commands', 'shutdown'): ('help',),  # the tool's own name
     ('options', 'allow-write'): ('help', 'setting-help', 'value-help',),  # the cache forwards, the fake accepts
     ('options', 'audit'): ('setting-help',),  # the audit tag prefixes (CACHE/SCR/INV/DSH) ride the prose
     ('options', 'audit-forward'): ('help',),  # the audit tag prefixes ride the prose

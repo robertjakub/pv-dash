@@ -38,6 +38,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the repo root — the canon fold rides the loader's own
 from scriptlib import TOOLS
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -49,7 +50,9 @@ def section_rows(path, section):
         reg = json.load(open(path))
     except (OSError, ValueError):
         return None
-    return reg.get(section) or []
+    from common.settings.options import canon_fold, load_canon
+    canon = load_canon()
+    return [canon_fold(r, canon, section, path) for r in reg.get(section) or []]
 
 
 def main():

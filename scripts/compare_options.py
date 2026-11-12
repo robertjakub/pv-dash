@@ -24,6 +24,7 @@ import sys
 from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # the repo root — the canon fold rides the loader's own
 from scriptlib import TOOLS
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -41,7 +42,10 @@ def knobs_of(path):
         reg = json.load(open(path))
     except (OSError, ValueError):
         return None
-    return [r for r in (reg.get('options') or [])
+    from common.settings.options import canon_fold, load_canon
+    canon = load_canon()
+    return [canon_fold(r, canon, 'options', path)
+            for r in (reg.get('options') or [])
             if isinstance(r, dict) and not r.get('node')]
 
 

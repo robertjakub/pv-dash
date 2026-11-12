@@ -205,10 +205,16 @@ def load(tool_dir):
     rows = tuple(mod.OPTIONS)
     sys.modules.pop('options', None)
     sys.path.pop(0)
+    from common.settings.options import canon_fold, load_canon
+    canon = load_canon()
     with open(os.path.join(REPO, tool_dir, 'lib', 'options.json'),
               encoding='utf-8') as f:
         meta = json.load(f)
-    return rows, {r['name']: r for r in meta['options']}
+    # the env render's sample values read the raw JSON's default/conv — the
+    # canon refs resolve here too (the fold is the loader's own, the row's
+    # inline field wins)
+    return rows, {r['name']: canon_fold(r, canon, 'options', tool_dir)
+                  for r in meta['options']}
 
 
 def wrap(text):

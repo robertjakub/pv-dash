@@ -12,6 +12,26 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **scraper** — **the shipped `metrics.token` placeholder retires**:
+  `scraper/examples/metrics.token` is gone — the docker image creates the
+  placeholder in `config-defaults/` with the same `RUN echo` the suite key
+  uses (the entrypoint still materializes a random `/config/metrics.token`
+  on the first seed, 0600; the compose stacks' `AUTH_TOKEN`/
+  prometheus wire-in unchanged).
+
+- **cache** — **the selection example and its schema join the shared
+  homes**: `cache/examples/modbus-cache-filter.json` moves to
+  `extras/examples/` and `cache/schema/selection.schema.json` becomes
+  `shared/schema/modbus-cache-filter.schema.json` (the cache's
+  `schema/` dir retires; the docker image and the nix package install
+  the pair from the shared build contexts, the runtime
+  `/config/selection.json` name unchanged). `cache/dev` drops its
+  `--selection` line — the daemon default (every profile entry) is the
+  dev shape; pass `--selection extras/examples/modbus-cache-filter.json`
+  to slim it. family_drift's suite-coverage sweep follows the
+  tests/suites/ move (it still grepped the thin wrappers — every knob
+  read as uncovered).
+
 - **tests** — **the suite bodies move under `tests/suites/`**: the ten
   graduated suites' real modules live there; `tests/<name>.py` become
   thin wrappers (`runpy`, `__name__='__main__'`) so the battery's suite

@@ -29,10 +29,9 @@
 # ../docker/README.md; a flag beats the env: `docker run ... modbus-scraper
 # --upstream 10.0.0.2:15502` on top). The compose stacks add
 # AUTH_TOKEN=file:/config/metrics.token (a random token the entrypoint
-# generates on the first seed, 0600, pvsuite — bundled metrics.token is a
-# placeholder that is never copied, shared with the stack's Prometheus)
-# and AUTH/AUTH_KEY=file:/config/modbus-auth.token: the stack's Modbus
-# hops ship authenticated (see README.md).
+# generates on the first seed, 0600, pvsuite, shared with the stack's
+# Prometheus) and AUTH/AUTH_KEY=file:/config/modbus-auth.token: the
+# stack's Modbus hops ship authenticated (see README.md).
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -47,12 +46,15 @@ COPY --from=shared texts.json shared/
 COPY --chown=pvsuite bin/ scraper/bin/
 COPY --chown=pvsuite lib/ scraper/lib/
 COPY --chown=pvsuite examples/modbus-scraper.conf examples/metrics.json scraper/
-COPY --chown=pvsuite examples/metrics.json examples/metrics.token config-defaults/
-# the suite key's placeholder: the entrypoint materializes any *.token in
-# config-defaults as a random value on the first seed (the bundled content
-# is never copied) — the compose stacks point the scraper's client-side
-# auth at /config/modbus-auth.token (the handshake it proves to the cache)
-RUN echo placeholder > config-defaults/modbus-auth.token
+COPY --chown=pvsuite examples/metrics.json config-defaults/
+# the token placeholders: the entrypoint materializes any *.token in
+# config-defaults as a random value on the first seed (the placeholder
+# content is never copied) — metrics.token is the compose stacks' shared
+# exporter bearer (the scraper + Prometheus), modbus-auth.token the suite
+# key the stacks point the scraper's client-side auth at
+# (/config/modbus-auth.token, the handshake it proves to the cache)
+RUN echo placeholder > config-defaults/modbus-auth.token \
+    && echo placeholder > config-defaults/metrics.token
 RUN chmod +x scraper/bin/*.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/scraper/bin/modbus-scraper.py /usr/local/bin/modbus-scraper \
     && ln -s /pv-suite/scraper/bin/modbus-scraper-ctl.py /usr/local/bin/modbus-scraper-ctl \

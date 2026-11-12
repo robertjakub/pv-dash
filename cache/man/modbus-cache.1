@@ -60,10 +60,10 @@ Modbus unit id
 Modbus connect/read timeout in seconds
 .TP
 .BI \-\-modbus\-auth " modbus-auth"
-the auth scheme the cache's own Modbus clients must speak: `suite`
-demands the crypt handshake (magic + nonce + HMAC proof of the shared
-key) right after every connect and drops the client on ERR/anything
-else; none/empty = no auth at all
+the Modbus auth scheme: `suite` demands the crypt handshake (magic +
+nonce + HMAC proof of the shared key) right after every connect — the
+peer answers OK, or ERR and the session drops; none/empty = no auth at
+all
 .TP
 .BI \-\-modbus\-auth\-key " modbus-auth-key"
 the shared key the cache's clients prove with the suite handshake (min
@@ -88,7 +88,7 @@ value may be `file:<path>` — the first line of an owner\-only 0600 file
 (a systemd LoadCredential rides as file:/run/credentials/...)
 .TP
 .BI \-\-modbus\-interval " modbus-interval"
-seconds between cache polls
+seconds between polls
 .TP
 .BI \-\-modbus\-read\-delay " modbus-read-delay"
 seconds between consecutive inverter reads within a poll cycle, 0 = no
@@ -157,8 +157,8 @@ refuse further connections from one peer IP past this many simultaneous
 connections, 0 = no per\-IP limit
 .TP
 .BI \-\-control\-port " control-port"
-control server target: unix socket path or TCP port on 127.0.0.1; 0 =
-off
+JSON\-lines control server target: unix socket path or TCP port number
+on 127.0.0.1; 0 = off
 .TP
 .BI \-\-control\-token " control-token"
 require a token on control connections: the client authenticates with
@@ -193,8 +193,8 @@ the plain 0600) ($CONTROL_SOCKET_GROUP)
 DEBUG\-log the full output of every control command
 .TP
 .B \-\-metrics\-server
-serve the cache's own Prometheus /metrics endpoint (the live `set
-metrics enable` toggle exists too)
+serve the tool's own Prometheus /metrics endpoint (the live `set metrics
+enable` toggle exists too)
 .TP
 .BI \-\-metrics\-listen " metrics-listen"
 the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every
@@ -229,17 +229,16 @@ maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
 limit
 .TP
 .BI \-\-audit\-log " audit-log"
-CACHE audit trail: a file path or \- for stdout (the docker/journald
-way); `none` turns the local file off (with a forward spelled that is
-the remote\-only mode); $AUDIT_LOG or
-~/.local/state/modbus\-cache/audit.log — the XDG state home
+the audit trail: a file path or \- for stdout (the docker/journald way);
+`none` turns the local file off (with a forward spelled that is the
+remote\-only mode); the XDG state home when unset
 .TP
 .BI \-\-audit\-forward " audit-forward"
-also forward the CACHE audit trail: syslog (the local socket
-auto\-scan), syslog:/path (an explicit socket), udp://host[:514]
-(RFC5426, best\-effort) or tcp://host[:514] (RFC6587 framing) — the
-off\-box copy carries the per\-writer hash chain, so a scheduled search
-at the collector can alert on a chain break; docs/AUDIT.md
+also forward the audit trail: syslog (the local socket auto\-scan),
+syslog:/path (an explicit socket), udp://host[:514] (RFC5426,
+best\-effort) or tcp://host[:514] (RFC6587 framing) — the off\-box copy
+carries the per\-writer hash chain, so a scheduled search at the
+collector can alert on a chain break; docs/AUDIT.md
 .TP
 .BI \-\-audit\-forward\-format " audit-forward-format"
 the remote forward's envelope: RFC5424 (the default) or CEF — the local
@@ -262,7 +261,7 @@ also rotate the audit log at UTC midnight
 rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
-disable the CACHE audit trail
+disable the audit trail
 .TP
 .BI \-\-audit\-requests " audit-requests"
 audit one REQUESTS tally per client per this many seconds, 0 = off
@@ -304,7 +303,7 @@ dump command and the shutdown)
 .B \-\-restore\-on\-start
 load the state dump when the daemon starts (needs \-\-dump\-path) — a
 restart serves last\-known values instead of cold misses; without it the
-dump loads on demand ($RESTORE_ON_START)
+dump loads on demand
 .TP
 .B \-\-config
 config file — the set grammar: every line a `set <name> <value>`,

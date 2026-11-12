@@ -493,8 +493,10 @@
       "setting-help": "the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes",
       "hidden": true
     },
+    "metrics-acl-table": "the metrics ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs",
     "uplink": "the inverter link: session counters, per-block latency and errors",
-    "uplink-sources": "the register map: one row per polled register — fc, register, the range that fetches it, source"
+    "uplink-sources": "the register map: one row per polled register — fc, register, the range that fetches it, source",
+    "version": "the suite version"
   },
   "commands": {
     "help": {

@@ -247,7 +247,7 @@ the write gates: the forwarding toggle and the register ranges
 | `show cache-all` | show-only (hidden) | every cached range-entry: its words, age, expiry and status |
 | `show uplink` | show-only | the inverter link: session counters, per-block latency and errors |
 | `show uplink-sources` | show-only | the register map: one row per polled register — fc, register, the range that fetches it, source |
-| `show version` | show-only | the modbus-cache version |
+| `show version` | show-only | the suite version |
 | `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
 | `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
 | `show write-registers-table` | show-only | the write-registers gate as its acl chain: one allow/deny line per range (the profile's rules with their descs when the knob rides profile) |

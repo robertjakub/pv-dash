@@ -97,8 +97,6 @@ EXEMPT = {
     ('options', 'upstream'): ('env', 'help', 'hint', 'setting-help',),  # the Modbus upstream vs the Prometheus URL
     ('options', 'write'): ('setting-help',),  # the write gates differ per side
     ('show', 'connections'): ('setting-help',),  # the per-tool clients (Modbus peers vs HTTP vs pages)
-    ('show', 'metrics-acl-table'): ('setting-help',),  # the long spell vs the report pointer
-    ('show', 'version'): ('setting-help',),  # each tool's own version string
 }
 
 

@@ -165,7 +165,7 @@
       "setting-help": "every cached range-entry: its words, age, expiry and status", "hidden": true },
     { "name": "uplink", "shared": "uplink" },
     { "name": "uplink-sources", "shared": "uplink-sources", "live": "uplink/sources" },
-    { "name": "version", "setting-help": "the modbus-cache version" },
+    { "name": "version", "shared": "version" },
     { "name": "config", "shared": "config", "live": "config" },
     { "name": "knobs", "shared": "knobs", "live": "knobs" },
     { "name": "write-registers-table", "live": "write/registers/table",
@@ -174,8 +174,7 @@
       "setting-help": "the connect ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs" },
     { "name": "write-acl-table", "live": "acl/write/table",
       "setting-help": "the write ACL as its rule chain, one entry per line (the acl/connect/table report for acl/write)" },
-    { "name": "metrics-acl-table", "live": "metrics/acl/table",
-      "setting-help": "the metrics ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs" }
+    { "name": "metrics-acl-table", "shared": "metrics-acl-table", "live": "metrics/acl/table" }
   ],
   "commands": [
     { "name": "help", "shared": "help" },

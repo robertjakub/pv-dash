@@ -233,10 +233,10 @@ texts the rows ref; the drift and must-ref gates live in
 | section | blocks | cache refs | scraper refs | inverter refs | dashboard refs |
 |---|---|---|---|---|---|
 | options | 46 | 46 | 40 | 41 | 39 |
-| show | 4 | 4 | 4 | 2 | 2 |
+| show | 6 | 6 | 6 | 4 | 4 |
 | commands | 10 | 10 | 10 | 8 | 8 |
 
-The exempt (intentionally per-tool) names: **45** —
+The exempt (intentionally per-tool) names: **43** —
 each with its reason in `scripts/lint_options.py`.
 
 ## The wire-text sweep — the log/audit canon

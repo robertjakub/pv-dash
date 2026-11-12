@@ -12,6 +12,16 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **The show/commands canon wave (docs/show-commands-align.md)** — the
+  `show` section's last two drifts fold: `metrics-acl-table` speaks the
+  long rule-chain spell family-wide (the "(the metrics/acl report)"
+  pointer drops) and `version` answers "the suite version" (the per-tool
+  nouns were the suite's own words apart — common/runtime/version.py
+  numbers one suite). Two new show blocks (62 canon blocks, 44
+  family-wide, 0 dead), the two show exemptions retired; the commands
+  section's remaining drift is the tools' own truth (the fake nouns, the
+  reload parentheticals, the clear/inspect/set examples) and stays.
+
 - **The key-alignment wave (docs/options-align.md)** — the four option
   registries align on the canon blocks: the audit helps de-tagged (the
   CACHE/SCR/INV/DSH prefixes and the spelled state-home paths drop), the

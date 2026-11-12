@@ -90,11 +90,10 @@
   ],
   "commands": [
     { "name": "help", "shared": "help" },
-    { "name": "inspect", "help": "one pretty dump of everything (the state, the counters, the caps)" },
+    { "name": "inspect", "shared": "inspect" },
     { "name": "ping", "shared": "ping" },
     { "name": "quit", "shared": "quit" },
-    { "name": "request", "help": "the state machinery: the dump written and restored, the daemon reloaded",
-      "node": true },
+    { "name": "request", "shared": "request", "node": true },
     { "name": "request-dump", "shared": "request-dump", "live": "request/dump" },
     { "name": "request-reload", "live": "request/reload",
       "help": "save the live overrides and restart the whole daemon (the config file and the flags are re-resolved)" },

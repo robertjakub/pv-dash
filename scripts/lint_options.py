@@ -367,6 +367,104 @@ def lint(path):
     return nits, canon
 
 
+def _canon_text(v):
+    """The byte-for-byte compare form of one field's value (sorts keys, keeps
+    the bool/number distinction)."""
+    return json.dumps(v, ensure_ascii=False, sort_keys=True)
+
+
+def family_lint():
+    """The help-canon wave's family-wide passes over all four registries:
+
+    (a) the RESOLUTION pass — every row's `shared` key resolves to a canon
+        block of its section, every block is referenced by >=1 row, no
+        options block carries `name` (the flat name is the block's key), no
+        two blocks byte-duplicate each other;
+    (b) the MUST-REF pass — a gated field carried byte-identical INLINE by
+        >=3 tools with no canon block speaking it fails (the exempt list
+        applies; two-tool identities may stay inline); where the block DOES
+        speak it, the byte-equal inline twins are named for dropping;
+    (c) the DRIFT pass — the gated fields of the same-named rows compare
+        byte-for-byte on the EFFECTIVE rows (the fold applied, the row
+        overrides won), a difference not in the exempt list fails.
+
+    Returns the nits; main() prints them and exits 1."""
+    from common.settings.options import canon_fold
+    with open(os.path.join(REPO, 'shared', 'options-help.json'), encoding='utf-8') as f:
+        canon = json.load(f)
+    metas = {}
+    for tool in TOOLS:
+        with open(os.path.join(REPO, tool, 'lib', 'options.json'), encoding='utf-8') as f:
+            metas[tool] = json.load(f)
+    nits = []
+    # (a) the resolution pass
+    for section, blocks in canon.items():
+        for key, block in blocks.items():
+            if section == 'options' and isinstance(block, dict) and 'name' in block:
+                nits.append('the canon block %s/%s carries "name" — the flat name is '
+                            'the block\'s key, never a field' % (section, key))
+            refs = sum(1 for t in TOOLS
+                       for r in (metas[t].get(section) or [])
+                       if isinstance(r, dict) and r.get('shared') == key)
+            if not refs:
+                nits.append('the canon block %s/%s is never referenced (the orphan gate)'
+                            % (section, key))
+    seen_blocks = {}
+    for section, blocks in canon.items():
+        for key, block in blocks.items():
+            mark = _canon_text(block)
+            if mark in seen_blocks:
+                nits.append('the canon blocks %s/%s and %s byte-duplicate each other'
+                            % (seen_blocks[mark], key, section))
+            else:
+                seen_blocks[mark] = '%s/%s' % (section, key)
+    for section in ('options', 'show', 'commands'):
+        for t in TOOLS:
+            for r in metas[t].get(section) or []:
+                key = r.get('shared')
+                if key is not None and key not in (canon.get(section) or {}):
+                    nits.append('%s: the %s row %r refs the unknown canon key %r'
+                                % (t, section, r['name'], key))
+    # (b) + (c): the effective rows per name
+    for section in ('options', 'show', 'commands'):
+        field_names = GATED if section == 'options' else (SECTION_FIELD[section],)
+        by_name = {}
+        for t in TOOLS:
+            for r in metas[t].get(section) or []:
+                eff = canon_fold(r, canon, section, t)
+                by_name.setdefault(r['name'], []).append((t, r, eff))
+        for name, rows in sorted(by_name.items()):
+            if len(rows) < 2:
+                continue
+            for f in field_names:
+                vals = {}
+                for t, orig, eff in rows:
+                    if f in eff:
+                        vals.setdefault(_canon_text(eff[f]), []).append(t)
+                if len(vals) > 1 and f not in EXEMPT.get((section, name), ()):
+                    nits.append('the family drift: %s %s.%s differs — %s'
+                                % (section, name, f,
+                                   ' | '.join('%s: %s' % (', '.join(ts), v[:44])
+                                              for v, ts in sorted(vals.items()))))
+                block = (canon.get(section) or {}).get(name)
+                for v, ts in vals.items():
+                    if len(ts) < 3:
+                        continue
+                    block_has = (section != 'options' and block == json.loads(v)) or \
+                                (section == 'options' and isinstance(block, dict)
+                                 and _canon_text(block.get(f)) == v)
+                    if (section, name) in EXEMPT and f in EXEMPT.get((section, name), ()):
+                        continue
+                    if not block_has:
+                        nits.append('the must-ref: %s %s.%s is byte-identical inline on %s — '
+                                    'ref the canon block (or exempt)' % (section, name, f, ', '.join(ts)))
+                    elif any(f in orig for t, orig, eff2 in rows if _canon_text(eff2.get(f)) == v):
+                        nits.append('the must-ref: %s %s.%s rides the canon block — drop the '
+                                    'byte-equal inline twins (%s)'
+                                    % (section, name, f, ', '.join(ts)))
+    return nits
+
+
 def main():
     check, diff, propose = ('--check' in sys.argv[1:], '--diff' in sys.argv[1:],
                             '--propose' in sys.argv[1:])
@@ -415,9 +513,13 @@ def main():
                 sys.stdout.writelines(difflib.unified_diff(
                     disk.splitlines(True), canon.splitlines(True),
                     path, path + ' (canonical)'))
+    family = family_lint()
+    for nit in family:
+        print(nit)
+        bad = True
     if bad:
         sys.exit(1)
-    print('lint: all four registries clean and canonical')
+    print('lint: all four registries clean and canonical (the family passes too)')
 
 
 if __name__ == '__main__':

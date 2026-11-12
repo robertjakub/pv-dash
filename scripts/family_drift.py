@@ -227,6 +227,23 @@ def knobs_deltas(rows, names):
     return out
 
 
+def canon_coverage():
+    """The help-canon's split: the canon blocks per section, the refing rows
+    per tool, the exempt names lint_options carries. The drift gate lives in
+    lint_options --check — this report shows the fold's reach."""
+    from lint_options import EXEMPT
+    with open(os.path.join(REPO, 'shared', 'options-help.json'), encoding='utf-8') as f:
+        canon = json.load(f)
+    refs = {t: {} for t in TOOLS}
+    for t in TOOLS:
+        with open(os.path.join(REPO, t, 'lib', 'options.json'), encoding='utf-8') as f:
+            m = json.load(f)
+        for section in ('options', 'show', 'commands'):
+            rows = m.get(section) or []
+            refs[t][section] = sum(1 for r in rows if r.get('shared'))
+    return canon, refs, len(EXEMPT)
+
+
 # ------------------------------------------------------- the wire-text sweep
 
 
@@ -1220,6 +1237,21 @@ def emit():
     ap(KNOBS_VERBS)
     ap('')
     ap(KNOBS_FINDINGS)
+    ap('')
+    canon, refs, n_exempt = canon_coverage()
+    ap('**The canon coverage** (shared/options-help.json — the registry')
+    ap('texts the rows ref; the drift and must-ref gates live in')
+    ap('`lint_options --check`, the exempt names ride it):')
+    ap('')
+    ap('| section | blocks | ' + ' | '.join(f'{t} refs' for t in TOOLS) + ' |')
+    ap('|---|---|' + '---|' * len(TOOLS))
+    for section in ('options', 'show', 'commands'):
+        blocks = canon.get(section) or {}
+        ap(f'| {section} | {len(blocks)} | '
+           + ' | '.join(str(refs[t][section]) for t in TOOLS) + ' |')
+    ap('')
+    ap(f'The exempt (intentionally per-tool) names: **{n_exempt}** —')
+    ap('each with its reason in `scripts/lint_options.py`.')
     ap('')
 
     # ---- 4. the wire-text sweep

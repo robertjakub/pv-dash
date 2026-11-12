@@ -24,7 +24,12 @@ render them elsewhere) show with the rest; edited fields are marked.
 A live RENAME is a console-surface edit (the wire keys the flat
 registry name; the suites' pool/listing pins follow). An alias is an
 edit: the cli translates it through the spellings map, so a second
-spelling rides alone. The face rides the acl editor's golden-master
+spelling rides alone. The shared ref edits to a canon key of
+shared/options-help.json (resolved against the file, the node rows
+included; the clear speaks inline again); a block-carried field shows
+the block's text marked (canon), editing it lays the inline override,
+and the value-help menu seeds the block's pairs first — the override
+replaces the whole dict. The face rides the acl editor's golden-master
 shapes: every file write runs with SIGINT blocked (a ^C cannot
 truncate it), a ^C speaks through the surfaces (no traceback), and the
 exit runs one lint pass — with the canonical re-render when the file
@@ -214,13 +219,14 @@ def dialog_wrapper(dialog, ed):
 # ---------------------------------------------------------------- the options face
 
 PROJECTS = ('cache', 'scraper', 'inverter', 'dashboard')
-INLINE = ('name', 'flag', 'env', 'conv', 'group', 'live', 'alias', 'negates')
-EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hint', 'value-help', 'default', 'hidden', 'restart')
-SHOW_EDITABLE = ('group', 'live', 'alias', 'setting-help', 'hidden')   # the registry's `show` rows: the
-                                                                       # bucket, the live hierarchy, the
-                                                                       # alias, the word's description, the mark
-CMD_EDITABLE = ('group', 'help', 'hidden', 'internal')   # the `commands` rows: the bucket, the
-                                                         # description, the marks
+INLINE = ('name', 'flag', 'env', 'conv', 'shared', 'group', 'live', 'alias', 'negates')
+EDITABLE = ('shared', 'group', 'live', 'alias', 'setting-help', 'hint', 'value-help', 'default', 'hidden', 'restart')
+SHOW_EDITABLE = ('shared', 'group', 'live', 'alias', 'setting-help', 'hidden')   # the registry's `show` rows: the
+                                                                                 # canon ref, the bucket, the live
+                                                                                 # hierarchy, the alias, the word's
+                                                                                 # description, the mark
+CMD_EDITABLE = ('shared', 'group', 'help', 'hidden', 'internal')   # the `commands` rows: the canon ref,
+                                                                   # the bucket, the description, the marks
 BEFORE_HELP = ('setting-help', 'values', 'hint', 'value-help', 'default')
 
 
@@ -315,6 +321,7 @@ def view_rows(rows, filt='', order='name', kind=row_kind, vmode='all', kmode='al
                 if q in r['name'].lower()
                 or q in (r.get('live') or '').lower()
                 or q in (r.get('alias') or '').lower()
+                or q in (r.get('shared') or '').lower()
                 or q in kind(r)
                 or (r.get('live') and 'live' in q)   # `live` = the live-settable ones
                 or (r.get('hidden') and 'hidden' in q)   # `hidden` = the wire-only ones
@@ -385,8 +392,42 @@ class OptionsEditor:
         self.show_names = {r['name'] for r in self.show}
         self.cmds = meta.get('commands') or []       # the `commands` rows (the wire's verb list)
         self.cmd_names = {r['name'] for r in self.cmds}
+        self.canon = self._load_canon()
         self.row = None
         self.pristine = None
+
+    def _load_canon(self):
+        """shared/options-help.json — the `shared` field's ref target; an
+        absent or broken file reads as no canon (the editor never crashes on
+        the pre-wave tree, a ref just fails to resolve)."""
+        try:
+            with open(os.path.join(ROOT, 'shared', 'options-help.json'), encoding='utf-8') as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    def canon_block(self, row):
+        """The row's canon block (the section's flat text on the show/command
+        faces), or None when the row carries no ref."""
+        section = 'show' if self.is_show(row) else ('commands' if self.is_cmd(row) else 'options')
+        return (self.canon.get(section) or {}).get(row.get('shared') or '')
+
+    def effective(self, row, key):
+        """(value, from_canon): the row's inline field, else — when the row
+        refs a block carrying it — the block's answer (the fold's, shown
+        marked `canon`)."""
+        if key in row:
+            return row[key], False
+        block = self.canon_block(row)
+        if block is None:
+            return None, False
+        section = 'show' if self.is_show(row) else ('commands' if self.is_cmd(row) else 'options')
+        if section == 'options':
+            if isinstance(block, dict) and key in block:
+                return block[key], True
+        elif isinstance(block, str) and key == ('setting-help' if section == 'show' else 'help'):
+            return block, True
+        return None, False
 
     def _stamp(self):
         st = os.stat(self.path)
@@ -517,11 +558,45 @@ class OptionsEditor:
                 break
         self.row = None
 
+    def set_shared(self, value):
+        """The canon ref: a key of shared/options-help.json in the row's own
+        section; the clear deletes the ref — the row speaks inline again.
+        The tool's own wiring (conv, live, default, ...) and any field the
+        block does not speak stay inline; on success the status names the
+        inline twins the block byte-carries (the drop candidates)."""
+        name = self.row['name']
+        text = (value or '').strip()
+        if not text:
+            if 'shared' not in self.row:
+                return False, 'err %s carries no shared ref (nothing to clear)' % name
+            del self.row['shared']
+            return True, 'ok %s.shared cleared (the row speaks inline again)' % name
+        section = 'show' if self.is_show(self.row) else ('commands' if self.is_cmd(self.row) else 'options')
+        block = (self.canon.get(section) or {}).get(text)
+        if block is None:
+            keys = ', '.join(sorted((self.canon.get(section) or {}))) or 'none yet'
+            return False, 'err no canon key %r in shared/options-help.json (%s: %s)' % (text, section, keys)
+        if section == 'options' and isinstance(block, dict) and 'name' in block:
+            return False, "err the canon block %r carries \"name\" — the flat name is the block's key" % text
+        self.row['shared'] = text
+        twins = []
+        if section == 'options' and isinstance(block, dict):
+            twins = sorted(k for k, v in block.items()
+                           if k in self.row and json.dumps(self.row[k], ensure_ascii=False, sort_keys=True)
+                           == json.dumps(v, ensure_ascii=False, sort_keys=True))
+        elif isinstance(block, str):
+            field = 'setting-help' if section == 'show' else 'help'
+            twins = [field] if field in self.row else []
+        note = ' (the block also speaks: %s — clear them to fold)' % ', '.join(twins) if twins else ''
+        return True, 'ok %s.shared = %s%s' % (name, text, note)
+
     def set_field(self, key, value):
         """One field edit with the gate rules; (ok, message)."""
         name = self.row['name']
         if key == 'name':
             return False, 'err the name is the row\'s identity — it does not edit'
+        if key == 'shared':
+            return self.set_shared(value)
         if key in ('hidden', 'restart', 'internal'):   # the bool marks — hidden on the knobs, the
             # show rows and the command rows too; internal: command rows
             # only; restart: option rows only. The editor writes true/false
@@ -550,7 +625,7 @@ class OptionsEditor:
         if self.is_cmd(self.row):
             if key not in CMD_EDITABLE:
                 return False, 'err %s is a command row — only %s edit' % (name, ' | '.join(CMD_EDITABLE))
-        if self.row.get('node') and key not in ('setting-help', 'group'):
+        if self.row.get('node') and key not in ('setting-help', 'group', 'shared'):
             return False, 'err %s is a hierarchy node — only its setting-help and group edit' % name
         if key == 'default':
             # the static rung (the resolver's last ladder layer): conv-typed
@@ -596,6 +671,8 @@ class OptionsEditor:
         was = self.row.get(key)
         if value == (was or ''):
             return False, '%s: %s already %r' % (name, key, was)
+        _, canon_carries = self.effective(self.row, key)   # the pre-edit answer: the field
+        was_canon_only = was is None and canon_carries      # absent inline, the block speaking
         if value:
             if isinstance(was, bool):   # a bool field stores a bool, whatever the spelling
                 v = value.lower()
@@ -606,10 +683,14 @@ class OptionsEditor:
                 self.row[key] = value
         else:
             if key not in self.row:
+                _, from_canon = self.effective(self.row, key)
+                if from_canon:
+                    return False, 'err %s carries no inline %s — the canon block speaks; edit to override' % (name, key)
                 return False, 'err %s carries no %s (nothing to clear)' % (name, key)
             del self.row[key]
-        return True, 'ok %s.%s %s' % (name, key, '= %s' % json.dumps(value, ensure_ascii=False) if value
-                                      else 'cleared')
+        note = ' (the inline override of the canon block)' if was_canon_only else ''
+        return True, 'ok %s.%s %s%s' % (name, key, '= %s' % json.dumps(value, ensure_ascii=False) if value
+                                        else 'cleared', note)
 
     def index_lines(self, filt='', order='name', vmode='all', kmode='all'):
         """The line-mode knob index: the name, its live-or-group bucket, the
@@ -624,13 +705,26 @@ class OptionsEditor:
               % (self.path, len(rows), len(self.rows) + len(self.show) + len(self.cmds), note))
         for r in rows:
             bucket = bucket_of(self, r)
-            help_text = r.get('setting-help') or r.get('help') or ''
+            sval, _ = self.effective(r, 'setting-help')
+            hval, _ = self.effective(r, 'help')
+            help_text = sval or hval or ''
             print('  %-23s %-26s %-13s %s' % (r['name'], bucket, self.kind(r), help_text[:56]))
         print()
+
+    def seed_value_help(self):
+        """The inline value-help dict seeded from the canon block — the
+        override replaces the WHOLE dict, so an edit that lands without the
+        seed would drop the block's other pairs silently."""
+        block = self.canon_block(self.row)
+        if 'value-help' not in self.row and isinstance(block, dict) and block.get('value-help'):
+            self.row['value-help'] = dict(block['value-help'])
+            return True
+        return False
 
     def edit_value_help(self, rest):
         """The line-mode value-help grammar: <KEY> <text> | -<KEY> | -."""
         name = self.row['name']
+        self.seed_value_help()
         vh = dict(self.row.get('value-help') or {})
         if rest == '-':
             if not vh:
@@ -702,8 +796,11 @@ def options_dialog(editor, screen):
             marks = []
             if editor.row.get(key) != editor.pristine.get(key):   # absent-absent = not edited
                 marks.append('edited')
+            val, is_canon = editor.effective(editor.row, key)
+            if is_canon:
+                marks.append('canon')
             line = '  %s%-12s %s%s' % ('*' if key in editor.editable_set(editor.row) else ' ',
-                                       key, shown(editor.row, key),
+                                       key, shown({key: val}, key) if val is not None else '-',
                                        ('   [%s]' % '; '.join(marks)) if marks else '')
             put(2 + i, 0, line, curses.A_REVERSE if idx == fcursor else 0)
         status(msg)
@@ -756,7 +853,7 @@ def options_dialog(editor, screen):
         if not isinstance(initial, str):   # the conv-typed default edits as its own spelling
             initial = str(initial)
         if not was:
-            initial = next((d for f, d, _ in proposals(editor.row) if f == key), initial)
+            initial = next((d for f, d, _ in proposals(editor.row, editor.canon) if f == key), initial)
         text = input_line('%s: ' % key, initial)
         if text is None:
             return 'unchanged (esc)'
@@ -770,7 +867,9 @@ def options_dialog(editor, screen):
         return confirm('quit discarding')
 
     def vh_menu():
-        """The value-help key menu for the open row."""
+        """The value-help key menu for the open row (the canon pairs seed the
+        inline dict — the override replaces the whole dict)."""
+        editor.seed_value_help()
         vcursor, vtop, msg = 0, 0, ''
         while True:
             keys = list(editor.row.get('value-help') or {})
@@ -844,7 +943,7 @@ def options_dialog(editor, screen):
                 elif not name.strip() or any(c.isspace() for c in name.strip()) or '/' in name.strip():
                     msg = 'err the node name must be one clean word'
                 else:
-                    draft = next((d for f, d, _ in proposals({'name': name.strip(), 'node': True})
+                    draft = next((d for f, d, _ in proposals({'name': name.strip(), 'node': True}, editor.canon)
                                   if f == 'setting-help'), '')
                     desc = input_line('setting-help: ', draft)   # the draft = the ack-inline
                     if desc is None:
@@ -911,7 +1010,7 @@ def options_dialog(editor, screen):
                     if ok:
                         fcursor = min(fcursor, len(row_keys(editor.row, editor.editable_set(editor.row))) - 1)
             elif k in (ord('p'), ord('P')):   # the proposals: one prefilled edit per field
-                prs = proposals(editor.row)
+                prs = proposals(editor.row, editor.canon)
                 if not prs:
                     msg = 'nothing to propose for %s — the fields carry their drafts, or the shape is not derivable' % editor.row['name']
                 for f, d, why in prs:
@@ -973,13 +1072,17 @@ def options_dialog(editor, screen):
 
 def show_row(editor, row):
     """The line-mode row view: every field aligned, the unwritten changes
-    marked (edited)."""
+    marked (edited), the block-carried fields marked (canon)."""
     print()
     for key in row_keys(row):
+        val, is_canon = editor.effective(row, key)
         note = ''
         if editor.pristine is not None and row.get(key) != editor.pristine.get(key):
             note = '(edited)'
-        print('    %-13s %s%s' % (key, shown(row, key), ('    %s' % note) if note else ''))
+        elif is_canon:
+            note = '(canon)'
+        print('    %-13s %s%s' % (key, shown({key: val}, key) if val is not None else '-',
+                                  ('    %s' % note) if note else ''))
     print()
 
 

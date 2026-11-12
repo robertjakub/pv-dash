@@ -202,14 +202,26 @@ prints the bare value, \\fBinspect\\fR dumps the state, and
 mid-session the console
 retries (\\fB--reconnect\\fR attempts, \\fB--reconnect-wait\\fR seconds
 apart). With a control token configured the wire is HMAC-signed: the
-console signs every command and verifies every reply."""
+console signs every command and verifies every reply.
+.PP
+Every reply prints through the console's pager: a text taller than the
+screen pauses at a page \\(em space prints the next page, return one more
+line, \\fBq\\fR stops the rest (the command already ran; only the
+rendering stops). \\fB--page-size\\fR/\\fBCLI_PAGE_SIZE\\fR set the page
+size (\\fB0\\fR = off, empty = the terminal height); a session-local
+\\fBpage\\fR command retunes it live (never sent to the daemon); a
+terminal smaller than 20 rows or 64 columns refuses to start."""
     env = """.SH ENVIRONMENT
 .TP
 .B CTL
 the control target when \\fB--control-port\\fR is unset.
 .TP
 .B CONTROL_TOKEN ", " CLI_KEEPALIVE
-the TCP token and the idle-ping interval in seconds (0 = off)."""
+the TCP token and the idle-ping interval in seconds (0 = off).
+.TP
+.B CLI_PAGE_SIZE
+the console pager's page size, lines; \\fB0\\fR = off, empty = the
+terminal height."""
     exit_status = EXIT_STATUS_CLI
     return page(
         "console-style session on the modbus-scraper control server",

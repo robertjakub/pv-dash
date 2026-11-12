@@ -154,6 +154,12 @@ printf 'set interval 5\nrequest poll now\n' | python3 scraper/bin/modbus-scraper
 python3 scraper/bin/modbus-scraper-cli.py            # TAB completes, ? lists
 ```
 
+The console prints through a pager: a reply taller than the screen pauses
+(`-- more --`) — space walks a page, return a line, `q` stops the rest
+(`--page-size`/`CLI_PAGE_SIZE` set the size, 0 = off; the session-local
+`page` command retunes it live; a terminal under 20 rows or 64 columns
+refuses to start).
+
 The wire (the signed frames, the peer-cred trusted peers, the read-only
 ops role, the F5 token rule) is the family's — one paragraph per piece in
 [docs/common/ACL.md](../docs/common/ACL.md) (the control-plane row) and

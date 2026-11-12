@@ -118,7 +118,7 @@ def main():
         else ('127.0.0.1:%s' % control_target if control_target.isdigit() else 'unix:%s' % control_target) \
         + (', read-only ops token accepted' if control_ops_token else '')
     client = ModbusTCP(cfg['host'], cfg['modbus_port'], cfg['modbus_unit'], cfg['timeout'], cfg['modbus_offset'],
-                       auth=cfg['auth'], auth_key=cfg['auth_key'])
+                       auth=cfg['auth'], auth_key=cfg['modbus_auth_key'])
     scraper = Scraper(cfg, client, spec)
     Handler.scraper = scraper
     Handler.log_access = cfg['log_access']

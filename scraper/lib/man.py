@@ -29,7 +29,7 @@ the device is detected automatically (its synthesized diagnostics block)
 and adds the device-up / cache-age / cache-uptime gauges.
 .PP
 Modbus auth (\\fB--modbus-auth\\fR): with \\fBsuite\\fR the session proves the
-shared key (\\fB--auth-key\\fR, min 16 characters) with a crypt handshake
+shared key (\\fB--modbus-auth-key\\fR, min 16 characters) with a crypt handshake
 right after every connect \\(em 52 bytes: magic, fresh nonce,
 HMAC\\-SHA256 proof; the peer answers \\fBOK\\fR and plain Modbus follows,
 or \\fBERR\\fR and the connection fails (the poller keeps retrying).
@@ -68,13 +68,19 @@ The control server speaks JSON lines ({"cmd": "..."} ->
 {"status": "ok|fail|note|bye", "text": "..."}; TCP requires the token when
 configured and refuses to start without one). Commands:
 \\fBset\\fR/\\fBclear\\fR/\\fBshow\\fR/\\fBhelp\\fR (the settings: modbus
-interval, modbus timeout, the modbus read delay, the metrics limits caps,
+interval, modbus timeout, the modbus read delay, the modbus merge gap (the
+poll plan rebuilds), the metrics limits caps,
 the metrics caps
 max-pv/max-grid,
 log-access, log-level, control socket-group (re-modes the live unix socket
 0600/0660) \\(em and the startup-only secrets: control token, the ops
 token, metrics auth token \\(em the wire refuses set/clear, the value
-never rendering \\(em \\fBshow <secret>\\fR refuses), \\fBshow connections\\fR
+never rendering \\(em \\fBshow <secret>\\fR refuses), \\fBshow uplink\\fR
+(the inverter link: session counters \\(em connects, exchanges, bytes,
+errors \\(em plus one row per poll block: status, latency, failures;
+the cache's gold report over the scraper's fetch; \\fBshow
+uplink-sources\\fR widens the table \\(em the sources column after the
+range names the profile registers the block pools), \\fBshow connections\\fR
 (the live HTTP clients), \\fBshow version\\fR, \\fBshow knobs\\fR
 (the dictionary of the registry), \\fBrequest poll now\\fR,
 \\fBinspect\\fR, \\fBrequest reload-config\\fR (the SIGHUP path),

@@ -96,9 +96,10 @@ the inverter Modbus settings
 | `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | Modbus unit ID |
 | `modbus-offset` | `set modbus offset` | settable | `N` | `--modbus-offset` / `MODBUS_OFFSET` | added to register addresses |
 | `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth settings: the Modbus scheme the poll session speaks (modbus auth — suite or none) and the bearer token the metrics endpoint requires (auth token) |
-| `auth-key` | — | startup-only (secret) | `KEY` | `--auth-key` / `AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
+| `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
 | `timeout` | `set modbus timeout` | settable | `s` | `--timeout` / `TIMEOUT` | Modbus connect/read timeout |
 | `read-delay` | `set modbus read-delay` | settable | `s` | `--read-delay` / `READ_DELAY` | seconds between consecutive device reads within a poll cycle |
+| `merge-gap` | `set modbus merge-gap` | settable | `registers` | `--merge-gap` / `MERGE_GAP` | max register gap when merging the profile's source ranges into block reads; the plan rebuilds |
 | `profile` | `set modbus profile` | settable | `\<file>` | `--profile` / `PROFILE` | device profile JSON: the registers the metrics read (a bare name resolves in profiles/profiles/) |
 | `grid-positive-import` | `set modbus grid-positive-import` | settable | `on\|off` | `--grid-positive-import` / `GRID_POSITIVE_IMPORT` | grid register positive when importing |
 | `interval` | `set modbus interval` | settable | `s` | `--interval` / `INTERVAL` | seconds between polls of the inverter |
@@ -213,6 +214,8 @@ the state dump: the live overrides' file, the restore-on-start
 | report | kind | description |
 |---|---|---|
 | `show connections` | show-only | the live HTTP clients of /metrics: the gate counters, one row per peer IP |
+| `show uplink` | show-only | the inverter link: session counters, per-block latency and errors |
+| `show uplink-sources` | show-only | the uplink table widened: the sources column after the range names the profile registers each block pools |
 | `show version` | show-only | the modbus-scraper version |
 | `show config` | show-only | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
 | `show knobs` | show-only | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |

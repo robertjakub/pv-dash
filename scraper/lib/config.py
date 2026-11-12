@@ -83,6 +83,10 @@ def validate_config(cfg):
         fail('client_timeout', 'must be >= 0 (0 = off)')
     if cfg['max_conn_per_ip'] < 0:
         fail('max_conn_per_ip', 'must be >= 0 (0 = no per-IP limit)')
+    if cfg['read_delay'] < 0:
+        fail('read_delay', 'must be >= 0')
+    if cfg['merge_gap'] < 0:
+        fail('merge_gap', 'must be >= 0 (0 = read each source range separately)')
     if not (AUDIT_MAX_MB_MIN <= cfg['audit_max_mb'] <= AUDIT_MAX_MB_MAX):
         fail('audit_max_mb', 'must be %d..%d (0 = no size rotation)'
              % (AUDIT_MAX_MB_MIN, AUDIT_MAX_MB_MAX))
@@ -101,8 +105,8 @@ def validate_config(cfg):
         logger.warning('timeout (%gs) > interval (%gs): one poll can take longer than the poll '
                        'interval; the loop simply runs back-to-back', cfg['timeout'], cfg['interval'])
     check_hostname(cfg['host'], 'upstream host')
-    if cfg['auth'] and not cfg['auth_key']:
-        fail('auth', "the suite auth needs a key: set --auth-key/$AUTH_KEY too (min 16 characters)")
+    if cfg['auth'] and not cfg['modbus_auth_key']:
+        fail('auth', "the suite auth needs a key: set --modbus-auth-key/$MODBUS_AUTH_KEY too (min 16 characters)")
     listen_host, _listen_port = parse_listen(cfg['listen'])
     check_hostname(listen_host, 'listen')
     if not is_loopback_host(listen_host) and not cfg['auth_token']:
@@ -229,10 +233,14 @@ def resolve_config(args, script_dir=None):
         'modbus_offset': resolve(args.modbus_offset, 'MODBUS_OFFSET', 'modbus_offset',
                                  DEFAULTS['modbus_offset'], int, row=OPT['modbus-offset']),
         'auth': parse_auth_type(resolve(getattr(args, 'modbus_auth', None), 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
-        'auth_key': check_auth_key(
-            parse_secret((resolve(getattr(args, 'auth_key', None), 'AUTH_KEY', 'auth_key', '', str)
-                          or '').strip() or None, 'auth-key'), 'auth-key'),
+        'modbus_auth_key': check_auth_key(
+            parse_secret((resolve(getattr(args, 'modbus_auth_key', None), 'MODBUS_AUTH_KEY', 'modbus_auth_key', '', str)
+                          or '').strip() or None, 'modbus-auth-key'), 'modbus-auth-key'),
         'timeout': resolve(args.timeout, 'TIMEOUT', 'timeout', DEFAULTS['timeout'], float, row=OPT['timeout']),
+        'read_delay': resolve(args.read_delay, 'READ_DELAY', 'read_delay',
+                              DEFAULTS['read_delay'], float, row=OPT['read-delay']),
+        'merge_gap': resolve(args.merge_gap, 'MERGE_GAP', 'merge_gap',
+                             DEFAULTS['merge_gap'], int, row=OPT['merge-gap']),
         'max_kwp': resolve(args.max_kwp, 'MAX_KWP', 'max_kwp', DEFAULTS['max_kwp'], float, row=OPT['max-kwp']),
         'max_grid_kw': resolve(args.max_grid_kw, 'MAX_GRID_KW', 'max_grid_kw', DEFAULTS['max_grid_kw'], float,
                                row=OPT['max-grid-kw']),

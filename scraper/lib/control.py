@@ -110,7 +110,9 @@ class ControlServer(_ControlServer):
     NODE_BY_NAME = NODE_BY_NAME
     SET_BY_NAME = SET_BY_NAME
     SHOW_OPTIONS = SHOW_OPTIONS
-    SHOW_REPORTS = {'show inputs-metrics': 'inputs_metrics_report',
+    SHOW_REPORTS = {'show uplink': 'uplink_report',
+                    'show uplink-sources': ('uplink_report', True),
+                    'show inputs-metrics': 'inputs_metrics_report',
                     'show inputs': 'inputs_report',
                     'show metrics-acl-table': 'acl_table_report'}
 
@@ -128,14 +130,15 @@ class ControlServer(_ControlServer):
                          dump_key=dump_key, dump_interval=dump_interval, log_replies=log_replies)
 
     def _after_restore(self):
-        self.scraper.wake.set()   # the poll loop re-reads the config-driven knobs now
+        self.scraper.rebuild_plan()   # the restored profile/metrics-spec/merge-gap re-plan
+        self.scraper.wake.set()       # the poll loop re-reads the config-driven knobs now
 
     def command_help(self):
         """The one-line command reference: the state-dump commands appear
         only when a dump path is configured (there is nothing to dump
         into otherwise)."""
-        cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|'
-                'version|config|knobs>, request poll now, request reload-config')
+        cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|uplink|'
+                'uplink-sources|version|config|knobs>, request poll now, request reload-config')
         cmds += ', request reload, request restart, shutdown, quit'
         return self.command_help_tail(cmds)
 
@@ -204,6 +207,14 @@ class ControlServer(_ControlServer):
                 s.cfg['read_delay'] = v
             s.wake.set()
             return secs(v)
+        if key == 'merge-gap':
+            v = numi(val, 'merge-gap', 'registers')
+            self._gate_range(key, v, 'registers')
+            with s.lock:
+                s.cfg['merge_gap'] = v
+            s.rebuild_plan()   # the plan re-merges; the poll walk picks it up (the cache's gold shape)
+            s.wake.set()
+            return '%d' % v
         if key == 'timeout':
             v = num(val, 'timeout', 'seconds')
             if not 0 < v <= 60:
@@ -304,6 +315,8 @@ class ControlServer(_ControlServer):
             with s.lock:   # build-first: a bad profile never lands, nothing to roll back
                 s.cfg['profile'] = path
                 s.cfg['sources'] = sources
+            s.rebuild_plan()   # the poll plan follows the new register map
+            s.wake.set()
             return path
         if key == 'metrics-spec':
             try:
@@ -316,6 +329,8 @@ class ControlServer(_ControlServer):
                 s.cfg['metrics_spec'] = val
                 s.cfg['sources'] = sources
                 s.spec = spec   # the poller reads the new spec on the next poll
+            s.rebuild_plan()   # the poll plan follows the new register map
+            s.wake.set()
             return val
         if key == 'metric-prefix':
             if not re.match(r'[A-Za-z_][A-Za-z0-9_]*$', val):
@@ -329,6 +344,8 @@ class ControlServer(_ControlServer):
                 s.cfg['metric_prefix'] = val
                 s.cfg['sources'] = sources
                 s.spec = spec
+            s.rebuild_plan()   # the poll plan follows the new register map
+            s.wake.set()
             return val
         # the generic path: a typed row (int/float/str conv) needs no branch
         # — the row's value words, conv, choices and min/max gate through
@@ -417,6 +434,7 @@ class ControlServer(_ControlServer):
             'grid-positive-import': 'on' if cfg['grid_positive_import'] else 'off',
             'interval': cfg['interval'],
             'read-delay': cfg['read_delay'],
+            'merge-gap': cfg['merge_gap'],
             'metrics-spec': cfg['metrics_spec'],
             'metric-prefix': cfg['metric_prefix'],
             'max-kwp': cfg['max_kwp'],
@@ -453,6 +471,76 @@ class ControlServer(_ControlServer):
         return ('upstream=%s:%d interval=%s poll=%s last-poll=%s errors=%d'
                 % (s.cfg['host'], s.cfg['modbus_port'], secs(s.cfg['interval']),
                    'ok' if s.up else 'down', age, s.errors))
+
+    @staticmethod
+    def _bytes(n):
+        return '%.1fkiB' % (n / 1024) if n >= 1024 else '%dB' % n
+
+    def uplink_report(self, with_sources=False):
+        """The inverter link: the session counters (connects, exchanges,
+        bytes, errors) and one row per poll block with its status, latency
+        and last error — `show uplink-sources` widens the table with the
+        block's sources column right after the range, naming the profile
+        registers it pools (the cache's gold report over the scraper's
+        fetch)."""
+        s = self.scraper
+        u = s.client
+        now = time.monotonic()
+        if u.sock is not None:
+            sess = 'connected %s' % (secs(now - u.connected_since)
+                                     if u.connected_since is not None else '?')
+        else:
+            sess = 'down' if u.connects else 'never connected'
+        mean = s.poll_secs_sum / s.poll_count if s.poll_count else 0.0
+        last_ok = 'never' if not s.last_poll else '%s ago' % secs(time.time() - s.last_poll)
+        if u.last_error is None:
+            last_err = 'none'
+        else:
+            when = '' if u.last_error_at is None else '%s ago: ' % secs(now - u.last_error_at)
+            last_err = '%s%s' % (when, u.last_error)
+        with s.lock:
+            blocks = list(s.blocks)
+            stats = {k: dict(v) for k, v in s.block_stats.items()}
+            leaf_sources = dict(s.leaf_sources)
+        rows = [
+            'upstream  %s:%d unit %d (offset %d), timeout %s, auth %s'
+            % (u.host, u.port, u.unit, u.offset, secs(u.timeout), s.cfg.get('auth') or 'none'),
+            'session   %s, connects %d, exchanges %d, in %s out %s, errors %d'
+            % (sess, u.connects, u.exchanges, self._bytes(u.bytes_in), self._bytes(u.bytes_out), u.errors),
+            'last err  %s' % last_err,
+            'poll      interval %s, read-delay %s, merge-gap %d, cycle last %s mean %s max %s, last ok %s, plan %d block(s)'
+            % (secs(s.cfg['interval']), secs(s.cfg.get('read_delay') or 0.0), s.cfg.get('merge_gap') or 0,
+               secs(s.poll_secs_last), secs(mean), secs(s.poll_secs_max), last_ok, len(blocks)),
+        ]
+        cells = []
+        for fc, start, count, leaves in blocks:
+            names = (', '.join(n for lf in leaves for n in leaf_sources.get(lf, ()))
+                     if with_sources else None)
+            st = stats.get((fc, start, count))
+            if st is None:
+                row = ('fc%d' % fc, '%d:%d' % (start, count), 'pending', '-', '-', '-', '0', '-')
+            else:
+                if st['last_err'] is None:
+                    status, err = 'ok', '-'
+                elif st['last_code'] is not None:
+                    status, err = 'ex %d' % st['last_code'], st['last_err']
+                else:
+                    status, err = 'error', st['last_err']
+                row = ('fc%d' % fc, '%d:%d' % (start, count), status, secs(st['last']),
+                       secs(st['sum'] / st['ok_n']) if st['ok_n'] else '-',
+                       secs(st['max']), '%d' % st['fails'], err)
+            if names is not None:
+                row = row[:2] + (names,) + row[2:]   # the sources column rides after the range
+            cells.append(row)
+        if cells:
+            head = (('fc', 'range', 'sources', 'status', 'last', 'mean', 'max', 'fails', 'last error')
+                    if with_sources else
+                    ('fc', 'range', 'status', 'last', 'mean', 'max', 'fails', 'last error'))
+            widths = [max(len(h), max((len(r[i]) for r in cells), default=0)) for i, h in enumerate(head)]
+            rows.append('  '.join(h.ljust(w) for h, w in zip(head, widths)))
+            for r in cells:
+                rows.append('  '.join(v.ljust(w) for v, w in zip(r, widths)))
+        return 'ok %s\n%s' % ('uplink-sources' if with_sources else 'uplink', '\n'.join(rows))
 
     def connections_line(self):
         """The live HTTP clients of the exposition endpoint (the base's
@@ -527,8 +615,11 @@ class ControlServer(_ControlServer):
                '' if s.up else ' (FAILING)'),
             'listen    %s, control %s' % (cfg['listen'], self.describe()),
             'profile   %s' % cfg['profile'],
-            'poll      interval %s, errors %d, sanity %s'
-            % (secs(cfg['interval']), s.errors, 'ok' if not s.error_state() else s.error_state()),
+            'poll      interval %s, errors %d, plan %d block(s): %s, sanity %s'
+            % (secs(cfg['interval']), s.errors, len(s.blocks),
+               ' '.join('%s%d:%d' % ('' if fc == 3 else 'fc%d ' % fc, st, c)
+                        for fc, st, c, _ in s.blocks),
+               'ok' if not s.error_state() else s.error_state()),
             'values    %s' % ('; '.join('%s=%g' % (k, v) for k, v in sorted(values.items())) or 'none yet'),
             'clients   %d active (limit %s, timeout %s, per-ip %s)'
             % (gate.total() if gate else 0,

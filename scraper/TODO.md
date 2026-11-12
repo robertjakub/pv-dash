@@ -5,6 +5,27 @@ The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The show-uplink wave brought the cache's two gold pieces to the scraper's
+upstream Modbus link: the poll block planner hoisted to
+common/modbus/blocks.py (the cache imports it back unchanged) merges the
+profile's source ranges into as few reads as `--merge-gap`/`MERGE_GAP`
+(live `modbus merge-gap`, default 8, `0` = each range alone) allows — the
+bundled sun2000 profile's 13 sources walk as 4 blocks, the read delay
+paces between blocks, a failed block bisects to its leaves (the cache's
+split-on-failure shape, a bad register never starves its pooled
+neighbors) and the ok replies slice back per source for the decode; the
+plan rebuilds live on set profile/metrics-spec/metric-prefix/merge-gap and
+on the restore/reload paths. `show uplink` rides the SHOW_REPORTS
+dispatch: the session counters (connects/exchanges/bytes/errors — the
+ModbusTCP client mirrors the cache's Upstream counter block
+attribute-for-attribute, so a later ClientBase hoist is a move, not a
+rename) and one row per block with the pooled profile source names
+(comma-separated when pooled), status, latency and last error; inspect
+names the plan. The wave also fixed the read-delay wave's fresh-start
+dump crash (read_delay never resolved into the startup config — any
+request dump killed the control session with a KeyError) and gained
+`clear read-delay` its configured-value restore.
+
 The NixOS settings wave inverted the module (nixos/modules/
 modbus-scraper.nix): the dedicated knob options are gone — one freeform
 `settings` attrset renders verbatim `NAME=value` lines into the unit's

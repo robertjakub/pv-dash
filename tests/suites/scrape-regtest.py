@@ -1848,8 +1848,8 @@ try:
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check('scraper control: the hierarchy node answers its namespace (the ? shape)',
-          words == ['auth', 'grid-positive-import', 'offset', 'profile',
-                    'timeout', 'unit', 'upstream'], r[:160])
+          words == ['auth', 'grid-positive-import', 'interval', 'merge-gap', 'offset', 'profile',
+                    'read-delay', 'timeout', 'unit', 'upstream'], r[:160])
     # 6b-2. the register map lives in the device profile: `set profile` swaps
     #        it live, a profile without the power registers rolls back
     r = sctl('show profile', 15597)
@@ -1892,6 +1892,43 @@ try:
           r.startswith('ok inputs-metrics') and 'huawei_battery_charge_watts' in r, r[:80])
     r = sctl('request poll now', 15597)
     check('scraper control: request poll now', r.startswith('ok request poll now'), r[:80])
+    # 6b-2b. show uplink: the cache's gold inverter-link report over the
+    #        scraper's fetch — the session counters + one row per poll block
+    #        (the pooled profile sources, status, latency, failures)
+    time.sleep(1.3)   # a full cycle lands: the clear-profile rebuild reset the block tally
+    r = sctl('show uplink', 15597)
+    check('scraper control: show uplink carries the session rows and the plan',
+          r.startswith('ok uplink\n') and '\nupstream  ' in r and '\nsession   ' in r
+          and 'connects' in r and 'exchanges' in r and 'errors' in r
+          and 'merge-gap 8' in r and 'plan ' in r, r[:240])
+    uprows = [ln for ln in r.splitlines() if ln.startswith('fc')]
+    check('scraper control: show uplink renders the lean per-block table (no sources column)',
+          'fc' in r and 'range' in r and 'status' in r and 'fails' in r
+          and 'sources' not in r and uprows and 'ok' in r, repr(r.splitlines()[4:6]) if len(r.splitlines()) > 5 else r[:160])
+    check('scraper control: show uplink reads the block tally (a rendered latency)',
+          len(uprows) > 1 and 'ms' in uprows[1], uprows[1] if len(uprows) > 1 else '')
+    r = sctl('show uplink-sources', 15597)
+    vhead = next((ln for ln in r.splitlines() if ln.startswith('fc')), '')
+    vhi = {w: i for i, w in enumerate(vhead.split())}
+    vrows = [ln for ln in r.splitlines()
+             if len(ln) > 2 and ln.startswith('fc') and ln[2].isdigit()]   # the data rows (the header spells 'fc  range')
+    check('scraper control: show uplink-sources widens the table (sources after the range, the pooled names)',
+          r.startswith('ok uplink-sources\n') and 'range' in vhi and 'sources' in vhi and 'status' in vhi
+          and vhi['range'] < vhi['sources'] < vhi['status'] and 'pv-power' in r
+          and any(', ' in ln for ln in vrows), repr(r.splitlines()[4:6]) if len(r.splitlines()) > 5 else r[:160])
+    r = sctl('set merge-gap 0', 15597)
+    check('scraper control: set merge-gap 0 rebuilds the plan (each range alone)',
+          r.startswith('ok merge-gap=0'), r[:90])
+    r = sctl('show uplink', 15597)
+    check('scraper control: the uplink report speaks merge-gap 0 and the wider plan',
+          'merge-gap 0' in r and uprows and len([ln for ln in r.splitlines() if ln.startswith('fc')]) >
+          len(uprows), 'merge-gap 0: %s' % r.splitlines()[3][:120])
+    r = sctl('clear merge-gap', 15597)
+    check('scraper control: clear merge-gap restores the configured default',
+          r.startswith('ok merge-gap=8'), r[:90])
+    r = sctl('show read-delay', 15597)
+    check('scraper control: show read-delay answers the configured value (the fresh-start resolve)',
+          r.startswith('ok read-delay=50.00ms'), r[:90])
     r = sctl('request reload-config', 15597)
     check('scraper control: request reload-config', r.startswith('ok reloaded'), r[:80])
     # 6b-3. the secrets on the wire: startup-only (the dump-key treatment) —
@@ -2205,16 +2242,16 @@ try:
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check('scraper_ctl: show modbus answers the live words (the grouped sections, the direct children)',
-          r.returncode == 0 and words == ['auth', 'grid-positive-import', 'offset', 'profile', 'timeout', 'unit',
-                                          'upstream'],
+          r.returncode == 0 and words == ['auth', 'grid-positive-import', 'interval', 'merge-gap', 'offset',
+                                          'profile', 'read-delay', 'timeout', 'unit', 'upstream'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show'], capture_output=True, text=True, timeout=15)
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check("scraper_ctl: the bare show answers the root in the console's own words",
-          r.returncode == 0 and words == ['audit', 'config', 'connections', 'control', 'dump',
-                                          'dump-interval', 'inputs', 'knobs', 'metrics', 'modbus', 'system',
+          r.returncode == 0 and words == ['audit', 'config', 'connections', 'control', 'dump', 'inputs',
+                                          'knobs', 'metrics', 'modbus', 'system', 'uplink', 'uplink-sources',
                                           'version'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
@@ -2329,12 +2366,12 @@ try:
     #     fails the same way (the peer must speak the scheme)
     SKEY = 'scr-suite-key-16chars!'
     procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15910 + BASE),
-                                   '--control-port', '0', '--modbus-auth', 'suite', '--auth-key', SKEY],
+                                   '--control-port', '0', '--modbus-auth', 'suite', '--modbus-auth-key', SKEY],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_fake.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19461 + BASE), '--interval', '1',
-                                   '--control-port', '0', '--modbus-auth', 'suite', '--auth-key', SKEY],
+                                   '--control-port', '0', '--modbus-auth', 'suite', '--modbus-auth-key', SKEY],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth.log'), 'w'), stderr=subprocess.STDOUT))
     for _ in range(30):
         try:
@@ -2352,7 +2389,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19462 + BASE), '--interval', '1',
                                    '--control-port', '0', '--modbus-auth', 'suite',
-                                   '--auth-key', 'wrong-key-16chars00'],
+                                   '--modbus-auth-key', 'wrong-key-16chars00'],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_wrong.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(3.0)
     status, m = wait_metrics(19462, want='scraper_up')
@@ -2365,11 +2402,11 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19468 + BASE), '--interval', '1',
                                    '--control-port', '19469', '--control-token', 'ctok-a',
-                                   '--modbus-auth', 'suite', '--auth-key', 'wrong-key-16chars00'],
+                                   '--modbus-auth', 'suite', '--modbus-auth-key', 'wrong-key-16chars00'],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_rot.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(2.0)
     r = subprocess.run([sys.executable, CTLB, '--control-port', '19469', '--control-token', 'ctok-a',
-                        'set', 'auth-key', SKEY], capture_output=True, text=True, timeout=15)
+                        'set', 'modbus-auth-key', SKEY], capture_output=True, text=True, timeout=15)
     check('suite auth: startup-only — the key set refuses',
           r.stdout.startswith('% error: restart required (startup-only knob)'), r.stdout[:120])
     procs[-1].terminate()
@@ -2378,7 +2415,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15910 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19468 + BASE), '--interval', '1',
                                    '--control-port', '19469', '--control-token', 'ctok-a',
-                                   '--modbus-auth', 'suite', '--auth-key', SKEY],
+                                   '--modbus-auth', 'suite', '--modbus-auth-key', SKEY],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_rot.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(2.0)
     for _ in range(30):
@@ -2400,7 +2437,7 @@ try:
                        text=True, timeout=15)
     check('suite auth: suite without a key fails the config fast',
           r.returncode == 1 and 'needs a key' in r.stderr, r.stderr[-160:])
-    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'suite', '--auth-key', 'short'],
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'suite', '--modbus-auth-key', 'short'],
                        capture_output=True, text=True, timeout=15)
     check('suite auth: a short key fails the config fast',
           r.returncode == 1 and 'at least 16 characters' in r.stderr, r.stderr[-160:])
@@ -2412,9 +2449,9 @@ try:
     time.sleep(0.7)
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15911 + BASE),
                                    '--listen', '127.0.0.1:%d' % (19464 + BASE), '--interval', '1',
-                                   '--control-port', '0', '--modbus-auth', 'suite', '--auth-key', SKEY],
+                                   '--control-port', '0', '--modbus-auth', 'suite', '--modbus-auth-key', SKEY],
                                   stdout=open(os.path.join(SCRATCH, 'scr_auth_plain.log'), 'w'), stderr=subprocess.STDOUT))
-    time.sleep(3.0)
+    time.sleep(4.5)   # the plain fake never answers the handshake: the failure lands at the 3s socket timeout
     status, m = wait_metrics(19464, want='scraper_up')
     check('suite auth: an authed client of a plain server fails (scraper_up 0)',
           m.get('scraper_up') == 0, str(m.get('scraper_up')))

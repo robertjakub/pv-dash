@@ -21,6 +21,9 @@ port **502**, unit id **1**.
 - a poll loop reads the device profile's registers every `--interval`
   seconds (the register map — addresses, types, gains, function codes —
   comes from the profile **alone**; there are no register override knobs);
+  the source ranges merge into as few **block reads** as the `--merge-gap`
+  allows (a failed block splits to its sources — `show uplink` renders the
+  plan and its latency);
 - the reading passes **sanity caps** (`--max-kwp`, `--max-grid-kw`): bad
   data answers **HTTP 503** with `# Error collecting metrics from
   inverter` until a good poll, never silently wrong numbers;
@@ -87,12 +90,13 @@ set system log-level INFO
 |---|---|---|
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
-| `--modbus-auth` / `--auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/common/MODBUS.md](../docs/common/MODBUS.md) |
+| `--modbus-auth` / `--modbus-auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/common/MODBUS.md](../docs/common/MODBUS.md) |
 | `--profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
 | `--metric-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
 | `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
 | `--read-delay` | `0.05` | seconds between consecutive device reads within a poll cycle (the slow-dongle pacing); `0` = no wait |
+| `--merge-gap` | `8` | max register gap when merging the profile's source ranges into block reads (fewer round trips); `0` = read each range separately |
 | `--grid-positive-import` | off | grid register positive means import |
 | `--timeout` / `--interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
 | `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F13) |
@@ -160,7 +164,9 @@ command, settable (`set`/`clear`) or show-only — is tabled in
 
 | Command | Effect |
 |---|---|
-| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `modbus interval`, `modbus timeout`, `modbus read-delay`, the `metrics limits` caps, `metrics caps max-pv`/`metrics caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit instance`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `set` / `clear` | the live settings: `modbus profile` (the map swaps live; `default` restores the bundled sun2000), `modbus interval`, `modbus timeout`, `modbus read-delay`, `modbus merge-gap` (the poll plan rebuilds), the `metrics limits` caps, `metrics caps max-pv`/`metrics caps max-grid`, `system log-access`, `system log-level`, `audit log-file`/`audit rotate …`/`audit forward`/`audit instance`/`audit disable` (the audit family swaps live), `modbus auth` (the scheme swaps live), `metrics acl`, `control ops verbs`/`control trust-uids`/`control socket-group`, `control port` (rebinds the listener live) — `system listen` (the serve address, `show listen` answers it) and the tokens/auth keys are startup-only: the set answers the restart note, pass them by flag/env/config |
+| `show uplink` | the inverter link: session counters plus one row per poll block — status, latency, failures |
+| `show uplink-sources` | the uplink table widened: the sources column after the range names the profile registers each block pools |
 | `show connections` | the live HTTP clients of /metrics |
 | `request poll now` | the loop wakes immediately |
 | `request reload-config` | the SIGHUP path (the token file re-reads, so the bearer token rotates too) |

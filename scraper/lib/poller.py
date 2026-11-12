@@ -1,14 +1,31 @@
 #!/usr/bin/env python3
-"""The poller: reads the inverter, sanity-checks and stores metric values (stdlib only)."""
+"""The poller: reads the inverter, sanity-checks and stores metric values (stdlib only).
+
+The poll walks the block plan — the cache's gold planner
+(common/modbus/blocks.py) merges the profile's source ranges into as few
+Modbus reads as possible, the read delay paces between blocks, a failed
+block splits to its leaves (a bad register must not starve its pooled
+neighbors) and the ok replies slice back into the sources. The per-block
+tally feeds `show uplink`."""
 import logging
 import struct
 import threading
 import time
+from collections import deque
 
+from common.modbus.blocks import BIT_READ_FUNCS, build_blocks, span
 from .expr import evaluate
 from .statics import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX
 
 logger = logging.getLogger('scraper')
+
+HARD_SOURCES = ('pv-power', 'grid-power', 'battery-power', 'battery-soc')
+
+
+def _words_for(typ):
+    """The words one source read covers: bits and 16-bit types take one,
+    the 32-bit quartet (both word orders) two."""
+    return 1 if typ in ('bit', 'i16', 'u16') else 2
 
 
 class Scraper:
@@ -30,6 +47,34 @@ class Scraper:
         self.poll_secs_max = 0.0
         self.poll_count = 0
         self.wake = threading.Event()   # `request poll now` on the control server: the wait ends immediately
+        # the poll plan (the cache's gold shape): the blocks, the per-block
+        # tally (`show uplink`), the leaf -> source names map
+        self.blocks = []
+        self.block_stats = {}
+        self.leaf_sources = {}
+        self.plan_gen = 0
+        self.rebuild_plan()
+
+    def rebuild_plan(self):
+        """(Re)build the poll plan from the resolved sources: the ranges
+        merged into blocks per function code, the leaf -> source names map
+        beside it. Runs at start and whenever the sources or the merge gap
+        change (a live set profile/metrics-spec/metric-prefix/merge-gap)."""
+        with self.lock:
+            ranges = []
+            leaf_sources = {}
+            for name, src in self.cfg['sources'].items():
+                leaf = (src['fc'], src['register'], _words_for(src['type']))
+                ranges.append(leaf)
+                leaf_sources.setdefault(leaf, []).append(name)
+            self.blocks = build_blocks(ranges, self.cfg.get('merge_gap', 8))
+            self.leaf_sources = leaf_sources
+            self.block_stats = {}
+            self.plan_gen += 1
+        logger.info('poll plan: %d block(s) over %d source(s)', len(self.blocks), len(leaf_sources))
+        for i, (fc, start, count, leaves) in enumerate(self.blocks, 1):
+            names = ', '.join(n for lf in leaves for n in leaf_sources.get(lf, ()))
+            logger.info('  block %d: fc%d %d:%d [ %s ]', i, fc, start, count, names)
 
     def reload(self, cfg):
         """Apply a freshly resolved config (SIGHUP); the socket reconnects on the next poll."""
@@ -41,6 +86,7 @@ class Scraper:
                           auth=cfg.get('auth'), auth_key=cfg.get('auth_key'))
         if (old['host'], old['modbus_port'], old['modbus_unit']) != (cfg['host'], cfg['modbus_port'], cfg['modbus_unit']):
             self.client.close()
+        self.rebuild_plan()
 
     def _mark_up(self, ok, err):
         with self.lock:
@@ -57,25 +103,49 @@ class Scraper:
                 logger.warning('inverter %s:%d unreachable: %s', self.cfg['host'],
                                self.cfg['modbus_port'], err)
 
-    def _read(self, profile_name):
-        """Read one source: the profile-declared type and function code on
-        the wire (fc 3 = holding, 4 = input, 1 = coils, 2 = discrete
-        inputs), decoded by the profile's gain (wire value = physical x
-        gain)."""
-        src = self.cfg['sources'][profile_name]
-        reg, typ, fc = src['register'], src['type'], src.get('fc', 3)
+    def _block_stat(self, key, secs, err=None):
+        """The `show uplink` tally of one poll-block attempt: the round-trip
+        time, the outcome (DeviceError keeps its Modbus exception code)."""
+        s = self.block_stats.setdefault(key, {'n': 0, 'ok_n': 0, 'fails': 0,
+                                              'last': 0.0, 'sum': 0.0, 'max': 0.0,
+                                              'last_err': None, 'last_code': None})
+        s['n'] += 1
+        s['last'] = secs
+        s['max'] = max(s['max'], secs)
+        if err is None:
+            s['ok_n'] += 1
+            s['sum'] += secs
+            s['last_err'] = None
+            s['last_code'] = None
+        else:
+            s['fails'] += 1
+            s['last_err'] = str(err)
+            s['last_code'] = err.code if hasattr(err, 'code') else None
+
+    def _read_block(self, fc, start, count):
+        """One plan block's read: FC1/FC2 unpack to 0/1 per address, FC3/FC4
+        return words — the addresses are profile-space, the client's offset
+        applies on the wire."""
+        if fc in BIT_READ_FUNCS:
+            return self.client.read_bits(start, count, fc=fc)
+        return self.client.read_registers(start, count, fc=fc)
+
+    def _decode(self, words, src):
+        """The source's decode from its block-reply words: the profile's
+        type ladder, then the gain (wire value = physical x gain)."""
+        typ = src['type']
         if typ == 'bit':
-            raw = self.client.read_bits(reg, 1, fc=fc)[0]
+            raw = words[0]
         elif typ in ('i16', 'u16'):
-            raw = self.client.read_registers(reg, 1, fc=fc)[0]
+            raw = words[0]
             if typ == 'i16' and raw >= 0x8000:
                 raw -= 0x10000
         elif typ in ('f32', 'f32swap'):
-            w0, w1 = self.client.read_registers(reg, 2, fc=fc)
+            w0, w1 = words[0], words[1]
             order = (w1, w0) if typ == 'f32swap' else (w0, w1)   # swap = the lo word first
             raw = struct.unpack('>f', struct.pack('>HH', *order))[0]
         else:                       # i32/u32 and the swapped word orders
-            w0, w1 = self.client.read_registers(reg, 2, fc=fc)
+            w0, w1 = words[0], words[1]
             if typ in ('i32swap', 'u32swap'):
                 w0, w1 = w1, w0
             raw = struct.unpack('>i', struct.pack('>HH', w0, w1))[0]
@@ -87,63 +157,89 @@ class Scraper:
         cfg = self.cfg
         started = time.monotonic()
         delay = cfg.get('read_delay', 0.0)
+        plan_gen = self.plan_gen
+        pending = deque(self.blocks)
+        done = []
+        ok_words = {}               # leaf -> the block reply's words for the leaf
+        failed = {}                 # leaf -> the terminal read exception
         first = True
         paced = True   # the read delay paces a healthy device; failures sweep unpaced
-
-        def paced_read(pn):
-            """One device read with the read-delay pacing: the wait lands
-            before every read but the first, and a failed read sweeps the
-            next one unpaced (the cache's gold shape)."""
-            nonlocal first, paced
+        while pending:
+            fc, start, count, leaves = pending.popleft()
             if first:
                 first = False
             elif delay and paced:
                 time.sleep(delay)
+            t0 = time.monotonic()
             try:
-                value = self._read(pn)
-            except Exception:
+                words = self._read_block(fc, start, count)
+                self._block_stat((fc, start, count), time.monotonic() - t0)
+                paced = True
+                for lf in leaves:
+                    ok_words[lf] = words[lf[1] - start: lf[1] - start + lf[2]]
+                done.append((fc, start, count, leaves))
+            except Exception as e:
                 paced = False
-                raise
-            paced = True
-            return value
-
-        try:
-            pv_raw = paced_read('pv-power')
-            grid_raw = paced_read('grid-power')
-            # the battery reads ride when the spec bound the registers (a
-            # profile without them keeps the battery metrics absent)
-            batt_raw = paced_read('battery-power') if 'battery-power' in cfg['sources'] else 0
-            soc = paced_read('battery-soc') if 'battery-soc' in cfg['sources'] else None
-            if first:
-                first = False
-            elif delay and paced:
-                time.sleep(delay)
-            diag = self._read_diag()
-        except Exception as e:
+                self.client.close()
+                if len(leaves) > 1:
+                    mid = len(leaves) // 2
+                    left, right = leaves[:mid], leaves[mid:]
+                    logger.debug('splitting block fc%d %d:%d after failure (%s)', fc, start, count, e)
+                    pending.appendleft((fc, right[0][1], span(right), right))
+                    pending.appendleft((fc, left[0][1], span(left), left))
+                else:
+                    self._block_stat((fc, start, count), time.monotonic() - t0, e)
+                    failed[leaves[0]] = e
+                    done.append((fc, start, count, leaves))
+        if plan_gen == self.plan_gen:   # the plan still owns the walk (no live rebuild mid-cycle)
+            self.blocks = done
+            live = {(fc, s, c) for fc, s, c, _ in done}
+            self.block_stats = {k: v for k, v in self.block_stats.items() if k in live}
+        # the sources decode off the ok replies; a failed leaf serving a
+        # hard source fails the cycle, a soft one keeps its metric absent
+        hard_err = None
+        for lf, e in failed.items():
+            for name in self.leaf_sources.get(lf, ()):
+                if name in HARD_SOURCES:
+                    if hard_err is None:
+                        hard_err = e
+                else:
+                    logger.warning('read of %s (%s) failed, the metric stays absent (%s)',
+                                   name, cfg['sources'][name]['metric'], e)
+        if hard_err is not None:
             self.client.close()
-            self._mark_up(False, e)
-            logger.debug('poll failed: %s', e)
+            self._mark_up(False, hard_err)
+            logger.debug('poll failed: %s', hard_err)
             self._account_cycle(started)
             return
-        # the remaining profile-bound sources (the phase rows, a bit flag, a
-        # float — whatever the spec binds beyond the power math): one read
-        # each, soft — a rejected read keeps its metric absent instead of
-        # failing the whole poll (the four power sources above stay hard)
+        pv_raw = grid_raw = None
+        batt_raw = 0
+        soc = None
         extras = {}
         raws = {}                       # the expression input name (the spec key) -> the read
-        for pn, src in cfg['sources'].items():
-            if pn in ('pv-power', 'grid-power', 'battery-power', 'battery-soc'):
-                continue
-            try:
-                value = paced_read(pn)
-            except Exception as e:
-                logger.warning('read of %s (%s) failed, the metric stays absent (%s)',
-                               pn, src['metric'], e)
-                continue
-            extras[src['metric']] = value
-            key = self.spec.profile_inputs.get(pn)
-            if key is not None:
-                raws[key] = value
+        for lf, words in ok_words.items():
+            for name in self.leaf_sources.get(lf, ()):
+                src = cfg['sources'][name]
+                value = self._decode(words, src)
+                if name == 'pv-power':
+                    pv_raw = value
+                elif name == 'grid-power':
+                    grid_raw = value
+                elif name == 'battery-power':
+                    batt_raw = value
+                elif name == 'battery-soc':
+                    soc = value
+                else:
+                    extras[src['metric']] = value
+                    key = self.spec.profile_inputs.get(name)
+                    if key is not None:
+                        raws[key] = value
+        if pv_raw is None or grid_raw is None:
+            # unreachable: build_sources refuses a spec without the power pair —
+            # the guard keeps the power math honest all the same
+            self._mark_up(False, 'the power sources did not poll')
+            self._account_cycle(started)
+            return
         self._account_cycle(started)
         pv, grid = pv_raw, grid_raw
         if cfg['grid_positive_import']:
@@ -172,6 +268,7 @@ class Scraper:
                 abs(grid), grid_cap, grid_reg, grid_raw, context)
         elif home < 0:
             err = 'Home power is negative: %.0f W (inconsistent readings)%s' % (home, context)
+        diag = self._read_diag()   # the cache-diag probe rides the cycle's tail, outside the values lock
         with self.lock:
             self.error = err
             if err is None:

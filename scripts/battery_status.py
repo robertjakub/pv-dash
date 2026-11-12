@@ -46,11 +46,20 @@ def age_txt(sec):
     return '(%s ago)' % fmt(sec)
 
 
-def last_line(status):
-    """The status's last word, aged — a growing age is the tell a suite
-    sits quiet too long."""
+def last_line(status, ended=False):
+    """The status's last word. The running slot's row carries the age —
+    a growing age is the tell a suite sits quiet too long; the previous
+    slot's row carries the battery's end time (the mtime IS the end —
+    the tally wrote it last)."""
     rows = status.read_text().splitlines()[-1:] if status.exists() else []
     if not rows:
+        return
+    if ended:
+        try:
+            t = datetime.datetime.fromtimestamp(status.stat().st_mtime)
+            print('  %-9s %s (ended %s)' % ('last:', rows[0], t.strftime('%H:%M:%S')))
+        except OSError:
+            print('  %-9s %s' % ('last:', rows[0]))
         return
     a = age_of(status)
     if a is not None:
@@ -171,7 +180,7 @@ def render():
         else:
             state = 'no tally'
         print('previous slot: %s (%s)' % (last.name, state))
-        last_line(status)
+        last_line(status, ended=True)
 
 
 def main():

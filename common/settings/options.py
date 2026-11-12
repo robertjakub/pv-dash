@@ -347,10 +347,21 @@ def _listing(name, options, node=None, hidden_words=()):
     words = {}
     for o in options:
         if o.hidden:
-            continue   # the pools' rule: the hidden rows never list (the typed path still answers)
+            # the / rule: the walk-in lists the hidden rows marked — the
+            # bare path still answers (the root never homes them but the
+            # guard keeps the rule uniform)
+            if home(o) == name:
+                for spelling in (o.live, o.alias):
+                    if spelling and spelling.startswith(prefix):
+                        rest = spelling[len(prefix):]
+                        _slot(words, rest.split('/')[0] + '/', o, '/' not in rest)
+            continue
         if o.node:
             if o.name != name and o.name.startswith(prefix):
-                _slot(words, o.name[len(prefix):].split('/')[0], o, False)
+                word = o.name[len(prefix):].split('/')[0]
+                if any(x.hidden and x.live and x.live.startswith(o.name + '/') for x in options):
+                    word += '/'   # the node's subtree hides knobs — the listing says so
+                _slot(words, word, o, False)
         elif o.name not in hidden_words and home(o) == name:
             for spelling in (o.live, o.alias):   # the console's own words — the walk's next segment
                 if spelling and spelling.startswith(prefix):
@@ -386,8 +397,8 @@ def describe_command_node(commands, help_map, groups, hidden, name):
     renders the setting namespaces — the node-first descriptions (a word
     that is itself a namespace describes by its node row, whose help and
     group COMMAND_HELP/COMMAND_GROUPS carry beside the commands), the
-    display groups' sections, the hidden rows listing MARKED (`*word` —
-    the * rule: the walk-in shows the namespace's quiet set, the typed
+    display groups' sections, the hidden rows listing MARKED (`word/` —
+    the / rule: the walk-in shows the namespace's quiet set, the typed
     path answers the bare word). None when nothing lists (the
     name is no command node)."""
     prefix = name + '/'
@@ -396,7 +407,7 @@ def describe_command_node(commands, help_map, groups, hidden, name):
         if w.startswith(prefix):
             word = w[len(prefix):].split('/')[0]
             if word and word not in words:
-                words[('*' + word) if w in hidden else word] = help_map.get(prefix + word, '')
+                words[(word + '/') if w in hidden else word] = help_map.get(prefix + word, '')
     if not words:
         return None
     buckets = {}
@@ -410,12 +421,14 @@ def describe_command_node(commands, help_map, groups, hidden, name):
 
 def describe_root(options, show_options=(), hidden_words=()):
     """The bare `show` answer — the wire's root listing: every visible
-    flat knob word homed at the root, the namespace nodes' walk words and
-    the show reports' words one per row, the display groups' sections.
+    flat knob word homed at the root, the namespace nodes' walk words (a
+    node whose subtree hides knobs lists marked, `dump/` — the / rule)
+    and the show reports' words one per row, the display groups' sections.
     `hidden_words` carries the runtime-gated words — the dump-gated
     `dump-interval` lists only while the dump node is on, and the caller
-    knows."""
-    return _listing('', tuple(options) + tuple(show_options), None, hidden_words)
+    knows. The hidden reports (config, knobs) never list — the / rule
+    marks KNOB namespaces, the reports are their own quiet set."""
+    return _listing('', tuple(options) + tuple(o for o in show_options if not o.hidden), None, hidden_words)
 
 
 def render_config_script(options, values, comment=None):

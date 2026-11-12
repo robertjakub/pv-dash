@@ -16,54 +16,29 @@ import sys
 import threading
 import time
 
-if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
-    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
-             'a standalone run shares /tmp scratch and collides across sessions)')
-SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
-os.makedirs(SCRATCH, exist_ok=True)   # the CI legs set a fixed path the battery never made
-print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check/start/frame builders
 
-PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
-    else os.environ.get('PV_SUITE_PROFILE', 'quick')
+import socket
+import json as _json
+import signal
+import struct
+import subprocess
+import sys
+import threading
+import time
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 R = os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')
 
-BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
 CACHE_PORT = 15505 + BASE
 PORT = 15501 + BASE
 
-failures = []
-
-
-def check(name, cond, detail=''):
-    print('%s %s%s' % ('PASS' if cond else 'FAIL', name, (' — ' + detail) if detail else ''))
-    if not cond:
-        failures.append(name)
-
 
 def txn(pdu, port=CACHE_PORT):
-    s = socket.create_connection(('127.0.0.1', port), timeout=10)
-    s.sendall(struct.pack('>HHHB', 77, 0, len(pdu) + 1, 1) + pdu)
-    head = b''
-    while len(head) < 7:                          # TCP is a stream: read the
-        chunk = s.recv(7 - len(head))             # MBAP header exactly, then
-        if not chunk:
-            raise ConnectionError('eof')
-        head += chunk
-    txn_, proto, length, unit = struct.unpack('>HHHB', head)
-    body = b''
-    while len(body) < length - 1:                 # ... the body exactly
-        chunk = s.recv(length - 1 - len(body))
-        if not chunk:
-            raise ConnectionError('eof')
-        body += chunk
-    s.close()
-    return body
+    return mbap(pdu, port)
 
 
 def rd(addr, n, port=CACHE_PORT):
@@ -77,29 +52,6 @@ def wr6(addr, value, port=CACHE_PORT):
 def wr16(addr, values, port=CACHE_PORT):
     return txn(struct.pack('>BHHB', 16, addr, len(values), len(values) * 2)
                + struct.pack('>%dH' % len(values), *values), port)
-
-
-procs = []
-
-
-def start(cmd, log=None, env_extra=None):
-    env = {**os.environ, **(env_extra or {})}
-    if log:
-        p = subprocess.Popen(cmd, stdout=open(log, 'w'), stderr=subprocess.STDOUT, env=env)
-    else:
-        p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
-    procs.append(p)
-    return p
-
-
-def _recvn(sock, n):
-    buf = b''
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
-            raise ConnectionError('eof')
-        buf += chunk
-    return buf
 
 
 class EvilUpstream:
@@ -132,8 +84,8 @@ class EvilUpstream:
         try:
             conn.settimeout(15)
             while True:
-                tid, _pid, length = struct.unpack('>HHH', _recvn(conn, 6))
-                rest = _recvn(conn, length)
+                tid, _pid, length = struct.unpack('>HHH', recvn(conn, 6))
+                rest = recvn(conn, length)
                 uid, fc = rest[0], rest[1]
                 if fc != 3 or len(rest) < 6:
                     raise ConnectionError('unsupported request')
@@ -2486,8 +2438,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     c.settimeout(5)
     auth_handshake_client(c, CL_KEY)
     c.sendall(struct.pack('>HHHB', 9, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 2))
-    head = _recvn(c, 7)
-    body = _recvn(c, struct.unpack('>HHH', head[:6])[2] - 1)
+    head = recvn(c, 7)
+    body = recvn(c, struct.unpack('>HHH', head[:6])[2] - 1)
     check('suite auth: the proved client reads through the cache',
           body[0] == 3 and body[1] == 4, body.hex())
     c.close()
@@ -2539,8 +2491,8 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     c = socket.create_connection(('127.0.0.1', AUTH_PORT), timeout=5)
     c.settimeout(5)
     c.sendall(struct.pack('>HHHB', 10, 0, 6, 1) + struct.pack('>BHH', 3, 32064, 2))
-    head = _recvn(c, 7)
-    body = _recvn(c, struct.unpack('>HHH', head[:6])[2] - 1)
+    head = recvn(c, 7)
+    body = recvn(c, struct.unpack('>HHH', head[:6])[2] - 1)
     c.close()
     check('suite auth: a plain client reads after the disable', body[0] == 3, body.hex())
     r = ctl_auth('set', 'auth-upstream', 'none')

@@ -142,7 +142,7 @@ class ControlServer:
         self.dump_path = dump_path or None   # the state dump file (the dump family)
         self.dump_restore = bool(restore_on_start)   # prospective-only: the START already chose
         self.dump_interval = float(dump_interval or 0.0)   # seconds between the automatic dumps; 0 = only the command/shutdown dumps
-        self.dump_wake = threading.Event()   # a live `set dump-interval` (and the off/on swaps) wake the dumper without a restart
+        self.dump_wake = threading.Event()   # a live `set dump interval` (and the off/on swaps) wake the dumper without a restart
         if dump_key is not None:
             self.dump_key = dump_key   # only when given: a subclass may property dump_key
         self.is_unix = not isinstance(target, int) and not str(target).isdigit()
@@ -518,8 +518,8 @@ class ControlServer:
         Modbus-write set words), _after_set (the fake's pin bookkeeping),
         show_root_hidden (the bare-show pool's extra hidden words),
         show_walk_tail (the walk's no-match tail), command_tool (the tool
-        verbs: poll now, reset, request flush cache / restart, the dump
-        with-cache spelling) and unknown_command (the final err's
+        verbs: request poll now, reset, request flush cache / restart, the
+        dump with-cache spelling) and unknown_command (the final err's
         spelling)."""
         cmd = cmd.strip()
         low = cmd.lower()
@@ -671,9 +671,11 @@ class ControlServer:
         scenario). The default is none."""
 
     def show_root_hidden(self):
-        """Extra hidden words for the bare `show`'s pool (the cache hides
-        dump-interval while no dump path is configured)."""
-        return ()
+        """Extra hidden words for the bare `show`'s pool: the
+        dump-interval knob hides while no dump path is configured (there
+        is nothing to dump into otherwise — the wire answers the clean
+        err)."""
+        return () if self.dump_path else ('dump-interval',)
 
     def show_walk_tail(self, args):
         """The show walk's no-match tail: None falls through to the next
@@ -685,8 +687,8 @@ class ControlServer:
 
     def command_tool(self, low, cmd):
         """The tool's own verbs, checked before the family's request
-        namespace (poll now, reset, request flush cache / restart, the
-        dump with-cache spelling). None = not one of them."""
+        namespace (request poll now, reset, request flush cache / restart,
+        the dump with-cache spelling). None = not one of them."""
         return None
 
     def unknown_command(self, cmd):

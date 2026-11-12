@@ -66,35 +66,54 @@ class DaemonExit(Exception):
 
 
 def pools(commands, internal, hidden, spellings, nodes, commands_help,
-          pool_names, banner_name):
-    """The standard console's pool/describe/welcome furniture (the three
-    simple cli bins' one shape; the cache's dump-gated pools keep their
-    own): the completion/list pools speak the CONSOLE spellings (the rows'
-    live/alias paths — the words TAB offers and `?` lists; the cli
-    translates them to the flat registry names when it sends — a
-    not-yet-live knob never lists, the hidden and internal rows never
-    list) and the welcome prints the family banner. Returns (pool_names,
-    describe_word, command_pool, setting_pool, welcome)."""
-    names = tuple(n for n in pool_names if n not in hidden)
+          pool_names, banner_name, hidden_settings=(), dump_gate=()):
+    """The standard console's pool/describe/welcome furniture — one shape
+    family-wide (the cache's dump-gated pools, generalized): the
+    completion/list pools speak the CONSOLE spellings (the rows' live/alias
+    paths — the words TAB offers and `?` lists; the cli translates them to
+    the flat registry names when it sends — a not-yet-live knob never
+    lists, the hidden and internal rows never list) and the welcome prints
+    the family banner. The dump-gated rows (`request dump`, `request
+    restore` and the `dump-interval` setting, plus the caller's dump_gate
+    extras — the cache's `request/dump/with-cache`) list only while a dump
+    path is configured: the welcome probes `show dump-path` first (there
+    is nothing to dump into otherwise — the wire would answer the clean
+    err). Returns (pool_names, describe_word, command_pool, setting_pool,
+    welcome)."""
     describe_word = make_describe_word(nodes, commands_help, spellings)
+    state = {'dump': False}
+    gated = ('request/dump', 'request/restore') + tuple(dump_gate)
 
     def command_pool():
-        """The first words the daemon offers right now (the hidden and the
-        internal rows never list)."""
-        return tuple(n for n in commands if n not in hidden and n not in internal)
+        """The first words the daemon offers right now: the dump-gated
+        rows ride the welcome's probe (they list only while a dump path is
+        configured); the internal rows (the machinery's own words) and the
+        other hidden rows never list."""
+        return tuple(n for n in commands
+                     if n not in internal
+                     and (n not in hidden or (state['dump'] and n in gated)))
 
     def setting_pool():
         """The show-branch pool: the console spellings (the hidden rows
-        never list)."""
-        return names
+        never list; the cli translates them to the flat registry names
+        when it sends; a not-yet-live knob — a restart-marked row awaiting
+        its live name — never lists either; the dump-interval knob's
+        console spelling rides the dump gate)."""
+        return tuple(n for n in pool_names
+                     if n not in hidden_settings
+                     and (n not in ('dump/interval', 'dump-interval') or state['dump']))
 
     def welcome(sock):
-        """The first-connect greeting: the console's two fixed lines — the
-        daemon's name and the one-line navigation hint."""
+        """The first-connect greeting: probe the dump state (the
+        dump-gated command/setting rows pool by it), then the console's
+        two fixed lines — the daemon's name and the one-line navigation
+        hint."""
+        reply = exchange(sock, wire('show dump-path'))
+        state['dump'] = bool(reply) and reply[3:].split('=', 1)[-1].strip() not in ('', 'off', 'none')
         print(T('banner.welcome') % banner_name)
         print(T('banner.hint'))
 
-    return names, describe_word, command_pool, setting_pool, welcome
+    return describe_word, command_pool, setting_pool, welcome
 
 
 def make_describe_word(nodes, commands_help, spellings):

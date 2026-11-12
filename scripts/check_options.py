@@ -240,7 +240,7 @@ def check_tool(tool):
     # PROTOCOL['socket_timeout'] — the loader splices it, the gate pins
     # (a registry row hand-copying the number, or a loader missing the
     # splice, drifts here)
-    timeout_row = next((o for o in options if o.name == 'timeout'), None)
+    timeout_row = next((o for o in options if o.name == 'modbus-timeout'), None)
     if timeout_row is not None:
         rows.append((timeout_row.static_default == PROTOCOL['socket_timeout'],
                      "%s: the modbus timeout's default is the protocol tree's socket_timeout%s"

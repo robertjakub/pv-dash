@@ -180,10 +180,10 @@ def build_parser(options, prog=None, description=None, epilog=None, add_help=Tru
 
 def _row_type(opt):
     """The argparse `type` callable over row_value — named for the knob so a
-    refused flag value reads 'argument --unit: invalid unit: ...'. The
-    row_value message rides the ArgumentTypeError verbatim (the bounds
-    text 'unit must be ..' reaches the one error line instead of argparse's
-    bare 'invalid unit value' wrapper)."""
+    refused flag value reads 'argument --modbus-unit: invalid modbus-unit:
+    ...'. The row_value message rides the ArgumentTypeError verbatim (the
+    bounds text 'modbus-unit must be ..' reaches the one error line instead
+    of argparse's bare 'invalid unit value' wrapper)."""
     def parse(raw):
         try:
             return row_value(opt, raw)

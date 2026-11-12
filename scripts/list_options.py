@@ -2,13 +2,18 @@
 """Print every row of the lib/options.json registries — the knobs, the show
 reports and the commands alike, one line each, the columns aligned:
 
-  <tool> <name> <live> <type> [hidden] [restart] [secret]
+  <tool> <name> <live> <type> <env> <snake> [hidden] [restart] [secret]
 
 `<type>` is the section the row rides in: options | show | commands; `<live>`
 is the row's live wire name (the set/spell path — or the report/command's
 live where the section carries one), `-` when the row has none (a pure
-node/startup-only/commands row); `hidden`/`restart`/`secret` name the row's
-flags, present only when true. The hierarchy-node rows (`"node": true`, the
+node/startup-only/commands row); `<env>` is the row's environment variable
+(the options rows carry one, `-` when the row reads none — the demo-only
+knobs, the show/command rows); `<snake>` is the option's flag spelling,
+taken verbatim (`--modbus-unit`, `-` where the row carries no flag — the
+node rows, the show/command rows);
+`hidden`/`restart`/`secret` name the row's flags, present only when true.
+The hierarchy-node rows (`"node": true`, the
 bare namespace words) stay hidden unless `--nodes` asks for them. Every tool
 prints into the one flat table. With no arguments every registry prints in
 registry order; name the projects to print a subset — positionally or via
@@ -114,6 +119,8 @@ def main():
             print('list_options.py: no registry at %s' % path)
             return 1
         rows = [(tool, row.get('name', '?'), row.get('live') or '-', section,
+                 (row.get('env') or '-') if section == 'options' else '-',
+                 (row['flag'] if row.get('flag') else '-'),
                  ''.join(' %s' % f for f in ('hidden', 'restart', 'secret') if row.get(f)))
                 for section in keep
                 for row in (section_rows(path, section) or [])
@@ -124,11 +131,12 @@ def main():
         rows.sort(key=lambda r: r[1])
     width = {}
     for row in rows:
-        for i, cell in enumerate(row[:4]):
+        for i, cell in enumerate(row[:6]):
             width[i] = max(width.get(i, 0), len(cell))
-    for tool, name, live, section, flags in rows:
-        print('%-*s  %-*s  %-*s  %-*s%s' % (
-            width[0], tool, width[1], name, width[2], live, width[3], section, flags))
+    for tool, name, live, section, env, snake, flags in rows:
+        print('%-*s  %-*s  %-*s  %-*s  %-*s  %-*s%s' % (
+            width[0], tool, width[1], name, width[2], live, width[3], section,
+            width[4], env, width[5], snake, flags))
     return 0
 
 

@@ -40,7 +40,7 @@ SCENARIOS = {k: float(v) for k, v in STATIC['scenarios'].items()}
 AUDIT_MAX_MB = DEFAULTS['audit_max_mb']
 AUDIT_FILES = DEFAULTS['audit_files']
 from common.wire.control import CLI_IDLE_TIMEOUT_S, CLI_KEEPALIVE_S, CLI_MAX_LINE_BYTES_S, \
-    CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S   # the clients' wire constants (the shared tree)
+    CLI_MIN_HEIGHT, CLI_MIN_WIDTH, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S   # the clients' wire constants (the shared tree)
 
 SUNRISE = STATIC['sun']['sunrise']             # the simulated day's window
 SUNSET = STATIC['sun']['sunset']               # (the battery day plan)

@@ -267,10 +267,16 @@ Proceed with shutdown? [confirm] y
 TAB completes commands, settings **and their values** (one candidate per
 line with the short descriptions from the shared registry); `?` prints the
 same list anywhere. `set`/`clear` print the `% changed` confirmation, `show`
-prints the bare value. While idle the CLI sends wire pings (every 55 s,
-`CLI_KEEPALIVE` to tune); when the connection dies it retries `--reconnect`
-times (default 3) with `--reconnect-wait` seconds (default 10) and resumes
-on the first success (`--reconnect 0` = die on loss).
+prints the bare value. Every reply prints through the console's pager: a
+reply taller than the screen pauses (`-- more --`), space prints the next
+page, return one more line, `q` stops the rest — `--page-size`/
+`CLI_PAGE_SIZE` set the page size (0 = off), the session-local `page`
+command retunes it live (never sent to the daemon), and a terminal smaller
+than 20 rows or 64 columns refuses to start. While idle the CLI sends wire
+pings (every 55 s, `CLI_KEEPALIVE` to tune); when the connection dies it
+retries `--reconnect` times (default 3) with `--reconnect-wait` seconds
+(default 10) and resumes on the first success (`--reconnect 0` = die on
+loss).
 
 ## Served registers (the default profile)
 

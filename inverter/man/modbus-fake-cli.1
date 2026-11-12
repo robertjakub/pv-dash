@@ -15,6 +15,14 @@ registry's own groups \(em ungrouped rows render bare, no header \(em, with
 the same in any position; \fBhelp <setting>\fR explains one; \fBshutdown\fR
 asks \fBProceed with shutdown? [confirm]\fR first.
 .PP
+Every reply prints through the console's pager: a text taller than the
+screen pauses at a page \(em space prints the next page, return one more
+line, \fBq\fR stops the rest (the command already ran; only the
+rendering stops). \fB--page-size\fR/\fBCLI_PAGE_SIZE\fR set the page
+size (\fB0\fR = off, empty = the terminal height); a session-local
+\fBpage\fR command retunes it live (never sent to the daemon); a
+terminal smaller than 20 rows or 64 columns refuses to start.
+.PP
 While idle the session sends wire pings; when the connection
 dies, the console retries (\fB--reconnect\fR attempts,
 \fB--reconnect-wait\fR seconds apart) and resumes on the
@@ -62,12 +70,20 @@ rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
 disable the audit trail
+.TP
+.BI \-\-page\-size " N"
+console pager: N lines per page (0 = off, empty = the terminal height;
+env CLI_PAGE_SIZE)
 
 
 .SH ENVIRONMENT
 .TP
 .B CLI_KEEPALIVE
 idle ping interval, seconds; \fB0\fR = off.
+.TP
+.B CLI_PAGE_SIZE
+the console pager's page size, lines; \fB0\fR = off, empty = the
+terminal height.
 .TP
 .B CTL ", " CONTROL_TOKEN
 the control target and TCP token when the flags are unset.

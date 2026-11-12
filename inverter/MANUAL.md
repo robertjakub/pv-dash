@@ -227,9 +227,9 @@ the state dump: the live overrides' file, the restore-on-start
 | report | kind | description |
 |---|---|---|
 | `show connections` | show-only | connected clients: peer, age, requests served |
-| `show metrics-acl-table` | show-only | the metrics ACL as its rule chain, one entry per line (the metrics/acl report) |
+| `show metrics-acl-table` | show-only | the metrics ACL as its rule chain, one entry per line: allow 0.0.0.0/0 (any), deny 0.0.0.0/0 (none), the whitelist spelled out — or the ip-prefix acl file's own rules with their descs |
 | `show registers` | show-only | the loaded profile's register map with the current values |
-| `show version` | show-only | the fake-inverter version |
+| `show version` | show-only | the suite version |
 | `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
 | `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
 

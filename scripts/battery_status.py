@@ -3,7 +3,8 @@
 owning pids, plus (after a blank line, its own block) the last non-live
 run — finished or canceled. A running slot also carries the current
 suite's live check counts (the suite: row reads the suite's log as the
-suite writes it). The read-only sibling of the battery runner —
+suite writes it, against the last green run's check total off the eta
+history). The read-only sibling of the battery runner —
 nothing here mutates the battery state (the stale links stay for the next
 battery start's housekeeping sweep). Stdlib only, like the rest of the
 family.
@@ -14,6 +15,7 @@ the period in seconds (default 1)."""
 
 import argparse
 import datetime
+import json
 import os
 import pathlib
 import re
@@ -93,6 +95,20 @@ def suite_counts(log):
     return pas, fail
 
 
+def checks_of(rid, suite):
+    """The suite's last green check total off the eta history — the run
+    id's tail names the profile (the runner's PROFILE verbatim); None
+    without a row (a suite never green at this profile shows bare)."""
+    try:
+        prof = rid.split('-', 2)[2]
+        row = json.loads((ROOT / 'eta.json').read_text()).get(prof, {}).get(suite)
+        if isinstance(row, dict):
+            return row.get('checks')
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
 def run_stamp(rid):
     """The run id's <YYYYMMDD>-<HHMMSS> head as an epoch — the elapsed
     wall time reads off it."""
@@ -170,7 +186,11 @@ def render():
                     cur = ''
             if cur:
                 sp, sf = suite_counts(d / (cur + '.log'))
-                print('  %-9s %s — %d pass, %d fail so far' % ('suite:', cur, sp, sf))
+                txt = '%s — %d pass, %d fail so far' % (cur, sp, sf)
+                tot = checks_of(rid, cur)
+                if tot:
+                    txt += ' (%d checks last green run)' % tot
+                print('  %-9s %s' % ('suite:', txt))
             # the queued suite: the WAIT row (the runner wrote it on the first
             # busy poll) is the status's last word exactly while the runner
             # sits in the quiet window — the START row (or a cancellation

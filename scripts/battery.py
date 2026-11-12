@@ -35,7 +35,8 @@ NOTE'd by the next start's housekeeping. Four port slots: four
 concurrent batteries max. The run dirs keep the newest 8 — the four a
 live battery can hold plus the newest history (the newest finished run
 is simply the newest dir) — and the eta history is one JSON home,
-eta.json: profile -> suite -> the slowest observed seconds.
+eta.json: profile -> suite -> the slowest observed seconds and the
+last green run's check total.
 
 One suite at a time within a run; a suite's verdict = its own ALL PASS
 with no FAIL lines, and the SUITE row carries the suite's own check
@@ -289,8 +290,9 @@ TOTAL = len(SUITES)
 BT0 = time.time()
 
 # the eta: the prior history of the same profile predicts the whole
-# batch — one JSON home (eta.json: profile -> suite -> the slowest
-# observed seconds). A suite without history goes partial instead of
+# batch — one JSON home (eta.json: profile -> suite -> {'secs': n,
+# 'checks': n} — the slowest observed seconds plus the last green run's
+# check total). A suite without history goes partial instead of
 # zeroing the whole batch, and every finished suite's actual lands in
 # the file right away — an interrupted run keeps its finished suites.
 ETAFILE = LOGROOT / 'eta.json'
@@ -301,7 +303,14 @@ def _load_etas():
         try:
             data = json.loads(ETAFILE.read_text())
             if isinstance(data, dict):
-                return data
+                # the checks total joined the row: the bare-int secs shape
+                # migrates to {'secs': n} once, right here
+                norm = {p: {s: (v if isinstance(v, dict) else {'secs': v})
+                            for s, v in rows.items()}
+                        for p, rows in data.items()}
+                if norm != data:
+                    ETAFILE.write_text(json.dumps(norm, indent=1, sort_keys=True) + '\n')
+                return norm
         except ValueError:
             pass
     return {}
@@ -312,7 +321,10 @@ ETAS = _load_etas()
 
 def eta_of(suite):
     """the suite's own historical wall time (seconds) — None without a row"""
-    return ETAS.get(PROFILE, {}).get(suite)
+    row = ETAS.get(PROFILE, {}).get(suite)
+    if isinstance(row, dict):
+        return row.get('secs')
+    return row
 
 
 remain = {s: eta_of(s) for s in SUITES}
@@ -456,13 +468,17 @@ for i, s in enumerate(SUITES, 1):
     pas, tot = suite_counts(RUNDIR / (s + '.log'))
     if rc == 0:
         # the history row lands per-suite on a PASS only — a failed leg's
-        # duration is noise (a hang or a crash predicts nothing); the row
-        # updates in place, but only when the new actual EXCEEDS the old:
+        # duration is noise (a hang or a crash predicts nothing); the secs
+        # update in place, but only when the new actual EXCEEDS the old:
         # the eta predicts, a warm-cache fast run must not shrink it and
         # under-estimate the batch — a slow run raising it is the safe
-        # direction
-        prev = ETAS.get(PROFILE, {}).get(s)
-        ETAS.setdefault(PROFILE, {})[s] = ds if prev is None or ds > prev else prev
+        # direction. The checks total runs the other rule: the LAST green
+        # count wins outright (the suite's own present size — a shrink
+        # must show, a partial run must not poison it)
+        row = ETAS.setdefault(PROFILE, {}).setdefault(s, {})
+        prev = row.get('secs')
+        row['secs'] = ds if prev is None or ds > prev else prev
+        row['checks'] = tot
         ETAFILE.write_text(json.dumps(ETAS, indent=1, sort_keys=True) + '\n')
         say('%s SUITE %d/%d %s: PASS (%s) (%d/%d)' % (time.strftime('%H:%M:%S'), n, total, s, dur, pas, tot))
     else:

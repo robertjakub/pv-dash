@@ -37,6 +37,25 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **everywhere** — **`show knobs` renders one flattened table**: the
+  group sections (`# --- group ---`) retire — the rows sort by knob name
+  under a `knob / flag / env / change` header, and the columns pad to the
+  data's own widths (the uplink report's rule; the fixed 23/26/30 gutters
+  misaligned on the long flag/env twins). The `help knobs` twin and every
+  dictionary pin follow; the substring pins survive untouched.
+
+- **cache** — **the per-client REQUESTS tally knob renames**:
+  `requests-audit` -> `audit-requests` (the flag `--requests-audit` ->
+  `--audit-requests`, the env `REQUESTS_AUDIT` -> `AUDIT_REQUESTS`; the
+  live path stays `audit/requests` — `set audit requests` unchanged —
+  and the internal `requests_audit_s` config key stays) — the name now
+  reads beside the audit family it joins (`audit-log`, `audit-forward`,
+  `audit-requests`). The README's flag row + audit-trail prose, the man
+  page and the generated surfaces follow; a stored dump keyed
+  `requests-audit` restores SKIPPED (the reply names the new knob) and
+  a config file's `set requests-audit` line answers unknown setting —
+  re-set once under the new name.
+
 - **cache, scraper** — **the register map consoles as words**: the
   `uplink-sources` show row's live path re-keys to `uplink/sources` —
   `show uplink sources` spells the register map from the ctl/cli (the

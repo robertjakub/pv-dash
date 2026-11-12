@@ -63,7 +63,7 @@ class Option:
     def __init__(self, name, flag, env, help='', conv=str, default=None, live=None,
                  secret=False, choices=None, negates=None, group=None, alias=None, restart=False,
                  setting_help=None, values=None, hint=None, value_help=None,
-                 min=None, max=None, check=None, node=False, hidden=False, no_env=None):
+                 min=None, max=None, check=None, node=False, hidden=False, no_env=None, gate=False):
         self.name = name
         self.flag = flag
         self.env = env
@@ -90,6 +90,7 @@ class Option:
         self.node = bool(node)    # a hierarchy node: no flag/env/conv/live — the row
                                   # names a live-path prefix and carries its setting-help
         self.hidden = bool(hidden)   # never lists in the ?/TAB pools (the wire still answers)
+        self.gate = bool(gate)    # an access-control knob: its namespace lists marked (the / rule)
         self.static_default = None   # the registry row's `default` — the resolver's
                                      # static rung (the ladder's last layer); the argparse
                                      # `default` above stays unset so the flag reads unset
@@ -359,8 +360,8 @@ def _listing(name, options, node=None, hidden_words=()):
         if o.node:
             if o.name != name and o.name.startswith(prefix):
                 word = o.name[len(prefix):].split('/')[0]
-                if any(x.hidden and x.live and x.live.startswith(o.name + '/') for x in options):
-                    word += '/'   # the node's subtree hides knobs — the listing says so
+                if any((x.hidden or x.gate) and x.live and x.live.startswith(o.name + '/') for x in options):
+                    word += '/'   # the subtree hides knobs or bears a gate — the listing says so
                 _slot(words, word, o, False)
         elif o.name not in hidden_words and home(o) == name:
             for spelling in (o.live, o.alias):   # the console's own words — the walk's next segment
@@ -768,7 +769,7 @@ def option_rows(rows, choices=None):
                      hint=row.get('hint'), value_help=row.get('value-help'),
                      min=row.get('min'), max=row.get('max'), check=row.get('check'), hidden=as_bool(row.get('hidden')),
                      restart=as_bool(row.get('restart')), no_env=row.get('no-env'),
-                     node=as_bool(row.get('node')))
+                     node=as_bool(row.get('node')), gate=as_bool(row.get('gate')))
         if 'default' in row:
             opt.static_default = row['default']
         elif opt.conv is bool and not opt.negates:
@@ -798,7 +799,7 @@ class Setting:
     place a knob's vocabulary lives."""
 
     def __init__(self, name, help, values=(), hint=None, value_help=None, group=None, alias=None,
-                 restart=False, secret=False, live=None, show_report=False):
+                 restart=False, secret=False, live=None, show_report=False, gate=False):
         self.name = name
         self.help = help
         self.values = values              # completable words
@@ -810,6 +811,7 @@ class Setting:
         self.restart = restart            # startup-only: set/clear answers the restart note
         self.secret = secret              # a token: the dump/show-config placeholder rule, the paste-back gate
         self.show_report = show_report    # a show-section row: never a set/clear target
+        self.gate = gate                  # an access-control knob: its namespace lists marked (the / rule)
 
     @property
     def display_group(self):
@@ -844,10 +846,12 @@ def settings_of(options):
                 continue
             seen.add(o.live)
             out.append(Setting(o.name, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live))
+                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live,
+                               gate=o.gate))
         elif o.restart:
             out.append(Setting(o.name, o.setting_help or o.help, o.values, o.hint, o.value_help,
-                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live))
+                               o.group, o.alias, restart=o.restart, secret=o.secret, live=o.live,
+                               gate=o.gate))
     return tuple(out)
 
 

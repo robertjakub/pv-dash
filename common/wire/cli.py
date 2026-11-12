@@ -116,6 +116,14 @@ def pools(commands, internal, hidden, spellings, nodes, commands_help,
         prefix for h in _hidden_settings_paths
         for prefix in ('/'.join(h.split('/')[:i]) for i in range(1, len(h.split('/'))))
         if prefix not in _hidden_settings_paths)
+    seen, gate_paths = set(), set()
+    for row in spellings.values():
+        if getattr(row, 'gate', False) and id(row) not in seen:
+            seen.add(id(row))
+            live = row.live or row.alias
+            if live and '/' in live:
+                gate_paths.add('/'.join(live.split('/')[:-1]))
+    _marked_settings = frozenset(_marked_settings | gate_paths)
 
     def command_pool():
         """The first words the daemon offers right now: the dump-gated

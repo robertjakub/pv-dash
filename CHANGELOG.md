@@ -23,7 +23,10 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   walk-ins (`help request`, `show dump`) list the hidden rows marked
   (`reload/`, `dump-key/`) — completable and typed bare, so a namespace
   whose every member hides stays discoverable (the fake's `request`
-  was the vanishing case).
+  was the vanishing case). The gate criterion joins as the second
+  mark source: a node whose subtree bears an access-control knob
+  lists marked too — the cache's `acl/` (its connect/write children
+  are visible; the mark says "this namespace speaks the gates").
 
 - **The show/commands canon wave (docs/show-commands-align.md)** — the
   `show` section's last two drifts fold: `metrics-acl-table` speaks the

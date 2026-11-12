@@ -108,7 +108,8 @@
         "none"
       ],
       "hint": "any|none|IP,...|file:<path>",
-      "default": "any"
+      "default": "any",
+      "gate": true
     },
     "control": {
       "setting-help": "the control plane: the target, the tokens, the ops role's RBAC policy, the trusted peers"
@@ -313,7 +314,8 @@
         "none": "no client may connect: every connection is rejected"
       },
       "default": "any",
-      "help": "clients allowed to connect to the /metrics endpoint: \"any\", \"none\" (refuse everyone), comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or \"file:<path>\" — the standalone ip-prefix acl file (the gate object {\"type\": \"ip-prefix\", \"rules\": [{\"type\": \"allow\"|\"deny\", \"prefix\": ...}]}: the last matching rule decides, a client no rule decides refuses; \"any\" = 0.0.0.0/0, the whole space); checked at accept — a client off the ACL is closed without a reply"
+      "help": "clients allowed to connect to the /metrics endpoint: \"any\", \"none\" (refuse everyone), comma-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or \"file:<path>\" — the standalone ip-prefix acl file (the gate object {\"type\": \"ip-prefix\", \"rules\": [{\"type\": \"allow\"|\"deny\", \"prefix\": ...}]}: the last matching rule decides, a client no rule decides refuses; \"any\" = 0.0.0.0/0, the whole space); checked at accept — a client off the ACL is closed without a reply",
+      "gate": true
     },
     "metrics-client-timeout": {
       "flag": "--metrics-client-timeout",

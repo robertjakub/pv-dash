@@ -787,10 +787,8 @@ try:
           r == 'ok restore a setting to its configured value: clear <setting>', r)
     r = ctl_cmd('help request', 15514 + BASE)
     check('help <command node>: the namespace lists its children (the ? shape)',
-          r == 'ok     flush         drop the cached registers and repoll now\n'
-               '    poll          the poll loop\'s manual wake\n'
-               '    reload        save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)\n'
-               '    reload-config re-read the config file (the SIGHUP path)', r)
+          r == 'ok     flush drop the cached registers and repoll now\n'
+               '    poll  the poll loop\'s manual wake', r)
     r = ctl_cmd('help request reload', 15514 + BASE)
     check('help <deep command path>: the row describes itself',
           r == 'ok save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values)', r)
@@ -1614,9 +1612,9 @@ try:
     r = ctl_cmd('show', 15530 + BASE)
     words = [line.strip().split()[0] for line in r[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
-    check("bare show: the root in the console's own words (the gated word hidden while the dump is off)",
-          words == ['acl', 'audit', 'cache', 'config', 'connections', 'control', 'dump',
-                    'knobs', 'limits', 'metrics', 'modbus', 'system',
+    check("bare show: the root in the console's own words (the hidden rows never list — the canon's config/knobs, the dump-gated interval)",
+          words == ['acl', 'audit', 'cache', 'connections', 'control', 'dump',
+                    'limits', 'metrics', 'modbus', 'system',
                     'uplink', 'version', 'write'],
           r[:220])
     r = ctl_cmd('set audit-max-mb 5', 15530 + BASE)

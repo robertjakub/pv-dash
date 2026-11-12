@@ -429,6 +429,19 @@
       "min": 0,
       "max": 60
     },
+    "modbus-merge-gap": {
+      "flag": "--modbus-merge-gap",
+      "env": "MODBUS_MERGE_GAP",
+      "conv": "int",
+      "hint": "registers",
+      "value-help": {
+        "0": "read each range separately"
+      },
+      "default": 8,
+      "help": "max register gap when merging ranges into block reads, 0 = read ranges separately",
+      "min": 0,
+      "max": 100
+    },
     "modbus-read-delay": {
       "flag": "--modbus-read-delay",
       "env": "MODBUS_READ_DELAY",

@@ -78,7 +78,7 @@ text (verbatim — this is the review surface).
 | control-log-replies | env | the dashboard's env twin; the daemons read none | ok |
 | listen | default | the per-tool ports | ok |
 | modbus-auth-key | help, setting-help | the key's audience: the cache's clients vs the handshake | ok |
-| modbus-merge-gap | max | the register spaces differ (100 vs 125) | ok |
+| modbus-merge-gap | max | RULED at review: max 100 family-wide — the block landed, the exempt keeps only the poll side's own setting-help | ok |
 | connect-acl | values, value-help, live | the cache forwards (acl/connect), the fake's wording is the fake's | ok |
 | allow-write | value-help, prose | the cache forwards, the fake accepts | ok |
 | the cache's dump/control family | setting-help, help | the dump words name the cache — the cache's own prose (deviations list) | ok |

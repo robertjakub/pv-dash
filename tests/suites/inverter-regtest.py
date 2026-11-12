@@ -175,7 +175,7 @@ def main():
         # ---- the wire's help branch speaks the commands (the rider)
         tx = ctl(A_CTL, 'help clear')
         check('help <command>: the row describes itself',
-              tx == 'ok restore a setting to its configured value (clear pv, clear seed)', tx)
+              tx == 'ok restore a setting to its configured value: clear <setting>', tx)
         tx = ctl(A_CTL, 'help request')
         check('help <command node>: the namespace lists its visible children',
               tx == 'ok     reload        save the live overrides and restart the whole daemon (the flags and the env are re-resolved)\n'

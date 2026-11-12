@@ -90,7 +90,7 @@ EXEMPT = {
     ('options', 'metrics/limits'): ('setting-help',),  # the caps prose differs per side
     ('options', 'modbus'): ('setting-help',),  # the session side differs (client upstream vs served fake)
     ('options', 'modbus-auth-key'): ('help', 'setting-help',),  # the key's audience differs (the cache's clients vs the handshake)
-    ('options', 'modbus-merge-gap'): ('max', 'setting-help',),  # the register spaces differ (the max 100 vs 125 too)
+    ('options', 'modbus-merge-gap'): ('setting-help',),  # the poll side's own ranges prose
     ('options', 'system'): ('setting-help',),  # the socket's per-tool purpose
     ('options', 'upstream'): ('env', 'help', 'hint', 'setting-help',),  # the Modbus upstream vs the Prometheus URL
     ('options', 'write'): ('setting-help',),  # the write gates differ per side

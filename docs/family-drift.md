@@ -232,7 +232,7 @@ texts the rows ref; the drift and must-ref gates live in
 
 | section | blocks | cache refs | scraper refs | inverter refs | dashboard refs |
 |---|---|---|---|---|---|
-| options | 46 | 46 | 40 | 41 | 39 |
+| options | 47 | 47 | 41 | 41 | 39 |
 | show | 6 | 6 | 6 | 4 | 4 |
 | commands | 12 | 12 | 12 | 10 | 10 |
 

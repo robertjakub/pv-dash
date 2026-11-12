@@ -58,8 +58,7 @@ listen address HOST:PORT
 Modbus unit id served
 .TP
 .BI \-\-modbus\-profile " modbus-profile"
-inverter profile JSON: name \-> register (+ optional type/scale), e.g.
-profiles/profiles/sun2000.json; MODBUS_PROFILE when unset
+device profile JSON (the shared profiles/ schema)
 .TP
 .BI \-\-max\-kwp " max-kwp"
 PV array size in kWp, peak = 75%% of it
@@ -112,10 +111,10 @@ the frequency machine's clamp in Hz around the nominal (0.2 = ±0.2 Hz; 0
 chaos RNG seed
 .TP
 .BI \-\-modbus\-auth " modbus-auth"
-the auth scheme the fake's Modbus clients must speak: `suite` demands
-the crypt handshake (magic + nonce + HMAC proof of the shared key) right
-after every connect and drops the client on ERR/anything else;
-none/empty = no auth at all — the trusted\-LAN posture
+the Modbus auth scheme: `suite` demands the crypt handshake (magic +
+nonce + HMAC proof of the shared key) right after every connect — the
+peer answers OK, or ERR and the session drops; none/empty = no auth at
+all
 .TP
 .BI \-\-modbus\-auth\-key " modbus-auth-key"
 the shared key the fake's clients prove with the suite handshake (min 16
@@ -136,20 +135,19 @@ audited WRITE\-REFUSED — the cache's \-\-allow\-write gate, mirrored
 (env ALLOW_WRITE)
 .TP
 .BI \-\-max\-clients " max-clients"
-refuse further Modbus connections past this many simultaneous clients, 0
-= no limit
+refuse further connections past this many simultaneous clients, 0 = no
+limit
 .TP
 .BI \-\-client\-timeout " client-timeout"
-disconnect Modbus clients silent for this many seconds, 0 = never —
-sheds connections from clients that died without closing
+disconnect clients silent for this many seconds, 0 = never
 .TP
 .BI \-\-max\-conn\-per\-ip " max-conn-per-ip"
-refuse further Modbus connections from one peer IP past this many
-simultaneous connections, 0 = no per\-IP limit
+refuse further connections from one peer IP past this many simultaneous
+connections, 0 = no per\-IP limit
 .TP
 .BI \-\-control\-port " control-port"
-control server target: unix socket path or TCP port number on 127.0.0.1
-(e.g. 15599); 0 = off. Talk to it with modbus\-fake\-ctl.py
+JSON\-lines control server target: unix socket path or TCP port number
+on 127.0.0.1; 0 = off
 .TP
 .BI \-\-control\-token " control-token"
 require a token on control connections: the client authenticates with
@@ -164,8 +162,7 @@ a second, read\-only control token: sessions authenticating with it may
 run its policy's verbs only (the default policy: show) (no set/clear, no
 reset, no shutdown) — the ops shift against the admin key, both audited;
 the value may be `file:<path>` — the first line of an owner\-only 0600
-file (a systemd LoadCredential rides as file:/run/credentials/...) (env
-CONTROL_OPS_TOKEN)
+file (a systemd LoadCredential rides as file:/run/credentials/...)
 .TP
 .BI \-\-control\-ops\-verbs " control-ops-verbs"
 the read\-only ops role's RBAC policy: the verbs its sessions may run,
@@ -174,7 +171,7 @@ comma\-separated
 .BI \-\-control\-trust\-uids " control-trust-uids"
 extra peer uids the unix control socket trusts without the token
 (SO_PEERCRED — a local systemd unit speaks without the secret); root and
-the daemon's own user are always trusted (env CONTROL_TRUST_UIDS)
+the daemon's own user are always trusted
 .TP
 .B \-\-control\-socket\-group
 leave the unix control socket group\-accessible (chmod 0660 instead of
@@ -191,7 +188,7 @@ log timestamps in the system time zone instead of UTC
 DEBUG\-log the full output of every control command
 .TP
 .B \-\-metrics\-server
-serve the fake's own Prometheus /metrics endpoint (the live `set metrics
+serve the tool's own Prometheus /metrics endpoint (the live `set metrics
 enable` toggle exists too)
 .TP
 .BI \-\-metrics\-listen " metrics-listen"
@@ -227,13 +224,12 @@ maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
 limit
 .TP
 .BI \-\-audit\-log " audit-log"
-INV audit trail: a file path or \- for stdout (the docker/journald way);
+the audit trail: a file path or \- for stdout (the docker/journald way);
 `none` turns the local file off (with a forward spelled that is the
-remote\-only mode); ~/.local/state/fake\-inverter/audit.log — the XDG
-state home when unset
+remote\-only mode); the XDG state home when unset
 .TP
 .BI \-\-audit\-forward " audit-forward"
-also forward the INV audit trail: syslog (the local socket auto\-scan),
+also forward the audit trail: syslog (the local socket auto\-scan),
 syslog:/path (an explicit socket), udp://host[:514] (RFC5426,
 best\-effort) or tcp://host[:514] (RFC6587 framing) — the off\-box copy
 carries the per\-writer hash chain, so a scheduled search at the
@@ -260,18 +256,18 @@ also rotate the audit log at UTC midnight
 rotated audit backups to keep
 .TP
 .B \-\-no\-audit\-log
-disable the INV audit trail
+disable the audit trail
 .TP
 .BI \-\-log\-level " log-level"
 the log verbosity: DEBUG adds client traffic and per\-poll detail
 .TP
 .BI \-\-dump\-path " dump-path"
-the state dump: the live setting overrides (the pins, the machines, the
-tokens apart) as one JSON, written 0600 with an integrity hash (a
-restore refuses a tampered, unsigned or group\-writable dump); dumped on
-the request dump command, the graceful shutdown and every
-\-\-dump\-interval seconds; loaded on start only with
-\-\-restore\-on\-start, on demand with the request restore command
+the state dump: the live setting overrides (the tokens apart) as one
+JSON, written 0600 with an integrity hash (a restore refuses a tampered,
+unsigned or group\-writable dump); dumped on the request dump command,
+the graceful shutdown and every \-\-dump\-interval seconds; loaded on
+start only with \-\-restore\-on\-start, on demand with the request
+restore command
 .TP
 .BI \-\-dump\-key " dump-key"
 the key that seals the state dumps and the reload's state file: the
@@ -289,9 +285,9 @@ seconds between the automatic state dumps, 0 = on request (the request
 dump command and the shutdown)
 .TP
 .B \-\-restore\-on\-start
-load the state dump when the fake starts (needs \-\-dump\-path) — the
-live overrides ride again instead of a cold start; without it the dump
-loads on demand
+load the state dump when the daemon starts (needs \-\-dump\-path) — a
+restart serves last\-known values instead of cold misses; without it the
+dump loads on demand
 .TP
 .B \-\-config
 config file — the set grammar: every line a `set <name> <value>`,

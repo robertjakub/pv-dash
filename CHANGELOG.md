@@ -91,6 +91,17 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   their landed order, a block's fields in the row rank) beside the four
   registries.
 
+- **the canon sweep's next six names ride the blocks** —
+  `modbus-unit`/`modbus-read-delay` (the options rows),
+  `uplink`/`uplink-sources` (the show rows) and
+  `request-poll-now`/`request/poll` (the command rows) fold from
+  `shared/options-help.json` (the first two-tool partial blocks), and
+  `shutdown` joins them family-wide: the four helps align to
+  "stop the server (asks to confirm)" and the lint's `shutdown`
+  exemption retires. The MANUALs, the man pages and `family_drift`'s
+  canon table regenerate (options 43 blocks, show 4, commands 10; the
+  exempt count 58 → 57).
+
 - **the docker names speak the daemon** — the fake inverter's image,
   compose service and env file rename to the daemon's own:
   `Dockerfile.modbus-fake-inverter`, service/image `modbus-fake-inverter`

@@ -565,15 +565,34 @@ def load_canon():
     return _CANON
 
 
+_BLOCK_KEYS = frozenset(('name', 'only', 'shared'))
+"""The three keys a canon block never carries: `name` (the flat name IS the
+block's key), `only` (the tool-exclusive mark — a block is family-wide by
+definition) and `shared` (the ref itself). Every other row field rides."""
+
+
+def _block_gate(block, key, label):
+    """The block's key gate at the fold: the three placement keys never
+    ride a block — a typo must never load as silence."""
+    bad = sorted(_BLOCK_KEYS & set(block))
+    if bad:
+        raise ValueError('%s: the canon block %r carries %s — never a block '
+                         'field (%s)' % (label, key, ', '.join(map(repr, bad)),
+                                         'the name is the block\'s key, '
+                                         'only/shared are the row\'s placement marks'))
+
+
 def canon_fold(row, canon, section='options', label='registry'):
     """The row's canon block folded under it: the block carries the
-    family-wide fields, the row's inline field wins (the per-tool override —
-    the escape hatch the whole-row ref keeps). The options blocks never
-    carry `name` — the flat name IS the block's key, not a field. The
-    show/commands canon is the flat word -> text map: the description field
-    (setting-help for the show rows, help for the command rows) falls to it
-    only when the row carries none — an `exit` row refs `quit`'s block by
-    name. An unknown `shared` key raises ValueError naming the row."""
+    family-wide fields — every row key but `name`/`only`/`shared` — and the
+    row's inline field wins (the per-tool override, the escape hatch the
+    whole-row ref keeps). The show/commands canon is the flat word -> text
+    map (the description field — setting-help for the show rows, help for
+    the command rows — falls to it only when the row carries none, an
+    `exit` row refs `quit`'s block by name) or, the same fold one shape up,
+    a dict block carrying the row's fields (`internal`, `hidden`, ...). An
+    unknown `shared` key or a block wearing one of the three placement keys
+    raises ValueError naming the row."""
     key = row.get('shared')
     if key is None:
         return row
@@ -581,16 +600,25 @@ def canon_fold(row, canon, section='options', label='registry'):
     if key not in blocks:
         raise ValueError('%s: the row %r refs the canon key %r — no such block in '
                          'shared/options-help.json' % (label, row.get('name'), key))
-    if section != 'options':
-        eff = dict(row)
-        field = 'setting-help' if section == 'show' else 'help'
+    field = 'setting-help' if section == 'show' else 'help'
+    block = blocks[key]
+    if section == 'options':
+        if not isinstance(block, dict):
+            raise ValueError('%s: the canon block %r is not an object — the options '
+                             'blocks carry the row fields' % (label, key))
+        _block_gate(block, key, label)
+        return {**block, **row}
+    if isinstance(block, dict):
+        _block_gate(block, key, label)
+        eff = {**block, **row}
         if field not in eff:
-            eff[field] = blocks[key]
+            raise ValueError('%s: the row %r refs the canon block %r — neither the '
+                             'row nor the block speaks %s' % (label, row['name'], key, field))
         return eff
-    if 'name' in blocks[key]:
-        raise ValueError('%s: the canon block %r carries "name" — the flat name is the '
-                         'block\'s key, never a field' % (label, key))
-    return {**blocks[key], **row}
+    eff = dict(row)
+    if field not in eff:
+        eff[field] = block
+    return eff
 
 
 def load_registry(here, choices=None):

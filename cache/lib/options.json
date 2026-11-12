@@ -201,9 +201,9 @@
     { "name": "request-restart", "live": "request/restart",
       "help": "restart the upstream session: connection + cache dropped, repoll", "hidden": true },
     { "name": "request-restore", "shared": "request-restore", "live": "request/restore" },
-    { "name": "set", "help": "configure a setting live: set <setting> <value>" },
+    { "name": "set", "shared": "set" },
     { "name": "show", "shared": "show", "help": "print a setting's live value, or a report" },
     { "name": "shutdown", "shared": "shutdown" },
-    { "name": "clear", "help": "restore a setting to its configured value: clear <setting>" }
+    { "name": "clear", "shared": "clear" }
   ]
 }

@@ -54,7 +54,6 @@ GATED = ('setting-help', 'help', 'value-help', 'hint', 'values',
 SECTION_FIELD = {'show': 'setting-help', 'commands': 'help'}
 
 EXEMPT = {
-    ('commands', 'clear'): ('help',),  # the tool's own clear examples
     ('commands', 'inspect'): ('help',),  # the tool's own dump contents
     ('commands', 'request'): ('help',),  # the tool's own verb list
     ('commands', 'request-dump'): ('help',),  # the daemon vs the fake noun
@@ -62,7 +61,6 @@ EXEMPT = {
     ('commands', 'request-reload-config'): ('help',),  # the fake's values re-apply note
     ('commands', 'request-restart'): ('help',),  # the upstream restart vs the session drop
     ('commands', 'request-restore'): ('help',),  # the daemon vs the fake noun
-    ('commands', 'set'): ('help',),  # the tool's own set examples
     ('commands', 'show'): ('help',),  # the cache's report list
     ('options', 'allow-write'): ('help', 'setting-help', 'value-help',),  # the cache forwards, the fake accepts
     ('options', 'auth-token'): ('help', 'setting-help',),  # the endpoints differ

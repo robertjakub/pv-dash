@@ -499,6 +499,7 @@
     "version": "the suite version"
   },
   "commands": {
+    "clear": "restore a setting to its configured value: clear <setting>",
     "help": {
       "help": "describe a word (help <setting>) or map every knob (help config)",
       "internal": true
@@ -508,6 +509,7 @@
       "internal": true
     },
     "quit": "close the session",
+    "set": "configure a setting live: set <setting> <value>",
     "request-dump": {
       "help": "write the state dump: the live setting overrides, sealed (when the daemon has a dump path)",
       "hidden": true

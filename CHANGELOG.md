@@ -17,10 +17,13 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   long rule-chain spell family-wide (the "(the metrics/acl report)"
   pointer drops) and `version` answers "the suite version" (the per-tool
   nouns were the suite's own words apart — common/runtime/version.py
-  numbers one suite). Two new show blocks (62 canon blocks, 44
-  family-wide, 0 dead), the two show exemptions retired; the commands
-  section's remaining drift is the tools' own truth (the fake nouns, the
-  reload parentheticals, the clear/inspect/set examples) and stays.
+  numbers one suite). The `set` and `clear` commands speak the cache's
+  grammar forms family-wide (`set <setting> <value>` / `clear <setting>`
+  — the per-tool example tails drop; the ?-walk and TAB walk the real
+  knobs). Four new commands/show blocks (64 canon blocks, 46
+  family-wide, 0 dead), four exemptions retired; the commands section's
+  remaining drift is the tools' own truth (the fake nouns, the reload
+  parentheticals, the inspect dumps) and stays.
 
 - **The key-alignment wave (docs/options-align.md)** — the four option
   registries align on the canon blocks: the audit helps de-tagged (the

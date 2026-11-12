@@ -23,7 +23,8 @@ the key-alignment wave landed (60 canon blocks, 42 family-wide, 0 dead).
 | request-dump, request-restore, request-reload-config | KEEP | the inverter's help says "the fake" where the blocks say "the daemon" | the fake nouns are the fake's truth (options-align §3 carry-over); the exempts stay | ok |
 | request-restart | QUESTION | the cache hides the row (`hidden: true`), the scraper shows it ("drop the Modbus session (reconnects on the next poll)"); no canon block | propose KEEP — the scraper's visibility may be deliberate (its restart is the mild session drop); flip to ALIGN (hide family-wide) if not | ok |
 | request-reload | KEEP | the per-tool parentheticals say what re-resolves (the restart-marked knobs / the config file and flags / the flags and env) | the reloaders genuinely differ; no block | ok |
-| request (node), clear, inspect, set | KEEP | the tool's own machinery words and examples | the exempts stay | ok |
+| request (node), inspect | KEEP | the tool's own machinery words and dump contents | the exempts stay | ok |
+| clear, set | ALIGN — flown | the three tools carried per-tool examples where the cache's row teaches the grammar | the cache's grammar forms are the family texts (`set <setting> <value>` / `clear <setting>`) — two new commands blocks, the example tails drop (the ?-walk and TAB walk the real knobs), both exemptions retired | ok |
 
 ## the options residual (for completeness)
 

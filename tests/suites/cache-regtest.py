@@ -1607,8 +1607,8 @@ try:
     check('audit node: the walk answers the intermediate node in the same shape',
           r == 'ok ' + '\n'.join([
               '    daily    also rotate the audit trail at UTC midnight',
-              '    files    the rotated audit backups kept',
-              '    max-size rotate the audit trail at this size in MB, 0 = no size rotation']), r)
+              '    files    rotated audit backups to keep',
+              '    max-size rotate the audit trail at this size in MB, keeping N backups; 0 = no size rotation']), r)
     r = ctl_cmd('help audit', 15530 + BASE)
     check('audit node: help answers the same listing', r == 'ok ' + listing, r)
     r = ctl_cmd('show modbus', 15530 + BASE)

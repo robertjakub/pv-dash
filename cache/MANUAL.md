@@ -66,9 +66,11 @@ The kinds — every row of the tables below carries one:
 | `inspect` | command | one pretty dump of everything (the status, the map, the counters, the write gate) |
 | `ping` | command (internal) | keep-alive: answers pong |
 | `quit` | command | close the session |
-| `request` | namespace | the state machinery: the dump written and restored, the cache dropped, the daemon reloaded |
+| `request` | namespace | the state machinery: the dump written and restored, the cache dropped, the poll woken, the daemon reloaded |
 | `request flush` | namespace | drop the cached registers and repoll now |
 | `request flush cache` | command | drop the cached registers, repoll now (request flush cache) |
+| `request poll` | namespace | the poll loop's manual wake |
+| `request poll now` | command | wake the poll loop immediately |
 | `request dump` | namespace (hidden) | the state dump: the live overrides written sealed (with-cache carries the cached register words too) |
 | `request dump with-cache` | command (hidden) | the dump carries the cached register words too |
 | `request reload` | command | save the live overrides and restart the whole daemon (the restart-marked knobs take their configured values) |
@@ -155,7 +157,7 @@ configured verbs (the default: show,flush)
 
 | knob | set / clear | kind | value | flag / env | description |
 |---|---|---|---|---|---|
-| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show,flush) (no set/clear, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
+| `control-ops-token` | — | startup-only (secret) | `TOKEN` | `--control-ops-token` / `CONTROL_OPS_TOKEN` | a second, read-only control token: sessions authenticating with it may run its policy's verbs only (the default policy: show,flush) (no set/clear, no request poll now, no request dump/restore, no restart, no shutdown) — the ops shift against the admin key, both audited (`file:<path>` = the token from an owner-only file) *(hidden)* |
 | `control-ops-verbs` | `set control ops verbs` | settable | `VERB,...` | `--control-ops-verbs` / `CONTROL_OPS_VERBS` | the read-only ops role's RBAC policy: the verbs its sessions may run, comma-separated |
 
 ### metrics

@@ -33,43 +33,10 @@ from lib.man import cli_page
 from lib.options import COMMANDS, COMMAND_HELP, COMMAND_HIDDEN, COMMAND_INTERNAL, HIDDEN_SETTINGS, NODE_BY_NAME, POOL_NAMES, SETTING_SPELLINGS, SHOW_LIVES
 from lib.statics import AUDIT_FILES, AUDIT_MAX_MB, CLI_KEEPALIVE_S, CLI_MAX_LINE_BYTES_S, CLI_RECONNECT, CLI_RECONNECT_WAIT_S, CLI_TIMEOUT_S
 
-SESSION = {'dump': False}
-
-
-DUMP_GATED = ('request/dump', 'request/dump/with-cache', 'request/restore')
-
-
-def command_pool():
-    """The first words the daemon offers right now: the dump node's request
-    children ride the dump gate (they list only while the dump node is on);
-    the internal rows (the machinery's own words) and the other hidden
-    rows never list."""
-    return tuple(n for n in COMMANDS
-                 if n not in COMMAND_INTERNAL
-                 and (n not in COMMAND_HIDDEN or (SESSION['dump'] and n in DUMP_GATED)))
-
-
-def setting_pool():
-    """The words the daemon offers right now (the hidden rows never list;
-    the console spellings list — the cli translates them to the flat
-    registry names when it sends; a not-yet-live knob — a restart-marked
-    row awaiting its live name — never lists either)."""
-    return tuple(n for n in POOL_NAMES
-                 if n not in HIDDEN_SETTINGS
-                 and (n != 'dump-interval' or SESSION['dump']))
-
-
-describe_word = cli.make_describe_word(NODE_BY_NAME, COMMAND_HELP, SETTING_SPELLINGS)
-
-
-def welcome(sock):
-    """The first-connect greeting: probe the dump state (the dump-gated
-    command/setting rows pool by it) and print the navigation hint."""
-    reply = cli.exchange(sock, cli.wire('show dump-path'))
-    val = reply[3:].split('=', 1)[-1].strip() if reply and reply.startswith('ok ') else ''
-    SESSION['dump'] = val not in ('', 'off', 'none')
-    print(T('banner.welcome') % 'modbus-cache')
-    print(T('banner.hint'))
+describe_word, command_pool, setting_pool, welcome = cli.pools(
+    COMMANDS, COMMAND_INTERNAL, COMMAND_HIDDEN, SETTING_SPELLINGS, NODE_BY_NAME, COMMAND_HELP,
+    POOL_NAMES, 'modbus-cache', hidden_settings=HIDDEN_SETTINGS,
+    dump_gate=('request/dump/with-cache',))
 
 
 def _render_special(low, reply):

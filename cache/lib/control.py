@@ -108,18 +108,23 @@ class ControlServer(_ControlServer):
         into otherwise)."""
         cmds = ('commands: set <setting> <value>, clear <setting>, inspect, show <setting|connections|cache|'
                 'uplink|version|config|knobs|write-registers-table|acl-connect-table|acl-write-table>')
-        cmds += ', request flush cache, request reload, request reload-config, request restart, shutdown, quit'
+        cmds += ', request flush cache, request poll now, request reload, request reload-config, request restart, shutdown, quit'
         return self.command_help_tail(cmds, dump_words=', request dump [with-cache], request restore')
 
     def command_tool(self, low, cmd):
         """The cache's own verbs beside the family's request namespace:
-        the cache clear (the words drop, the poll wakes), the dump
-        with-cache spelling and the upstream session restart."""
+        the cache clear (the words drop, the poll wakes), the poll-now
+        nudge, the dump with-cache spelling and the upstream session
+        restart."""
         if low == 'request flush cache':
             dropped = self.proxy.cache.clear()
             self.proxy.poll_wake.set()
             logger.info('control: cache cleared (%d register word(s) dropped), repolling now', dropped)
             return 'ok cache cleared (%d register word(s) dropped), repolling now' % dropped
+        if low == 'request poll now':
+            self.proxy.poll_wake.set()
+            logger.info('control: request poll now (the loop wakes immediately)')
+            return 'ok request poll now (the loop wakes immediately, %s)' % self.summary()
         if low == 'request dump with-cache':
             return self.dump_state(True)
         if low == 'request restart':
@@ -136,11 +141,6 @@ class ControlServer(_ControlServer):
         """The one-line cache state (show cache): the ok frame wraps the
         bare line the proxy renders."""
         return 'ok ' + self.cache_line()
-
-    def show_root_hidden(self):
-        """The bare `show`'s pool hides dump-interval while no dump path
-        is configured (nothing would dump into it)."""
-        return () if self.dump_path else ('dump-interval',)
 
     def _apply(self, key, value):
         """Apply a live setting; returns the display string or raises

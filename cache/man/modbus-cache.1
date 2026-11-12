@@ -171,10 +171,10 @@ file:/run/credentials/...)
 .BI \-\-control\-ops\-token " control-ops-token"
 a second, read\-only control token: sessions authenticating with it may
 run its policy's verbs only (the default policy: show,flush) (no
-set/clear, no request dump/restore, no restart, no shutdown) — the ops
-shift against the admin key, both audited; the value may be
-`file:<path>` — the first line of an owner\-only 0600 file (a systemd
-LoadCredential rides as file:/run/credentials/...)
+set/clear, no request poll now, no request dump/restore, no restart, no
+shutdown) — the ops shift against the admin key, both audited; the value
+may be `file:<path>` — the first line of an owner\-only 0600 file (a
+systemd LoadCredential rides as file:/run/credentials/...)
 .TP
 .BI \-\-control\-ops\-verbs " control-ops-verbs"
 the read\-only ops role's RBAC policy: the verbs its sessions may run,

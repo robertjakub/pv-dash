@@ -408,6 +408,9 @@ try:
     check('control: show cache counters', 'hits 1' in r and 'range(s)' in r and 'map v0' in r, r)
     r = ctl_cmd('request flush cache', 15514 + BASE)
     check('control: clear cache', r.startswith('ok cache cleared (') and 'repolling now' in r, r)
+    r = ctl_cmd('request poll now', 15514 + BASE)
+    # the canon log line (both tools speak it): control: request poll now the loop wakes immediately
+    check('control: request poll now wakes the loop', r.startswith('ok request poll now ('), r)
     b = rd(32064, 2, port=15513 + BASE)
     check('control: cache refills after clear', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
     r = ctl_cmd('request restart', 15514 + BASE)

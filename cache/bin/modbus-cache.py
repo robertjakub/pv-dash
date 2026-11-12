@@ -339,7 +339,7 @@ def main():
         else:
             logger.info('no state dump at %s yet, starting cold', proxy.dump_path)
     # the dumper thread always runs (it parks while dump-interval is off):
-    # a live `set dump-interval` wakes it without a restart — and a live
+    # a live `set dump interval` wakes it without a restart — and a live
     # `set dump/path` (no path at start) finds the thread waiting too
     def watch_dump():
         while not proxy.stopping:

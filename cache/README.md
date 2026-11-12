@@ -205,6 +205,7 @@ authenticated with.
 | `show connect-acl-table` / `show write-acl-table` / `show metrics-acl-table` | the ACLs as their rule chains (show-only) |
 | `request dump` / `request restore` | write the write-behind state / load it back — see [Persistence](#persistence) |
 | `request flush cache` | drop all cached values (like SIGUSR1), repoll immediately |
+| `request poll now` | wake the poll loop: the wait between the cycles fires now |
 | `request restart` | drop the upstream connection **and** the cache, repoll now |
 | `request reload` | **restart the whole daemon with the configuration kept**: the live overrides save to `<config>.reload`, the process re-execs, the fresh daemon re-applies them once (the `restart: true` knobs take their configured values); the cache starts empty |
 | `request reload-config` | re-read the config file without the restart — the same re-apply as `SIGHUP` (the map swaps atomically, the overrides clear, a broken file keeps the previous settings) |

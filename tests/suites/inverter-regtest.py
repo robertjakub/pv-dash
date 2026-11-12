@@ -179,8 +179,8 @@ def main():
         tx = ctl(A_CTL, 'help request')
         check('help <command node>: the namespace lists its children, the hidden marked (/ rule)',
               tx == 'ok     dump/          write the state dump: the live setting overrides, sealed (when the fake has a dump path)\n'
-                    '    reload/        save the live overrides and restart the whole daemon (the flags and the env are re-resolved)\n'
                     '    reload-config/ re-read the config file (the values re-apply over the running machines)\n'
+                    '    reload/        save the live overrides and restart the whole daemon (the flags and the env are re-resolved)\n'
                     '    restore/       re-apply a state dump\'s overrides (when the fake has a dump path)', tx)
         tx = ctl(A_CTL, 'help request reload')
         check('help <deep command path>: the row describes itself',
@@ -1030,18 +1030,18 @@ def main():
         tx = ctl(L_CTL, 'show modbus')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
-        check('node walk: the modbus listing answers the live words (the key never lists)',
-              words == ['auth', 'profile'] and 'modbus-auth-key' not in tx, tx[:160])
+        check('node walk: the modbus listing answers the live words (the key hides behind the marked auth node)',
+              words == ['auth/', 'profile'] and 'modbus-auth-key' not in tx, tx[:160])
         tx = ctl(L_CTL, 'show')
         words = [line.strip().split()[0] for line in tx[3:].strip().splitlines()
                  if line.strip() and not line.strip().startswith('[')]
-        check("node walk: the bare show answers the root in the console's own words",
+        check("node walk: the bare show answers the root in the console's own words (the knob-hiding nodes marked)",
               words == ['audit', 'batt', 'battery-kwh', 'battery-state', 'chaos', 'client-timeout', 'cloud',
-                        'connect-acl', 'connections', 'control', 'dump', 'grid',
+                        'connect-acl', 'connections', 'control/', 'dump/', 'grid',
                         'grid-frequency', 'grid-frequency-wander', 'grid-outage',
                         'grid-voltage', 'grid-voltage-wander', 'load', 'max-clients', 'max-conn-per-ip', 'max-kwp',
-                        'metrics', 'modbus', 'mppt', 'pv', 'registers', 'scenario', 'seed',
-                        'soc', 'static', 'strict', 'system', 'time', 'time-scale', 'timezone', 'version',
+                        'metrics/', 'modbus/', 'mppt', 'pv', 'registers', 'scenario', 'seed',
+                        'soc', 'static', 'strict', 'system/', 'time', 'time-scale', 'timezone', 'version',
                         'write'], tx[:220])
         tx = ctl(L_CTL, 'show control ops')
         check('node walk: the intermediate node lists its live children',

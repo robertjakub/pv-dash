@@ -18,23 +18,20 @@ import subprocess
 import sys
 import time
 
-if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
-    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
-             'a standalone run shares /tmp scratch and collides across sessions)')
-SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
-os.makedirs(SCRATCH, exist_ok=True)   # the CI legs set a fixed path the battery never made
-print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check/frame builders
 
-PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
-    else os.environ.get('PV_SUITE_PROFILE', 'quick')
+import os
+import socket
+import struct
+import subprocess
+import sys
+import time
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
 CTL = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-ctl.py')
 LOG = os.path.join(SCRATCH, 'inv_regtest.log')
-FAILURES = []
+FAILURES = failures   # the suite's upper-case name for the shared accumulator (the doc + the tail speak FAILURES)
 
-BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
 A_MODBUS, A_CTL = 15970 + BASE, 15971 + BASE        # --max-clients 1
 B_MODBUS, B_CTL = 15972 + BASE, 15973 + BASE        # --client-timeout 1
 C_MODBUS, C_CTL = 15974 + BASE, 15975 + BASE        # --max-conn-per-ip 1 --max-clients 0
@@ -49,12 +46,6 @@ B_METRICS = 15979 + BASE                     # instance B's /metrics (max-client
 UNIT = 1
 
 
-def check(name, ok, detail=''):
-    print(('PASS ' if ok else 'FAIL ') + name + (' — ' + str(detail) if detail and not ok else ''))
-    if not ok:
-        FAILURES.append(name)
-
-
 def ctl(port, *cmds, token=None):
     out = subprocess.run([sys.executable, CTL, '--control-port', str(port)]
                          + (['--control-token', token] if token else []) + list(cmds),
@@ -67,7 +58,7 @@ def connect(port, timeout=5.0):
 
 
 def frame(txn, unit, pdu):
-    return struct.pack('>HHHB', txn, 0, len(pdu) + 1, unit) + pdu
+    return pack_mbap(txn, unit, pdu)
 
 
 def read_req(txn, func, addr, count):
@@ -75,22 +66,10 @@ def read_req(txn, func, addr, count):
 
 
 def exchange(sock, wire, txn):
-    """One Modbus round-trip: returns the reply's (func, byte-count-or-code, body)."""
+    """One Modbus round-trip: returns the reply's (txn, unit, body)."""
     sock.sendall(wire)
-    head = b''
-    while len(head) < 7:
-        chunk = sock.recv(7 - len(head))
-        if not chunk:
-            raise ConnectionError('EOF in MBAP')
-        head += chunk
-    txn_, _proto, length, unit_ = struct.unpack('>HHHB', head)
-    body = b''
-    while len(body) < length - 1:
-        chunk = sock.recv(length - 1 - len(body))
-        if not chunk:
-            raise ConnectionError('EOF in PDU')
-        body += chunk
-    return txn_, unit_, body
+    txn_, _proto, length, unit_ = struct.unpack('>HHHB', recvn(sock, 7))
+    return txn_, unit_, recvn(sock, length - 1)
 
 
 def eof_soon(sock, seconds=3.0):
@@ -1320,3 +1299,4 @@ if __name__ == '__main__':
         print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
         if FAILURES:
             print('FAILURES: %s' % FAILURES)
+        sys.exit(1)

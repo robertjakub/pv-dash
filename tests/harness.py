@@ -28,7 +28,9 @@ procs = []
 
 
 def check(name, cond, detail=''):
-    print('%s %s%s' % ('PASS' if cond else 'FAIL', name, (' — ' + detail) if detail else ''))
+    # the detail may be any shape (inverter passes filtered log-row LISTS
+    # for the fail diagnostics) — stringify at the render, never concat
+    print('%s %s%s' % ('PASS' if cond else 'FAIL', name, (' — ' + str(detail)) if detail else ''))
     if not cond:
         failures.append(name)
 
@@ -62,12 +64,17 @@ def recvn(sock, n):
     return buf
 
 
+def pack_mbap(txn, unit, pdu):
+    """the MBAP frame bytes: the header wrapped around the PDU (no socket)"""
+    import struct
+    return struct.pack('>HHHB', txn, 0, len(pdu) + 1, unit) + pdu
+
+
 def mbap(pdu, port, unit=1):
     """one MBAP transaction: the PDU in, the response body out"""
     import socket
-    import struct
     s = socket.create_connection(('127.0.0.1', port), timeout=10)
-    s.sendall(struct.pack('>HHHB', 77, 0, len(pdu) + 1, unit) + pdu)
+    s.sendall(pack_mbap(77, unit, pdu))
     head = b''
     while len(head) < 7:                          # TCP is a stream: read the
         chunk = s.recv(7 - len(head))             # MBAP header exactly, then

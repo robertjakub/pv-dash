@@ -20,21 +20,11 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
-    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
-             'a standalone run shares /tmp scratch and collides across sessions)')
-SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
-os.makedirs(SCRATCH, exist_ok=True)   # the CI legs set a fixed path the battery never made
-print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
-PROFILE = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] in ('quick', 'full') \
-    else os.environ.get('PV_SUITE_PROFILE', 'quick')
-
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P = os.path.join(REPO, 'dashboard', 'bin', 'dashboard.py')
-FAILURES = []
+FAILURES = failures   # the suite's upper-case name for the shared accumulator
 TOKEN = 'sekrit'
-BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
 PROM_PORT = 15970 + BASE     # the stub Prometheus
 HTTP_PORT = 15971 + BASE     # the dashboard's page/proxy surface
 CTRL_PORT = 15972 + BASE     # the dashboard's control server (token'd: the F5 rule)
@@ -134,12 +124,6 @@ def ops_roundtrip(cmd, token=OPS_TOKEN, port=None, unsigned=False, timeout=5.0):
         return str(obj.get('status')), str(obj.get('text', '')), obj.get('mac') == want
     except (OSError, ValueError) as e:
         return 'boom', str(e), False
-
-
-def check(name, ok, detail=''):
-    print(('PASS ' if ok else 'FAIL ') + name + (' — ' + str(detail) if detail and not ok else ''))
-    if not ok:
-        FAILURES.append(name)
 
 
 def connect(port, timeout=5.0):
@@ -716,3 +700,4 @@ if __name__ == '__main__':
         print('FAIL suite crashed: %s: %s' % (type(e).__name__, e))
         if FAILURES:
             print('FAILURES: %s' % FAILURES)
+        sys.exit(1)

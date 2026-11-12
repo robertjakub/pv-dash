@@ -13,7 +13,7 @@ import threading
 import time
 from collections import deque
 
-from common.modbus.blocks import BIT_READ_FUNCS, build_blocks, span
+from common.modbus.blocks import BIT_READ_FUNCS, block_stat, build_blocks, span
 from .expr import evaluate
 from .statics import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX
 
@@ -103,25 +103,6 @@ class Scraper:
                 logger.warning('inverter %s:%d unreachable: %s', self.cfg['host'],
                                self.cfg['modbus_port'], err)
 
-    def _block_stat(self, key, secs, err=None):
-        """The `show uplink` tally of one poll-block attempt: the round-trip
-        time, the outcome (DeviceError keeps its Modbus exception code)."""
-        s = self.block_stats.setdefault(key, {'n': 0, 'ok_n': 0, 'fails': 0,
-                                              'last': 0.0, 'sum': 0.0, 'max': 0.0,
-                                              'last_err': None, 'last_code': None})
-        s['n'] += 1
-        s['last'] = secs
-        s['max'] = max(s['max'], secs)
-        if err is None:
-            s['ok_n'] += 1
-            s['sum'] += secs
-            s['last_err'] = None
-            s['last_code'] = None
-        else:
-            s['fails'] += 1
-            s['last_err'] = str(err)
-            s['last_code'] = err.code if hasattr(err, 'code') else None
-
     def _read_block(self, fc, start, count):
         """One plan block's read: FC1/FC2 unpack to 0/1 per address, FC3/FC4
         return words — the addresses are profile-space, the client's offset
@@ -173,7 +154,7 @@ class Scraper:
             t0 = time.monotonic()
             try:
                 words = self._read_block(fc, start, count)
-                self._block_stat((fc, start, count), time.monotonic() - t0)
+                block_stat(self.block_stats, (fc, start, count), time.monotonic() - t0)
                 paced = True
                 for lf in leaves:
                     ok_words[lf] = words[lf[1] - start: lf[1] - start + lf[2]]
@@ -188,7 +169,7 @@ class Scraper:
                     pending.appendleft((fc, right[0][1], span(right), right))
                     pending.appendleft((fc, left[0][1], span(left), left))
                 else:
-                    self._block_stat((fc, start, count), time.monotonic() - t0, e)
+                    block_stat(self.block_stats, (fc, start, count), time.monotonic() - t0, e)
                     failed[leaves[0]] = e
                     done.append((fc, start, count, leaves))
         if plan_gen == self.plan_gen:   # the plan still owns the walk (no live rebuild mid-cycle)

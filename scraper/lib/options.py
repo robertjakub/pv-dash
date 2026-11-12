@@ -17,38 +17,26 @@ config script (the ini's replacement), `show config`, the knob ->
 control-command mapper, the argparse parser (--help, built from these rows —
 common/settings/options.py build_parser) and scripts/check_options.py all read this
 table."""
-import json
 import os
 
-from common.modbus.protocol import apply_socket_timeout
-from common.settings.options import default_ops_verbs, known_verbs, load_registry, make_describe, registry_view, settings_of
-
+from common.settings.options import load_options_module, registry_view, unpack_registry_view
 
 
 def _load_options():
     """The rows from lib/options.json (next to this loader): the shared
     registry parser (common/settings/options.py parse_registry_sections — the
-    show/commands sections, the control-grammar vocabulary) and the
-    shared row builder (option_rows) — the rows carry their `default` (the
-    static rung; lib/statics.py reads them off OPTIONS). The log-level row
-    takes its choices from lib/defaults.json (the same LOG_LEVELS the
-    control grammar validates against); the loader reads defaults.json
-    directly so the module also imports flat (scripts/check_options.py
-    walks lib/ on sys.path)."""
-    here = os.path.dirname(os.path.realpath(__file__))
-    with open(os.path.join(here, 'defaults.json'), encoding='utf-8') as f:
-        static = json.load(f)
-    # the audit rotation defaults do NOT ride the argparse parser: a
-    # static-wired default would shadow the env layer (the resolver never
-    # falls through a truthy flag value) — they ladder flag > env > config
-    # > static in lib/config.py like every other knob
-    rows, sections, options = load_registry(here, choices={'log-level': tuple(static['log_levels'])})
-    apply_socket_timeout(options)   # the modbus timeout's default is the protocol tree's socket_timeout
-    for key, value in sections.items():
-        globals()[key] = value
-    globals()['KNOWN_VERBS'] = known_verbs(sections['COMMANDS'])   # the RBAC vocabulary — the registry's rows are its one home
-    globals()['DEFAULT_OPS_VERBS'] = default_ops_verbs(globals()['KNOWN_VERBS'])
-    return options
+    show/commands sections, the control-grammar vocabulary), the shared row
+    builder (option_rows) and the shared loader glue (load_options_module —
+    the rows carry their `default`, the static rung; lib/statics.py reads
+    them off OPTIONS; the modbus timeout's default arms from the protocol
+    tree's socket_timeout). The audit rotation defaults do NOT ride the
+    argparse parser: a static-wired default would shadow the env layer (the
+    resolver never falls through a truthy flag value) — they ladder
+    flag > env > config > static in lib/config.py like every other knob.
+    defaults.json is read directly so the module also imports flat
+    (scripts/check_options.py walks lib/ on sys.path)."""
+    return load_options_module(globals(), os.path.dirname(os.path.realpath(__file__)),
+                               socket_timeout=True)
 
 
 # the control commands (the registries' `commands` rows — _load_options
@@ -74,19 +62,7 @@ CFG_KEYS = {'log-level': 'level'}
 # knob VALUE on the wire: `set metrics-spec table` takes 'table' as the
 # value, while `show metrics-acl-table` answers the report — one word per
 # side of the verb
-_VIEW = registry_view(OPTIONS, SHOW_OPTIONS)
-SETTINGS = _VIEW.settings
-SETTING_BY_NAME = _VIEW.setting_by_name   # the FLAT wire names — the daemon's match map
-SETTING_SPELLINGS = _VIEW.spellings   # + the console spellings (the live/alias paths) — the cli's match map
-SETTING_NAMES = _VIEW.setting_names   # the flat names: the dump keys, the clear defaults, the help lists
-POOL_NAMES = _VIEW.pool_names   # the console spellings (the lives + aliases) — the ?/TAB pools' raw list
-ALIAS_NAMES = _VIEW.alias_names
-SET_BY_NAME = _VIEW.set_by_name
-SHOW_LIVES = _VIEW.show_lives
-LIVE_SETTINGS = _VIEW.live_settings   # a row the registry spells without a `live` name (the restart-marked
-HIDDEN_SETTINGS = _VIEW.hidden_settings   # startup knobs, mid-grant) never lists; the wire still answers
-NODE_BY_NAME = _VIEW.node_by_name
-describe_setting, describe_value = _VIEW.describe
+unpack_registry_view(registry_view(OPTIONS, SHOW_OPTIONS), globals())
 
 
 # The custom show words: the non-knob, non-control-grammar views the show

@@ -14,35 +14,19 @@ import subprocess
 import sys
 import time
 
-if not os.environ.get('PV_RUN_DIR'):   # the battery sets it (scripts/battery.sh)
-    sys.exit('suite: run through scripts/battery.sh (the run dir + the port slot; '
-             'a standalone run shares /tmp scratch and collides across sessions)')
-SCRATCH = os.environ['PV_RUN_DIR']   # the battery's per-run tmp — every scratch file lands here (the sockets are the daemons' own /tmp constants)
-os.makedirs(SCRATCH, exist_ok=True)   # the CI legs set a fixed path the battery never made
-print('NOTE started at ' + time.strftime('%Y-%m-%d %H:%M:%S %z'))
+from harness import *   # the boot: the gate, SCRATCH, BASE, the NOTE stamp — the shared check accumulator (PROFILE rebinds below: the fuzz argv leads with the budget)
 
-REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(REPO, 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-BASE = int(os.environ.get('SUITE_PORT_BASE', '0'))   # the concurrent-battery port space (the runner's slot)
 PORT, CACHE_PORT = 15591 + BASE, 15592 + BASE
 ITERATIONS = int(sys.argv[1]) if len(sys.argv) > 1 else 300
 PROFILE = sys.argv[2] if len(sys.argv) > 2 else os.environ.get('PV_SUITE_PROFILE', 'quick')
 # quick: the basic supported FCs plus a small unsupported sample; full: the
-# whole opcode spread (the nightly depth — scripts/battery.sh full passes it)
+# whole opcode spread (the nightly depth — the battery full passes it)
 FC_POOL = ([3, 6, 15, 16, 3, 6, 22, 99] if PROFILE == 'quick'
            else [0, 3, 5, 6, 15, 16, 22, 99, 170, 255])
-
-failures = []
-
-
-def check(name, cond, detail=''):
-    print('%s %s%s' % ('PASS' if cond else 'FAIL', name, (' — ' + detail) if detail else ''))
-    if not cond:
-        failures.append(name)
-
 
 procs = []
 try:

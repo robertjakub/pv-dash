@@ -179,9 +179,9 @@ answers — command, settable (`set`/`clear`) or show-only — is tabled in
 
 ```bash
 python3 bin/dashboard.py --control-port /tmp/dashboard-8080.socket &
-python3 bin/dashboard-ctl.py show upstream          # one-shot
-python3 bin/dashboard-ctl.py request reload-config  # the SIGHUP path
-printf 'set log-queries on\nshow config\n' | python3 bin/dashboard-ctl.py
+python3 bin/dashboard-cli.py show upstream          # one-shot
+python3 bin/dashboard-cli.py request reload-config  # the SIGHUP path
+printf 'set log-queries on\nshow config\n' | python3 bin/dashboard-cli.py
 python3 bin/dashboard-cli.py                        # the console: TAB completion, ?, reconnect
 ```
 
@@ -304,7 +304,7 @@ and **zero tracebacks** in the logs.
 | `static/boot.js` / `static/i18n.js` | the config/i18n loader (must stay in `<head>`) / the translations |
 | `static/vendor/echarts.min.js` | vendored ECharts 5.5.1 (Apache-2.0) — no CDN needed |
 | `bin/dashboard.py` / `dashboard.conf` | static server + Prometheus proxy (serves `static/` by default) |
-| `bin/dashboard-ctl.py` / `bin/dashboard-cli.py` | the control clients: one-shot / batch and the console session |
+| `bin/dashboard-cli.py` | the control client: one-shot words / piped batch / the console session |
 | `lib/config.py` | settings resolution (CLI > env > the `dashboard.conf` set grammar > defaults) + the control-target resolution |
 | `lib/options.json` + `lib/options.py` | the knob registry and its loader (one source for the wire, the completions and the docs) |
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |

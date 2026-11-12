@@ -23,7 +23,7 @@ a token-less non-loopback bind refuses to start, F21; the `?auth=` query
 bootstraps the session cookie). The default bind is the loopback.
 .PP
 The JSON-lines control server (\fB--control-port\fR, talked to with
-\fBdashboard-ctl\fR(1) and \fBdashboard-cli\fR(1)) inspects and steers
+\fBdashboard-cli\fR(1)) inspects and steers
 the running server: the live settings (the caps, the log surface), the
 config reload, the graceful shutdown. With a control
 token configured the wire is HMAC-signed: every command and reply carries
@@ -274,8 +274,6 @@ family's control knobs all set live: \fBcontrol ops verbs\fR (the
 read-only role's policy), \fBcontrol trust-uids\fR (the peer-cred
 list), \fBcontrol socket-group\fR (0660 instead of 0600, the live
 socket re-modes). See
-.BR dashboard-ctl (1)
-and
 .BR dashboard-cli (1).
 
 .SH SECURITY
@@ -350,7 +348,6 @@ invalid configuration or a failed bind (reason on stderr).
 command-line misuse.
 
 .SH SEE ALSO
-.BR dashboard-ctl (1),
 .BR dashboard-cli (1),
 .BR modbus-scraper (1),
 .BR modbus-cache (1),

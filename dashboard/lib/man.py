@@ -3,7 +3,7 @@
 sections render from the tools' argparse parsers, the prose sections live
 here as roff. scripts/gen_man.py writes the shipped man/*.1 from these;
 `dashboard --man` (and the ctl/cli's --man) prints the same page."""
-from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_CTL, EXIT_STATUS_DAEMON, options_section, page
+from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
 VERSION = 'pv-suite 0.4.3'
@@ -30,7 +30,7 @@ a token-less non-loopback bind refuses to start, F21; the `?auth=` query
 bootstraps the session cookie). The default bind is the loopback.
 .PP
 The JSON-lines control server (\\fB--control-port\\fR, talked to with
-\\fBdashboard-ctl\\fR(1) and \\fBdashboard-cli\\fR(1)) inspects and steers
+\\fBdashboard-cli\\fR(1)) inspects and steers
 the running server: the live settings (the caps, the log surface), the
 config reload, the graceful shutdown. With a control
 token configured the wire is HMAC-signed: every command and reply carries
@@ -82,8 +82,6 @@ family's control knobs all set live: \\fBcontrol ops verbs\\fR (the
 read-only role's policy), \\fBcontrol trust-uids\\fR (the peer-cred
 list), \\fBcontrol socket-group\\fR (0660 instead of 0600, the live
 socket re-modes). See
-.BR dashboard-ctl (1)
-and
 .BR dashboard-cli (1)."""
     security = """.SH SECURITY
 The page and the proxy speak the F13 shape (F21 closed): the bearer token
@@ -151,45 +149,17 @@ config script."""
         options_section(parser),
         extra_sections=(signals, control, security, environment, files, exit_status),
         kind='daemon',
-        see_also='.BR dashboard-ctl (1),\n.BR dashboard-cli (1),\n.BR modbus-scraper (1),\n.BR modbus-cache (1),\n.BR modbus-fake-inverter (1)\n.PP\ndashboard/README.md in the suite checkout \\(em the full documentation.')
+        see_also='.BR dashboard-cli (1),\n.BR modbus-scraper (1),\n.BR modbus-cache (1),\n.BR modbus-fake-inverter (1)\n.PP\ndashboard/README.md in the suite checkout \\(em the full documentation.')
 
-
-def ctl_page(parser):
-    description = """\
-Sends one command (or a batch from stdin) to the dashboard's JSON-lines
-control server over TCP or a unix socket, prints the replies, exits. The
-one-shot sibling of \\fBdashboard-cli\\fR(1): no session, no completion
-\\(em the scriptable surface (the exit codes, one reply per command). With
-a control token configured the wire is HMAC-signed: the client signs every
-command and verifies every reply (the full sha256 of the frame, keyed by
-the token)."""
-    examples = """.SH EXAMPLES
-.RS
-.IP \\(bu 2
-.B dashboard-ctl show version
-.IP \\(bu 2
-.B dashboard-ctl request reload-config
-.IP \\(bu 2
-.B printf 'inspect\\enshow version\\en' | dashboard-ctl
-.RE"""
-    environment = """.SH ENVIRONMENT
-.TP
-.B CTL ", " CONTROL_TOKEN
-the control target and the TCP token when the flags are unset."""
-    exit_status = EXIT_STATUS_CTL
-    return page(
-        "send commands to the dashboard control server (one-shot / batch)",
-        'dashboard-ctl', 1, DATE, VERSION, MANUAL,
-        '.B dashboard-ctl\n.RI [ options ] " [command ...]"',
-        description,
-        options_section(parser),
-        extra_sections=(examples, environment, exit_status),
-        kind='ctl',
-        see_also='.BR dashboard-cli (1),\n.BR dashboard (1)')
 
 
 def cli_page(parser):
     description = """\
+One client, three modes by the invocation shape: command words one-shot
+(\\fBdashboard-cli\\fR show config\\fR \\(em the raw verdict head prints, exit
+0 ok, 1 connection error, 2 misuse), piped stdin batch (the script lines run
+in order, the same raw faces), a bare terminal the interactive console.
+.PP
 A session front-end on top of the dashboard's JSON-lines control socket:
 prompt with the connected port, TAB completion and \\fB?\\fR in every
 position (with the short descriptions from the shared command registry),
@@ -223,9 +193,9 @@ terminal height."""
     return page(
         "console-style session on the dashboard control server",
         'dashboard-cli', 1, DATE, VERSION, MANUAL,
-        '.B dashboard-cli\n.RI [ options ]',
+        '.B dashboard-cli\n.RI [ options ]\n.IB command " [args ...]"',
         description,
         options_section(parser),
         extra_sections=(env, exit_status),
         kind='cli',
-        see_also='.BR dashboard-ctl (1),\n.BR dashboard (1)')
+        see_also='.BR dashboard (1)')

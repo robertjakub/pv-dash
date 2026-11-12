@@ -72,10 +72,10 @@ The kinds — every row of the tables below carries one:
 | `request reload-config` | command | re-read the config file (the SIGHUP path) |
 | `request restart` | command | drop the Modbus session (reconnects on the next poll) |
 | `request restore` | command (hidden) | re-apply a state dump's overrides (when the daemon has a dump path) |
-| `set` | command | configure a setting (set metrics interval 5, set log-access on) |
+| `set` | command | configure a setting live: set \<setting> \<value> |
 | `show` | command | print a setting's live value, or a report |
 | `shutdown` | command | stop the server (asks to confirm) |
-| `clear` | command | restore a setting to its configured value (clear modbus interval, clear system log-level) |
+| `clear` | command | restore a setting to its configured value: clear \<setting> |
 
 ## Knobs
 

@@ -135,10 +135,9 @@
     { "name": "request-restart", "live": "request/restart",
       "help": "drop the Modbus session (reconnects on the next poll)" },
     { "name": "request-restore", "shared": "request-restore", "live": "request/restore" },
-    { "name": "set", "help": "configure a setting (set metrics interval 5, set log-access on)" },
+    { "name": "set", "shared": "set" },
     { "name": "show", "shared": "show" },
     { "name": "shutdown", "shared": "shutdown" },
-    { "name": "clear",
-      "help": "restore a setting to its configured value (clear modbus interval, clear system log-level)" }
+    { "name": "clear", "shared": "clear" }
   ]
 }

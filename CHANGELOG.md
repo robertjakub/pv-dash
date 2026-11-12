@@ -12,6 +12,19 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **the four CLIs** — **the console pager**: every console reply prints
+  through one door (`page_out`), a text taller than the screen pauses at
+  a page (`-- more --`, space = the next page, return = one more line,
+  `q` = stop the rest — the command already ran, only the rendering
+  stops), `--page-size` / `CLI_PAGE_SIZE` set the page size (`0` = off,
+  unset = the terminal height), and the session-local `page` command
+  retunes it live (bare = the state, `page N`, `page auto` — never sent
+  to the daemon, no registry row); a line wider than the screen shortens
+  with ` ...` on the end (the wire and the audit keep the tail), and a
+  terminal smaller than 20 rows (`cli_min_height`) or 64 columns
+  (`cli_min_width`) refuses the tty edition before the connect — piped
+  and scripted runs print whole, byte-for-byte, and never check.
+
 - **scraper** — **`show uplink` + the cache's block poll plan**: the
   profile's source ranges merge into as few Modbus reads as possible
   (`--merge-gap` / `MERGE_GAP`, live `modbus/merge-gap`, default 8,

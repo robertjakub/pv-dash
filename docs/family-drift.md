@@ -41,6 +41,8 @@ The sweep types:
     registries; the shipped examples re-parsed.
 13. **The secret-surface sweep** — the secret rows and the
     posture markers.
+14. **The console-print sweep** — the cli session path prints
+    through the one pager door; a naked print( fails --check.
 
 ## The code sweep — the text-structural pass
 
@@ -73,7 +75,7 @@ design); the top non-man pairs:
 | 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
-| 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1378` `run_dump_interval` |
+| 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
 | 0.78 | `cache/lib/control.py:798` `uplink_report` <-> `scraper/lib/control.py:479` `uplink_report` |
 | 0.78 | `inverter/lib/signals.py:78` `__init__` <-> `common/modbus/client.py:20` `__init__` |
 | 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
@@ -630,6 +632,19 @@ The findings:
   `file:`) is the F-trust surface: the loader parses, the dumps
   placeholder, the examples reference. A tool missing a marker is
   the story to chase.
+
+## The console-print sweep — the one pager door
+
+The cli session path (common/wire/cli.py + the four bin/*-cli.py)
+prints through `page_out`/`display` only: a naked `print(` with an
+argument is the drift (the bare `print()` pre-prompt blank is the
+loop's own). `--check` fails on any finding — the door holds or the
+wave explains itself.
+
+The door holds: 5 session-path files,
+every print through `page_out`/`display` (the bare pre-prompt
+blinks excepted).
+
 
 ## The remediation TODOs — the consistency rulings
 

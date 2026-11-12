@@ -27,7 +27,14 @@
     "mac_verify_failed": "the reply mac does not verify — the wire was tampered with",
     "command_too_long": "the typed command exceeds the control wire's line cap (%d bytes) — shorten it",
     "reply_too_long": "the reply exceeds the control wire's line cap (%d bytes)",
-    "keepalive_invalid": "invalid CLI_KEEPALIVE %r: must be a number of seconds (0 = off)"
+    "keepalive_invalid": "invalid CLI_KEEPALIVE %r: must be a number of seconds (0 = off)",
+    "more_status": "-- more -- %d/%d lines (space: page, return: line, q: stop)",
+    "page_invalid": "invalid CLI_PAGE_SIZE %r: must be a number of lines (0 = off)",
+    "page_bad": "invalid page size %r: a number of lines, 0 = off, or auto",
+    "page_state": "page %s",
+    "page_help": "the console's page size for long replies (never sent)",
+    "min_height": "the terminal is %d rows tall — the console needs at least %d rows (cli_min_height)",
+    "min_width": "the terminal is %d columns wide — the console needs at least %d columns (cli_min_width)"
   },
   "ctl": {
     "daemon_exit_done": "%% %s — done",

@@ -1,6 +1,6 @@
 # TODO (cache — the Done/history records)
 
-The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
+The open items live in the family-wide [TODO](../../docs/TODO.md) (tagged
 `[cache]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
@@ -142,7 +142,7 @@ the params but not the writer before — this tool already rebuilt, the
 family does now).
 
 The alert rules pack: the cache contributes its side to the family's
-pack ([`../extras/alerts/cache.yml`](../extras/alerts/cache.yml), the F16
+pack ([`../../extras/alerts/cache.yml`](../../extras/alerts/cache.yml), the F16
 closure — installed with this package as `share/modbus-cache/alerts.yml`)
 — and the missing metric landed first:
 `modbus_cache_write_refused_total` on the cache's own /metrics counts the
@@ -190,11 +190,11 @@ read the root file.
 
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (965 → ~430 lines) — the Nix/NixOS section moved to
-[docs/NIXOS.md (now nixos/README.md)](../nixos/README.md) (the module's option list rebuilt from
+[docs/NIXOS.md (now nixos/README.md)](../../nixos/README.md) (the module's option list rebuilt from
 `module.nix`: the README's had gone stale — it predated the metrics ACL,
 the dump knobs and the control-plane options), and the family-wide
 stories (the ACL grammar, the Modbus handshake, the audit chain
-mechanics) now point at docs/common/ACL.md / docs/common/MODBUS.md / docs/SECURITY.md
+mechanics) now point at docs/specs/ACL.md / docs/specs/MODBUS.md / docs/SECURITY.md
 instead of re-running them.
 
 The metrics/acl family wave: the cache rides along — the default

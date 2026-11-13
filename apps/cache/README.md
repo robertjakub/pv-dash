@@ -8,7 +8,7 @@
 A dependency-free (Python stdlib only) **Modbus TCP caching proxy** for
 devices that accept only a single client — e.g. a Huawei SUN2000 inverter
 and its SDongle/EMMA radio allow one Modbus TCP connection, so the
-[modbus-scraper](../apps/scraper/README.md) cannot share them with anything
+[modbus-scraper](../scraper/README.md) cannot share them with anything
 else. Point the scraper (or any other Modbus client) at the proxy instead
 of the inverter:
 
@@ -181,8 +181,8 @@ keyed by the token — mandatory over TCP, verify-if-present over the unix
 socket, where root, the daemon's own user and the `--control-trust-uids`
 peers skip the handshake (`SO_PEERCRED`). The wire, the roles and the
 secrets discipline are the family's — see
-[docs/common/ACL.md](../docs/common/ACL.md) (the control-plane row) and the audit's F5/F9/F12
-in [docs/SECURITY.md](../docs/SECURITY.md).
+[docs/specs/ACL.md](../../docs/specs/ACL.md) (the control-plane row) and the audit's F5/F9/F12
+in [docs/SECURITY.md](../../docs/SECURITY.md).
 
 The **read-only ops role**: a daemon may carry a second token
 (`--control-ops-token`) beside the admin one; its sessions may run the
@@ -278,10 +278,10 @@ ids are validated on every forwarded request before anything is cached.
 ## Register map (device profile)
 
 The proxy caches the registers listed in the **device profile** — the same
-shared schema the [fake inverter](../apps/inverter/README.md) serves and the
-[scraper](../apps/scraper/README.md) scrapes; the shipped profiles live in the
-suite's [`shared/profiles/`](../shared/profiles/) data dir (`sun2000.json` by default).
-The format is documented in [shared/profiles/README.md](../shared/profiles/README.md).
+shared schema the [fake inverter](../inverter/README.md) serves and the
+[scraper](../scraper/README.md) scrapes; the shipped profiles live in the
+suite's [`shared/profiles/`](../../shared/profiles/) data dir (`sun2000.json` by default).
+The format is documented in [shared/profiles/README.md](../../shared/profiles/README.md).
 Resolution: `--modbus-profile` flag, env `MODBUS_PROFILE`, config `set modbus profile`,
 then the bundled copy; the file is re-read on `SIGHUP`.
 
@@ -317,7 +317,7 @@ the largest blocks the device actually answers.
 
 The family-wide ACL map — the rule-chain semantics, the standalone acl
 file, the tools and where every tool's support stops — lives in
-[docs/common/ACL.md](../docs/common/ACL.md); the four gates' knobs
+[docs/specs/ACL.md](../../docs/specs/ACL.md); the four gates' knobs
 (`--connect-acl`, `--write-acl`, `--write-registers`, `--metrics-acl`)
 sit in the flag table above with their defaults and the inline grammar.
 Writing is gated four times: the frame parse gate, `--allow-write`, the
@@ -332,7 +332,7 @@ worked out).
 
 Beyond the address-based ACLs the cache speaks the family's **`suite`**
 Modbus auth — a proof-of-key handshake on the Modbus TCP wire itself (the
-wire shape is specified in [docs/common/MODBUS.md](../docs/common/MODBUS.md)): the client
+wire shape is specified in [docs/specs/MODBUS.md](../../docs/specs/MODBUS.md)): the client
 proves the shared key with one round trip after the TCP connect; the server
 answers `OK` (plain Modbus follows) or `ERR` (the connection is dead — a
 client that cannot prove the key never sees a frame).
@@ -347,11 +347,13 @@ The two legs are configured separately, with separate keys:
   gateway's** connection password. The upstream-only scheme of the pair:
   the cache's own clients always speak `suite` or nothing.
 
-Both keys are secrets (they never render back; `file:<path>` loads from an
-owner-only `0600` file). The floor is the scheme's: the suite handshake
-needs at least 16 characters, the Waveshare password non-empty ASCII — a
-key set while no scheme is chosen is dormant material. Both knobs are
-live-settable; the peer must speak the same scheme with the same key — the
+Both keys are restart-marked secrets (a `set` records pending until
+`request reload` applies it; they never render back; `file:<path>` loads
+from an owner-only `0600` file). The floor is the scheme's: the suite
+handshake needs at least 16 characters, the Waveshare password non-empty
+ASCII — a key set while no scheme is chosen is dormant material. Both
+schemes are live-settable; the peer must speak the same scheme with the
+same key — the
 fake inverter serves the server side, the scraper the client side, so a
 chain scraper → cache → inverter can run suite auth on either hop
 independently.
@@ -417,11 +419,11 @@ error's age) and every poll block
 `…block_latency_seconds{,_mean,_max}`, `…block_fails_total`). Anything but
 `/metrics` answers 404, an unauthenticated read 401.
 
-The alert rules pack ([`alerts/cache.yml`](../extras/alerts/cache.yml), the F16
+The alert rules pack ([`alerts/cache.yml`](../../extras/alerts/cache.yml), the F16
 closure) watches this endpoint's poll down, the age spikes and the
 write-refusal bursts — the cache-only install ships its half
 (`share/modbus-cache/alerts.yml`); see [the scraper's alerting
-section](../apps/scraper/README.md#alerting).
+section](../scraper/README.md#alerting).
 
 ## Audit logging
 
@@ -505,11 +507,11 @@ journalctl -u modbus-cache | grep -i 'not on'                 # ACL rejections
 Modbus TCP has no auth, no encryption and no access control — the proxy
 binds 127.0.0.1 by default and the write path defaults fully closed. The
 full story — the four write gates, the ACLs, the caps, the audit trail —
-is [docs/SECURITY.md](../docs/SECURITY.md).
+is [docs/SECURITY.md](../../docs/SECURITY.md).
 
 ## Testing
 
-Four standalone suites live in the suite-root [`tests/`](../tests/) —
+Four standalone suites live in the suite-root [`tests/`](../../tests/) —
 stdlib only, each starts its own fake inverter + proxy on scratch ports and
 cleans up after itself:
 
@@ -527,7 +529,7 @@ when the device starts answering sanely again.
 ## Source layout
 
 ```
-cache/
+apps/cache/
 ├── bin/
 │   ├── modbus-cache.py  # CLI, logging setup, signal handling
 │   └── modbus-cache-cli.py     # console-style interactive control session
@@ -551,7 +553,7 @@ cache/
 
 The shared pieces — the audit trail, the signed wire, the config/token
 plumbing, the Modbus core, the version — live in the suite-root
-[`common/`](../common/) package.
+[`common/`](../../common/) package.
 
 ## License
 

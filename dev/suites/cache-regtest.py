@@ -1621,7 +1621,7 @@ try:
              if line.strip() and not line.strip().startswith('[')]
     check("bare show: the root in the console's own words (the hidden rows never list — the canon's config/knobs, the dump-gated interval)",
           words == ['acl', 'audit', 'cache', 'connections', 'control', 'dump',
-                    'limits', 'metrics', 'modbus', 'system',
+                    'limits', 'metrics', 'modbus', 'system', 'trace',
                     'uplink', 'version', 'write'],
           r[:220])
     r = ctl_cmd('set audit-max-mb 5', 15530 + BASE)
@@ -2942,6 +2942,207 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
                        capture_output=True, text=True, timeout=15)
     check('waveshare auth: waveshare on the client leg fails the config fast (upstream only)',
           r.returncode != 0 and "use 'suite'" in r.stderr, r.stderr[-160:])
+
+    # 6c. the record feed (trace/socket + trace/sources): the cache speaks
+    # the replay's PVMB feed — modbus-replay-dump --socket renders it live,
+    # zero consumer changes. The client face's provenance notes, the
+    # upstream faces' two voices, the auth marker, the all-transitions
+    # rebind, the sources filter.
+    TR_FAKE, TR_CACHE, TR_CTL = 15550 + BASE, 15551 + BASE, 15552 + BASE
+    TR_SOCK = '/tmp/modbus-cache-%d-trace.socket' % TR_CACHE
+    start([sys.executable, F, '--control-port', '0', '--static', '--strict', '--listen', '127.0.0.1:%d' % TR_FAKE],
+          log=os.path.join(SCRATCH, 'reg_tr_fake.log'))
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % TR_FAKE,
+           '--listen', '127.0.0.1:%d' % TR_CACHE, '--modbus-interval', '1', '--modbus-profile', R,
+           '--trace-socket', 'default', '--trace-sources', 'all',
+           '--control-port', str(TR_CTL), '--control-token', 'sekrit'],
+          log=os.path.join(SCRATCH, 'reg_tr_cache.log'))
+    time.sleep(2.5)
+    if REPO not in sys.path:
+        sys.path.insert(0, REPO)
+    from common.modbus.trace import decode_record, parse_binary_header
+
+    def tr_cli(*args_):
+        r = subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py'),
+                            '--control-port', str(TR_CTL), '--control-token', 'sekrit'] + list(args_),
+                           capture_output=True, text=True, timeout=15)
+        return (r.stdout + r.stderr).strip()
+
+    check('trace: the feed socket exists at the derived -trace path', os.path.exists(TR_SOCK), TR_SOCK)
+    check('trace: the feed socket is 0600 (the secrets posture, not the umask)',
+          os.path.exists(TR_SOCK) and os.stat(TR_SOCK).st_mode & 0o777 == 0o600,
+          oct(os.stat(TR_SOCK).st_mode) if os.path.exists(TR_SOCK) else '-')
+    check('trace: the control plane still answers beside the feed', tr_cli('show version').startswith('ok'))
+    tr = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    tr.connect(TR_SOCK)
+    tr.settimeout(1.2)
+
+    def tr_drain():
+        buf = b''
+        try:
+            while True:
+                d = tr.recv(65536)
+                if not d:
+                    break
+                buf += d
+        except socket.timeout:
+            pass
+        return buf
+
+    trbuf = tr_drain()
+    _hdr = parse_binary_header(trbuf, 0)
+    check('trace: the feed speaks the PVMB header', trbuf[:4] == b'PVMB', trbuf[:6].hex())
+    check('trace: the run header names the cache posture',
+          _hdr is not None and 'modbus-cache' in _hdr[0]['upstream'], _hdr[0]['upstream'] if _hdr else '-')
+    tr_hlen = _hdr[1] if _hdr else 0
+
+    def tr_walk():
+        recs, off = [], tr_hlen
+        while off + 8 <= len(trbuf):
+            (bl,) = struct.unpack_from('>I', trbuf, off)
+            if off + 4 + bl + 4 > len(trbuf):
+                break
+            recs.append(decode_record(trbuf[off + 4:off + 4 + bl]))
+            off += 4 + bl + 4
+        return recs
+
+    def tr_client(recs):
+        return [r for r in recs if r['conn'] < 100000]
+
+    def tr_upstream(recs):
+        return [r for r in recs if r['conn'] >= 100000]
+
+    up0 = tr_walk()
+    check('trace: the poller voice rides its own conn space (100000 + the connection serial)',
+          bool(up0) and all(r['conn'] >= 100000 for r in up0),
+          '%d record(s), conn %s' % (len(up0), sorted({r['conn'] for r in up0})[:3]))
+    check('trace: the poller voice names the background poll',
+          any(r['kind'] == 0 and r['note'] == 'poll' for r in up0), str(len(up0)))
+    check('trace: the poller voice peers the device endpoint',
+          all(r['peer'] == '127.0.0.1:%d' % TR_FAKE for r in up0), up0[0]['peer'] if up0 else '-')
+
+    # the client face: a cache hit names its provenance, the peer stays the client
+    b = rd(32064, 2, port=TR_CACHE)
+    check('trace: the traced cache answers reads', b[0] == 3 and b[1] == 4, b.hex())
+    time.sleep(0.4)
+    trbuf += tr_drain()
+    hit = [r for r in tr_client(tr_walk()) if r['note'] == 'served from cache']
+    check('trace: the cache hit names its provenance', bool(hit), str(len(hit)))
+    if hit:
+        check('trace: the hit keeps the client as the peer on both records (the partner, not the producer)',
+              hit[-1]['peer'].startswith('127.0.0.1:') and hit[-1]['raw'][6] == 3, hit[-1]['peer'])
+
+    # the forward voice: an uncached read forwards — the client's own txn rides upstream
+    b = rd(3, 1, port=TR_CACHE)
+    time.sleep(0.4)
+    trbuf += tr_drain()
+    recs = tr_walk()
+    fwd_req = [r for r in tr_client(recs) if r['kind'] == 0 and r['raw'][7:9] == b'\x00\x03']
+    check('trace: the uncached read forwards (the client face records the request)',
+          bool(fwd_req), str(len(fwd_req)))
+    if fwd_req:
+        txn = fwd_req[-1]['raw'][:2]
+        up_pair = [r for r in tr_upstream(recs) if r['raw'][:2] == txn]
+        check('trace: the forward voice carries the client\'s own txn upstream',
+              any(r['kind'] == 0 for r in up_pair) and any(r['kind'] == 1 for r in up_pair),
+              hex(int.from_bytes(txn, 'big')))
+        fwd_rsp = [r for r in tr_client(recs) if r['note'] == 'forwarded — device reply']
+        check('trace: the forwarded answer names the device as the producer', bool(fwd_rsp), str(len(fwd_rsp)))
+
+    # the refusals and the diagnostics block
+    b = wr6(40001, 5, port=TR_CACHE)   # the trace cache runs without --allow-write
+    b = rd(65000, 4, port=TR_CACHE)
+    time.sleep(0.4)
+    trbuf += tr_drain()
+    notes = [r['note'] for r in tr_client(tr_walk())]
+    check('trace: the write refusal names its reason', 'refused: write support disabled' in notes, str(notes[-6:]))
+    check('trace: the diagnostics read names itself', 'diag registers' in notes, str(notes[-6:]))
+
+    # the sources filter: whole voices on/off, never sampling
+    n_up_before = len(tr_upstream(tr_walk()))
+    check('trace: set trace-sources client accepts', tr_cli('set trace-sources client').startswith('ok'))
+    time.sleep(2.5)   # a poll cycle passes: the poller voice must go silent
+    trbuf += tr_drain()
+    recs = tr_walk()
+    check('trace: sources client silences the poller voice',
+          all(r['conn'] < 100000 for r in recs[n_up_before:]),
+          '%d new record(s)' % max(0, len(recs) - n_up_before))
+    check('trace: set trace-sources bogus refuses with the one-liner',
+          tr_cli('set trace-sources bogus').startswith('err') and 'all, client or upstream'
+          in tr_cli('set trace-sources bogus'))
+    check('trace: set trace-sources upstream accepts', tr_cli('set trace-sources upstream').startswith('ok'))
+    trbuf += tr_drain()
+    n_client_before = len(tr_client(tr_walk()))
+    b = rd(32064, 2, port=TR_CACHE)
+    time.sleep(0.4)
+    trbuf += tr_drain()
+    check('trace: sources upstream silences the client face',
+          len(tr_client(tr_walk())) == n_client_before, 'the read rode no client-face record')
+    check('trace: set trace-sources all restores every voice', tr_cli('set trace-sources all').startswith('ok'))
+
+    # the rebind: ALL transitions, the same path included
+    tr2 = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)   # a second subscriber watches the EOFs
+    tr2.connect(TR_SOCK)
+    tr2.settimeout(1.0)
+    check('trace: set trace-socket none accepts', tr_cli('set trace-socket none').startswith('ok'))
+    time.sleep(0.3)
+    check('trace: none closes the socket file', not os.path.exists(TR_SOCK), TR_SOCK)
+    tr2.settimeout(1.5)
+    eof = tr2.recv(4096)
+    check('trace: the subscriber sees EOF on the rebind (it re-subscribes)', eof == b'', repr(eof[:16]))
+    check('trace: set trace-socket default rebinds after none',
+          tr_cli('set trace-socket default').startswith('ok') and os.path.exists(TR_SOCK))
+    tr3 = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    tr3.connect(TR_SOCK)
+    tr3.settimeout(1.0)
+    head3 = b''
+    while len(head3) < 4:
+        head3 += tr3.recv(4096)
+    check('trace: the rebound feed speaks the PVMB header again', head3[:4] == b'PVMB', head3[:6].hex())
+    r = tr_cli('set trace-socket default')
+    time.sleep(0.3)
+    eof3 = b''
+    try:
+        eof3 = tr3.recv(4096)
+    except socket.timeout:
+        pass
+    check('trace: the same-path set rebinds too (the subscriber sees EOF)',
+          r.startswith('ok') and eof3 == b'', repr(eof3[:16]))
+    tr.close()
+    tr2.close()
+    tr3.close()
+
+    # the auth marker: the upstream suite handshake shows byte-less
+    TRA_FAKE, TRA_CACHE, TRA_KEY = 15553 + BASE, 15554 + BASE, 'trace-suite-key-16'
+    TRA_SOCK = '/tmp/modbus-cache-%d-trace.socket' % TRA_CACHE
+    start([sys.executable, F, '--control-port', '0', '--static', '--strict', '--listen', '127.0.0.1:%d' % TRA_FAKE,
+           '--modbus-auth', 'suite', '--modbus-auth-key', TRA_KEY],
+          log=os.path.join(SCRATCH, 'reg_tra_fake.log'))
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % TRA_FAKE,
+           '--listen', '127.0.0.1:%d' % TRA_CACHE, '--modbus-interval', '1', '--modbus-profile', R,
+           '--modbus-auth-upstream', 'suite', '--modbus-auth-upstream-key', TRA_KEY,
+           '--trace-socket', 'default'],
+          log=os.path.join(SCRATCH, 'reg_tra_cache.log'))
+    time.sleep(2.5)
+    tra = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    tra.connect(TRA_SOCK)
+    tra.settimeout(1.5)
+    trabuf = tra.recv(65536)
+    _h = parse_binary_header(trabuf, 0)
+    tra_off = _h[1] if _h else 0
+    tra_recs = []
+    while tra_off + 8 <= len(trabuf):
+        (bl,) = struct.unpack_from('>I', trabuf, tra_off)
+        if tra_off + 4 + bl + 4 > len(trabuf):
+            break
+        tra_recs.append(decode_record(trabuf[tra_off + 4:tra_off + 4 + bl]))
+        tra_off += 4 + bl + 4
+    markers = [r for r in tra_recs if r['kind'] == 2 and r['note'] == 'PVA1 handshake (bytes withheld)']
+    check('trace: the upstream suite handshake rides as the byte-less marker', bool(markers), str(len(tra_recs)))
+    check('trace: no PVA1 proof bytes ever ride the feed',
+          all(not r['raw'].startswith(b'PVA1') for r in tra_recs),
+          str(sum(1 for r in tra_recs if r['raw'].startswith(b'PVA1'))))
+    tra.close()
 
     # 7. clean shutdowns
     r = cli('shutdown\n\n', 15514 + BASE)

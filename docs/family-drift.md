@@ -57,7 +57,7 @@ copy-paste twins), the similarity pass pairs cross-file bodies over the
 - 28L `main`: `apps/scraper/bin/modbus-scraper-cli.py:58`, `apps/inverter/bin/modbus-fake-cli.py:58`, `apps/dashboard/bin/dashboard-cli.py:58`, `apps/cache/bin/modbus-cache-cli.py:58`
 - 8L `_implied`: `apps/scraper/bin/modbus-scraper-cli.py:48`, `apps/inverter/bin/modbus-fake-cli.py:48`, `apps/dashboard/bin/dashboard-cli.py:48`, `apps/cache/bin/modbus-cache-cli.py:48`
 
-**The similarity pass**: 38 cross-file pair(s) over the ratio
+**The similarity pass**: 37 cross-file pair(s) over the ratio
 floor (12 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
@@ -74,15 +74,15 @@ design); the top non-man pairs:
 | 0.93 | `apps/cache/lib/options.py:23` `_load_options` <-> `apps/dashboard/lib/options.py:24` `_load_options` |
 | 0.93 | `apps/scraper/lib/options.py:25` `_load_options` <-> `apps/dashboard/lib/options.py:24` `_load_options` |
 | 0.90 | `apps/scraper/bin/modbus-scraper.py:241` `graceful_stop` <-> `apps/dashboard/bin/dashboard.py:474` `graceful_stop` |
-| 0.86 | `apps/cache/bin/modbus-cache.py:48` `parse_args` <-> `apps/scraper/bin/modbus-scraper.py:46` `parse_args` |
+| 0.86 | `apps/cache/bin/modbus-cache.py:49` `parse_args` <-> `apps/scraper/bin/modbus-scraper.py:46` `parse_args` |
 | 0.85 | `apps/cache/lib/options.py:23` `_load_options` <-> `apps/inverter/lib/options.py:27` `_load_options` |
 | 0.85 | `apps/scraper/lib/options.py:25` `_load_options` <-> `apps/inverter/lib/options.py:27` `_load_options` |
 | 0.85 | `apps/inverter/lib/options.py:27` `_load_options` <-> `apps/dashboard/lib/options.py:24` `_load_options` |
-| 0.85 | `apps/cache/bin/modbus-cache.py:48` `parse_args` <-> `apps/dashboard/bin/dashboard.py:277` `parse_args` |
+| 0.85 | `apps/cache/bin/modbus-cache.py:49` `parse_args` <-> `apps/dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `apps/inverter/lib/control.py:96` `__init__` <-> `apps/dashboard/lib/control.py:73` `__init__` |
-| 0.82 | `apps/cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
-| 0.78 | `apps/cache/lib/control.py:798` `uplink_report` <-> `apps/scraper/lib/control.py:474` `uplink_report` |
-| 0.78 | `apps/cache/lib/upstream.py:16` `read` <-> `apps/scraper/lib/protocol.py:63` `_read` |
+| 0.82 | `apps/cache/bin/modbus-cache.py:355` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
+| 0.78 | `apps/cache/lib/control.py:824` `uplink_report` <-> `apps/scraper/lib/control.py:474` `uplink_report` |
+| 0.78 | `apps/inverter/lib/control.py:466` `acl_table_report` <-> `apps/dashboard/lib/control.py:296` `acl_table_report` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -154,7 +154,7 @@ by semantic family — the knob layer is the one source --help, the man
 pages, the set grammar, the NixOS modules and the README checks read,
 so a drifted row travels wide.
 
-**The shape**: 236 knob rows across the
+**The shape**: 239 knob rows across the
 four registries; 34 names carry in all four:
 
 `audit`, `audit-daily`, `audit-files`, `audit-forward`, `audit-forward-format`, `audit-instance`, `audit-log`, `audit-max-mb`, `audit/rotate`, `control`, `control-log-replies`, `control-ops-token`, `control-ops-verbs`, `control-port`, `control-socket-group`, `control-token`, `control-trust-uids`, `control/ops`, `dump`, `dump-interval`, `dump-key`, `dump-path`, `listen`, `local-time`, `log-access`, `log-level`, `metrics`, `metrics-acl`, `metrics-client-timeout`, `metrics-max-clients`, `metrics-max-conn-per-ip`, `no-audit-log`, `restore-on-start`, `system`
@@ -163,7 +163,7 @@ four registries; 34 names carry in all four:
 
 | tool | only-there knobs |
 |---|---|
-| cache | `acl`, `allow-write`, `audit-requests`, `cache-ttl`, `client-timeout`, `connect-acl`, `dump-with-cache`, `limits`, `max-clients`, `max-conn-per-ip`, `metrics-listen`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-auth-upstream`, `modbus-auth-upstream-key`, `modbus-interval`, `modbus-merge-gap`, `modbus-profile`, `modbus-read-delay`, `modbus-timeout`, `modbus-unit`, `selection`, `upstream`, `write`, `write-acl`, `write-registers` |
+| cache | `acl`, `allow-write`, `audit-requests`, `cache-ttl`, `client-timeout`, `connect-acl`, `dump-with-cache`, `limits`, `max-clients`, `max-conn-per-ip`, `metrics-listen`, `metrics-server`, `metrics-token`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-auth-upstream`, `modbus-auth-upstream-key`, `modbus-interval`, `modbus-merge-gap`, `modbus-profile`, `modbus-read-delay`, `modbus-timeout`, `modbus-unit`, `selection`, `trace`, `trace-socket`, `trace-sources`, `upstream`, `write`, `write-acl`, `write-registers` |
 | scraper | `auth-token`, `grid-positive-import`, `max-grid-kw`, `max-kwp`, `metrics-prefix`, `metrics-spec`, `metrics/auth`, `metrics/limits`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-interval`, `modbus-merge-gap`, `modbus-offset`, `modbus-profile`, `modbus-read-delay`, `modbus-timeout`, `modbus-unit`, `modbus/caps`, `upstream` |
 | inverter | `allow-write`, `batt`, `battery-kwh`, `battery-state`, `chaos`, `client-timeout`, `cloud`, `connect-acl`, `grid`, `grid-frequency`, `grid-frequency-wander`, `grid-outage`, `grid-voltage`, `grid-voltage-wander`, `load`, `max-clients`, `max-conn-per-ip`, `max-kwp`, `metrics-listen`, `metrics-server`, `metrics-token`, `modbus`, `modbus-auth`, `modbus-auth-key`, `modbus-profile`, `mppt`, `pv`, `scenario`, `seed`, `soc`, `static`, `strict`, `time`, `time-scale`, `timezone`, `unit`, `write` |
 | dashboard | `auth`, `auth-token`, `client-timeout`, `config-js`, `log-queries`, `max-clients`, `max-conn-per-ip`, `metrics-listen`, `metrics-server`, `metrics-token`, `prom-prefix`, `static-dir`, `upstream` |
@@ -259,7 +259,7 @@ canon the operators grep for.
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
 **The phrase canon**: 25 log phrase(s) shared by >= 2 tools;
-89 tool-local. The canon (the lead clause, the tools that speak it):
+90 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|

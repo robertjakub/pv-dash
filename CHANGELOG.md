@@ -12,6 +12,39 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **The cache's record feed (`--trace-socket` / `--trace-sources`) — the
+  wire trace live** — the cache emits every Modbus record it serves and
+  exchanges to a unix feed socket in the same PVMB protocol
+  modbus-replay's record feed speaks: `modbus-replay-dump --socket`
+  renders the cache's traffic live with zero consumer changes, and the
+  records carry what a wire-side capture cannot — the provenance (the
+  note names `served from cache`, `forwarded — device reply`,
+  `refused: …`, `diag registers` per answer; `peer` stays the
+  conversation partner on both records). Four voices: the client face
+  (every served request and answer), the upstream poller (the
+  background block polls, own conn space — 100000 + the connection
+  serial, so the feed's (session, conn, txn) pairing never cross-pairs
+  a client request with the device's reply — the client's txn survives
+  the forward verbatim), the upstream forwards and the byte-less auth
+  marker (`PVA1 handshake (bytes withheld)` — the cache knows its own
+  handshake, no proof or password ever rides). `--trace-socket`:
+  `none` (the built-in default — off), `default` (the derived
+  `/tmp/modbus-cache-<listen-port>-trace.socket`; the `-trace` suffix
+  is mandatory — the control plane owns the un-suffixed path and the
+  bind unlinks first) or a path; the socket binds 0600 and EVERY
+  `set trace-socket` rebinds — all transitions, the same path
+  included: close (the subscribers see EOF, they re-subscribe), unlink,
+  bind. `--trace-sources`: `all` / `client` / `upstream` — whole
+  voices on/off, never sampling (a dropped voice is stated by the
+  knob, a dropped frame would be a lie: the orphan is the
+  device-died signal). Feed-only — no trace file on the cache (the
+  seal ruling owns state files). The trace machinery lifted to
+  `common/modbus/trace.py` (the format identity into the protocol
+  tree's `trace` section — one tree, no per-tool drift; the FeedSocket
+  chmods 0600 at bind, so the replay's own feed stops being
+  umask-dependent); the replay's lib keeps `FrameTap` + `TraceIndex`
+  and re-exports the shared module.
+
 - **`apps/modbus-replay`, the capture/replay sidecar** — a Modbus TCP
   debug instrument that sits on the wire between a pv-suite client and
   the device: capture mode pipes every client upstream and dumps both

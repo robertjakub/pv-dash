@@ -24,6 +24,10 @@ shapes answer the same tool surface. The writer appends across runs
 and flushes per record, so a killed capture leaves a readable trace;
 the framing is length-based, so a torn tail costs one record — the
 reader resyncs at the next run header instead of refusing the file.
+An unbounded capture is a disk hazard: at --trace-max-mb the writer
+rotates (the backups shift .1 .. .N, the oldest dropped), the fresh
+file stamps its own header — every backup a complete trace, readers
+unchanged.
 
 The auth handshakes do not ride MBAP (the PVA1 proof is a raw 52-byte
 frame, the Waveshare password raw ASCII, the verdicts raw 2-3 bytes):
@@ -72,6 +76,30 @@ TRACE_BINARY_VERSION = PROTOCOL['trace']['binary_version']
 REC_HEAD = struct.Struct('>dBI')     # ts, kind, conn
 HDR_HEAD = struct.Struct('>4sBBQH')  # magic, version, reserved, started, upstream_len
 MAX_PDU_LEN = 0xFFFF                 # the raw slot is u16 — MAX_PDU+7 fits with room
+
+# The rotation bounds (the trace family's audit-max-mb/audit-files twins —
+# the registries' trace-max-mb/trace-files rows repeat them as min/max, the
+# flag layer gates there): the rotated backups kept and the size that
+# triggers a rotation in MB (0 = no size rotation — the capture appends
+# unbounded, the default).
+TRACE_FILES_MIN = 1
+TRACE_FILES_MAX = 100
+TRACE_MAX_MB_MIN = 0
+TRACE_MAX_MB_MAX = 1048576
+
+
+def shift_backups(path, keep):
+    """The rotated backup shift (.1 <- .2 <- ... <- .N, the oldest
+    dropped) then the live file to .1 — the audit log's rotation shape,
+    the one spelling the trace family's writers share. A rotated file is
+    a complete trace of its own: every run stamps its header, so every
+    reader takes each backup for captured."""
+    for i in range(keep - 1, 0, -1):
+        src, dst = '%s.%d' % (path, i), '%s.%d' % (path, i + 1)
+        if os.path.exists(src):
+            os.replace(src, dst)
+    if os.path.exists(path):
+        os.replace(path, path + '.1')
 
 
 def encode_header(upstream, started):
@@ -304,23 +332,56 @@ class TraceWriter:
     encoding. Every run stamps one header first — the format identity
     + the posture a reader validates; the trace appends across runs
     (a multi-run file is a longer history). A path of None writes no
-    file: a pass-through capture feeds the subscribers only."""
+    file: a pass-through capture feeds the subscribers only.
+
+    The size rotation (max_mb, files — 0 = off, the default): at
+    max_mb the writer shifts the backups (.1 <- .2 <- ... <- .N, the
+    oldest dropped — shift_backups), reopens fresh and stamps a new
+    run header, so the live file keeps the plain name and every backup
+    is a complete trace of its own (a reader takes each for captured).
+    The record is the boundary: the size check runs before a record is
+    written, a block never straddles two files."""
     MODE = 0o600
 
-    def __init__(self, path, dump_type='binary', feed=None):
+    def __init__(self, path, dump_type='binary', feed=None, max_mb=0.0, files=3):
+        if not TRACE_MAX_MB_MIN <= max_mb <= TRACE_MAX_MB_MAX:
+            raise ValueError('trace-max-mb must be %d..%d MB' % (TRACE_MAX_MB_MIN, TRACE_MAX_MB_MAX))
+        if not TRACE_FILES_MIN <= files <= TRACE_FILES_MAX:
+            raise ValueError('trace-files must be %d..%d' % (TRACE_FILES_MIN, TRACE_FILES_MAX))
         self.path = path
         self.dump_type = dump_type
         self.feed = feed
+        self.max_bytes = int(max_mb * 1024 * 1024) if max_mb and max_mb > 0 else 0
+        self.keep = int(files)
         self.n = 0
         self._lock = threading.Lock()
         self._f = None
         if path:
-            self._f = open(path, 'ab' if dump_type == 'binary' else 'a',
-                           **({} if dump_type == 'binary' else {'encoding': 'utf-8'}))
-            try:
-                os.chmod(path, self.MODE)
-            except OSError:
-                pass
+            self._open_file()
+
+    def _open_file(self):
+        """The trace file opened (appended), 0600 — __init__ and every
+        rotation's one open."""
+        self._f = open(self.path, 'ab' if self.dump_type == 'binary' else 'a',
+                       **({} if self.dump_type == 'binary' else {'encoding': 'utf-8'}))
+        try:
+            os.chmod(self.path, self.MODE)
+        except OSError:
+            pass
+
+    def _stamp_header(self, started):
+        """The run's header block into the open file (binary or json) —
+        open_run's write half, _rotate's re-stamp."""
+        if self.dump_type == 'binary':
+            self._f.write(encode_header(self.upstream, started))
+        else:
+            self._f.write(json.dumps(
+                {'format': TRACE_FORMAT, 'version': TRACE_VERSION,
+                 'started': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(started)),
+                 'tool': 'modbus-replay', 'mode': 'capture',
+                 'upstream': self.upstream},
+                separators=(',', ':')) + '\n')
+        self._f.flush()
 
     def open_run(self, upstream, started=None):
         """The run's header: the format identity + the posture —
@@ -330,16 +391,23 @@ class TraceWriter:
             self.upstream = upstream
             if self._f is None:
                 return
-            if self.dump_type == 'binary':
-                self._f.write(encode_header(upstream, started))
-            else:
-                self._f.write(json.dumps(
-                    {'format': TRACE_FORMAT, 'version': TRACE_VERSION,
-                     'started': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(started)),
-                     'tool': 'modbus-replay', 'mode': 'capture',
-                     'upstream': upstream},
-                    separators=(',', ':')) + '\n')
-            self._f.flush()
+            self._stamp_header(started)
+
+    def _rotate(self):
+        """The size rotation: the backups shift (.1 <- .2 <- ... <- .N,
+        the oldest dropped), the file reopens fresh and stamps a new run
+        header — the caller holds the lock (emit's)."""
+        self._f.close()
+        shift_backups(self.path, self.keep)
+        self._open_file()
+        self._stamp_header(int(time.time()))
+
+    def _maybe_rotate(self):
+        """The size check before a record is written (the caller holds
+        the lock): at max_bytes the file rotates, the record lands in
+        the fresh file."""
+        if self.max_bytes and os.path.getsize(self.path) >= self.max_bytes:
+            self._rotate()
 
     def record(self, direction, conn, peer, raw, dec=None, note=None):
         """One wire record from the capture tap: direction 'c2d' | 'd2c'
@@ -362,6 +430,7 @@ class TraceWriter:
         converter's path too: the source's stamps ride unchanged."""
         with self._lock:
             if self._f is not None:
+                self._maybe_rotate()
                 if self.dump_type == 'binary':
                     self._f.write(encode_record(ts, kind, conn, peer, note, raw))
                 else:

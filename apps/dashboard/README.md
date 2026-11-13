@@ -185,6 +185,10 @@ printf 'set log-queries on\nshow config\n' | python3 bin/dashboard-cli.py
 python3 bin/dashboard-cli.py                        # the console: TAB completion, ?, reconnect
 ```
 
+The client bin is a symlink to the family's `apps/pvsuite-cli.py`
+dispatcher — `pvsuite-cli dashboard` spells the same client, the tool from
+the word.
+
 The console prints through a pager: a reply taller than the screen pauses
 (`-- more --`) — space walks a page, return a line, `q` stops the rest
 (`--page-size`/`CLI_PAGE_SIZE` set the size, 0 = off; the session-local
@@ -304,7 +308,7 @@ and **zero tracebacks** in the logs.
 | `static/boot.js` / `static/i18n.js` | the config/i18n loader (must stay in `<head>`) / the translations |
 | `static/vendor/echarts.min.js` | vendored ECharts 5.5.1 (Apache-2.0) — no CDN needed |
 | `bin/dashboard.py` | static server + Prometheus proxy (serves `static/` by default; the config sample is `examples/dashboard.conf`) |
-| `bin/dashboard-cli.py` | the control client: one-shot words / piped batch / the console session |
+| `bin/dashboard-cli.py` | the control client (a symlink to `apps/pvsuite-cli.py`, the family dispatcher): one-shot words / piped batch / the console session |
 | `lib/config.py` | settings resolution (CLI > env > the `dashboard.conf` set grammar > defaults) + the control-target resolution |
 | `lib/options.json` + `lib/options.py` | the knob registry and its loader (one source for the wire, the completions and the docs) |
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |

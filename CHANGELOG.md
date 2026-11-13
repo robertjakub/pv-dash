@@ -12,6 +12,28 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **The four cli clients fold into one `pvsuite-cli`** — the per-tool
+  `modbus-cache-cli` / `modbus-scraper-cli` / `modbus-fake-cli` /
+  `dashboard-cli` bins were four 60-line copies of the same SPEC
+  skeleton over `common/wire/cli.py`; one dispatcher
+  (`apps/pvsuite-cli.py`) carries the resolution now: the tool comes
+  from the invoked name (the installed `*-cli` names stay, as symlinks
+  to the dispatcher — the fake's legacy name spells the tool through the
+  map) or from the first word (`pvsuite-cli cache|scraper|inverter|dashboard`
+  or the daemon name; an explicit word that disagrees with the invocation
+  name is refused). The per-tool SPEC — the pools, the labels, the
+  defaults, the special renders — moved into each tool's
+  `lib/cli_spec.py`; only one tool's `lib/` is ever imported per
+  invocation, so the shared `lib` package name never collides. The
+  console surface is unchanged (the same prompts, completions, audit and
+  exit codes — the SPEC fields are the old bins', verbatim). Packaging
+  rides: the four Dockerfiles copy the dispatcher via a new `cli` build
+  context (the compose stacks carry it), the nix packages install it by
+  its store path under the client's name (the makeWrapper's argv[0]
+  inference keeps working), the man pages and MANUALs render unchanged
+  from the same per-tool `lib/man.py`, and the drift sweep's
+  console-print file list names the dispatcher.
+
 - **The apps/ tree carries no `*.token` examples** — the dashboard's
   `examples/page.token` placeholder is deleted (the only one under
   apps/: the cache, the scraper and the fake-inverter Dockerfiles

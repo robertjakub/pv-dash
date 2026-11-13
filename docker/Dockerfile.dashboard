@@ -4,11 +4,12 @@
 # shared one (seed the config volume, then su-exec).
 #
 # Build (the context = ../apps/dashboard, the entrypoint + common = the named contexts;
-# the entrypoint lives at docker/entrypoints/entrypoint.sh):
+# the entrypoint lives at docker/entrypoints/entrypoint.sh, the pvsuite-cli
+# dispatcher = ../apps):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.dashboard -t dashboard \
 #       --build-context scripts=../docker --build-context common=../common \
-#       --build-context shared=../shared ../apps/dashboard
+#       --build-context shared=../shared --build-context cli=../apps ../apps/dashboard
 #   # or: docker compose up -d dashboard
 #
 # Run:
@@ -38,6 +39,9 @@ COPY --from=common modbus/*.py common/modbus/
 COPY --from=shared suite/texts.json shared/suite/
 COPY --from=shared suite/protocol.json shared/suite/
 COPY --from=shared suite/wire.json shared/suite/
+# the family client dispatcher: the bin/dashboard-cli.py symlink in the
+# app context points at it (../../pvsuite-cli.py resolves here in-image)
+COPY --chown=pvsuite --from=cli pvsuite-cli.py pvsuite-cli.py
 COPY --chown=pvsuite bin/ dashboard/bin/
 COPY --chown=pvsuite lib/ dashboard/lib/
 COPY --chown=pvsuite static/ dashboard/static/
@@ -48,7 +52,7 @@ COPY --chown=pvsuite examples/config.js config-defaults/
 # is never copied) — the compose stacks point the page's bearer at
 # /config/page.token (AUTH_TOKEN=file:/config/page.token)
 RUN echo placeholder > config-defaults/page.token
-RUN chmod +x dashboard/bin/*.py /usr/local/bin/pv-entrypoint \
+RUN chmod +x dashboard/bin/*.py pvsuite-cli.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/dashboard/bin/dashboard.py /usr/local/bin/dashboard \
     && ln -s /pv-suite/dashboard/bin/dashboard-cli.py /usr/local/bin/dashboard-cli
 

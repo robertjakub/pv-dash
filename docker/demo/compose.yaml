@@ -59,6 +59,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        cli: ../../apps
     image: modbus-fake-inverter
     environment:
       # the server side: every client proves the stack's suite key right
@@ -82,6 +83,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        cli: ../../apps
         examples: ../../extras/examples
     image: modbus-cache
     environment:
@@ -110,6 +112,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        cli: ../../apps
     image: modbus-scraper
     environment:
       # the client side: the scraper proves the stack's suite key to the
@@ -158,6 +161,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        cli: ../../apps
     image: dashboard
     environment:
       # the proxy target: the stack's internal Prometheus service (the

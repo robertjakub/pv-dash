@@ -21,7 +21,7 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 bin/modbus-cache.py $out/share/modbus-cache/modbus-cache.py
-    install -Dm755 bin/modbus-cache-cli.py $out/share/modbus-cache/modbus-cache-cli.py
+    install -Dm755 ${../../../apps/pvsuite-cli.py} $out/share/modbus-cache/modbus-cache-cli.py
     install -dm755 $out/share/modbus-cache/lib
     install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/modbus-cache/lib/
     install -dm755 $out/share/modbus-cache/common

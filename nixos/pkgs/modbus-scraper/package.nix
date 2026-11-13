@@ -21,7 +21,7 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 bin/modbus-scraper.py $out/share/modbus-scraper/modbus-scraper.py
-    install -Dm755 bin/modbus-scraper-cli.py $out/share/modbus-scraper/modbus-scraper-cli.py
+    install -Dm755 ${../../../apps/pvsuite-cli.py} $out/share/modbus-scraper/modbus-scraper-cli.py
     install -dm755 $out/share/modbus-scraper/lib
     install -m644 lib/*.py lib/defaults.json lib/metrics.json lib/options.json $out/share/modbus-scraper/lib/
     install -dm755 $out/share/modbus-scraper/common

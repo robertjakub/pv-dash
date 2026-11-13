@@ -218,7 +218,10 @@ Live settings are runtime nudges — the config files stay the source of
 truth: the next `SIGHUP` re-resolves the config wholesale and the file
 always wins.
 
-`modbus-cache-cli` is the one client — the invocation shape picks the
+`modbus-cache-cli` is the one client (a symlink to the family's
+`apps/pvsuite-cli.py` dispatcher — `pvsuite-cli cache` or
+`pvsuite-cli modbus-cache` spells the same client, the tool from the word) —
+the invocation shape picks the
 mode: command words one-shot (`modbus-cache-cli show upstream` — the raw
 verdict head prints, exit `0` ok / `1` connection error / `2` misuse),
 piped stdin batch (`printf 'show cache\nclear cache\n' | modbus-cache-cli`),
@@ -532,7 +535,7 @@ when the device starts answering sanely again.
 apps/cache/
 ├── bin/
 │   ├── modbus-cache.py  # CLI, logging setup, signal handling
-│   └── modbus-cache-cli.py     # console-style interactive control session
+│   └── modbus-cache-cli.py     # console-style interactive control session (a symlink to the family dispatcher, ../../pvsuite-cli.py)
 ├── examples/
 │   └── modbus-cache.conf    # sample config in the set grammar
 ├── man/                     # the generated man pages (scripts/generators/man.py)

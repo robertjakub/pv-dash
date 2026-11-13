@@ -58,6 +58,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        cli: ../../apps
         examples: ../../extras/examples
     image: modbus-cache
     environment:
@@ -89,6 +90,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        cli: ../../apps
     image: modbus-scraper
     environment:
       # the client side: the scraper proves the stack's suite key to the
@@ -131,6 +133,7 @@ services:
         scripts: ..
         common: ../../common
         shared: ../../shared
+        cli: ../../apps
     image: dashboard
     environment:
       # EDIT before up: your external collector's base URL (the

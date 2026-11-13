@@ -21,7 +21,7 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 bin/modbus-fake-inverter.py $out/share/modbus-fake-inverter/modbus-fake-inverter.py
-    install -Dm755 bin/modbus-fake-cli.py $out/share/modbus-fake-inverter/modbus-fake-cli.py
+    install -Dm755 ${../../../apps/pvsuite-cli.py} $out/share/modbus-fake-inverter/modbus-fake-cli.py
     install -dm755 $out/share/modbus-fake-inverter/lib
     install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/modbus-fake-inverter/lib/
     install -dm755 $out/share/modbus-fake-inverter/common

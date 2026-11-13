@@ -5,6 +5,17 @@ The open items live in the family-wide [TODO](../../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+pvsuite-cli: the tool's cli bin (`modbus-scraper-cli.py`) became a symlink to
+the family dispatcher `apps/pvsuite-cli.py` — the tool's SPEC half
+(the pools, the labels, the defaults, the labels)
+moved to `lib/cli_spec.py`, and the dispatcher resolves the tool from
+the invoked name or the first word (`pvsuite-cli scraper` or the daemon
+name; a word that disagrees with the invocation name is refused).
+The console surface, the man page and the MANUAL render unchanged;
+the Dockerfile copies the dispatcher via the new `cli` build context
+and the nix package installs it by store path under the client's
+name (the wrapper's argv[0] inference keeps working).
+
 The help-canon wave moved the registry's family-wide texts to
 shared/suite/options.json: 44 rows reference their canon block and the
 loader folds the block under the row's own fields. The alignment is the

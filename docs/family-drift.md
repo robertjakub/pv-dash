@@ -52,15 +52,23 @@ compared two ways: the exact pass groups identical bodies (the
 copy-paste twins), the similarity pass pairs cross-file bodies over the
 0.72 ratio (the near-copies that already drifted).
 
-**The exact pass**: 0 duplicate group(s) in >= 2 files.
+**The exact pass**: 2 duplicate group(s) in >= 2 files.
 
+- 28L `main`: `apps/scraper/bin/modbus-scraper-cli.py:58`, `apps/inverter/bin/modbus-fake-cli.py:58`, `apps/dashboard/bin/dashboard-cli.py:58`, `apps/cache/bin/modbus-cache-cli.py:58`
+- 8L `_implied`: `apps/scraper/bin/modbus-scraper-cli.py:48`, `apps/inverter/bin/modbus-fake-cli.py:48`, `apps/dashboard/bin/dashboard-cli.py:48`, `apps/cache/bin/modbus-cache-cli.py:48`
 
-**The similarity pass**: 32 cross-file pair(s) over the ratio
+**The similarity pass**: 38 cross-file pair(s) over the ratio
 floor (12 of them the man-page prose, per-tool by
 design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
+| 1.00 | `apps/cache/bin/modbus-cache-cli.py:58` `main` <-> `apps/scraper/bin/modbus-scraper-cli.py:58` `main` |
+| 1.00 | `apps/cache/bin/modbus-cache-cli.py:58` `main` <-> `apps/inverter/bin/modbus-fake-cli.py:58` `main` |
+| 1.00 | `apps/cache/bin/modbus-cache-cli.py:58` `main` <-> `apps/dashboard/bin/dashboard-cli.py:58` `main` |
+| 1.00 | `apps/inverter/bin/modbus-fake-cli.py:58` `main` <-> `apps/dashboard/bin/dashboard-cli.py:58` `main` |
+| 1.00 | `apps/scraper/bin/modbus-scraper-cli.py:58` `main` <-> `apps/inverter/bin/modbus-fake-cli.py:58` `main` |
+| 1.00 | `apps/scraper/bin/modbus-scraper-cli.py:58` `main` <-> `apps/dashboard/bin/dashboard-cli.py:58` `main` |
 | 0.96 | `apps/cache/lib/options.py:23` `_load_options` <-> `apps/scraper/lib/options.py:25` `_load_options` |
 | 0.93 | `apps/scraper/bin/modbus-scraper.py:46` `parse_args` <-> `apps/dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.93 | `apps/cache/lib/options.py:23` `_load_options` <-> `apps/dashboard/lib/options.py:24` `_load_options` |
@@ -75,12 +83,6 @@ design); the top non-man pairs:
 | 0.82 | `apps/cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
 | 0.78 | `apps/cache/lib/control.py:798` `uplink_report` <-> `apps/scraper/lib/control.py:474` `uplink_report` |
 | 0.78 | `apps/cache/lib/upstream.py:16` `read` <-> `apps/scraper/lib/protocol.py:63` `_read` |
-| 0.78 | `apps/inverter/lib/control.py:466` `acl_table_report` <-> `apps/dashboard/lib/control.py:296` `acl_table_report` |
-| 0.76 | `apps/scraper/lib/control.py:119` `__init__` <-> `apps/inverter/lib/control.py:96` `__init__` |
-| 0.76 | `apps/scraper/lib/server.py:89` `relay` <-> `apps/dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `apps/scraper/lib/control.py:119` `__init__` <-> `apps/dashboard/lib/control.py:73` `__init__` |
-| 0.74 | `apps/cache/lib/config.py:127` `load_profile_write_gate` <-> `common/settings/config.py:444` `load_write_gate_file` |
-| 0.72 | `common/settings/config.py:14` `resolve_target` <-> `common/runtime/daemon.py:44` `default_config_path` |
 
 ## The surface sweep — the listeners, the wire and the loops
 
@@ -301,7 +303,7 @@ the family canon: same cause, same code, same text shape.
 **The rc summary** + **the distinct refusal texts** (the literal
 message args — the family's refusal canon):
 
-- rc 0 (the clean exits): 8; rc 1 (the binds): 11; rc 2 (the CLI mistakes): 4; 0 site(s) raising a variable (the message/`rc` computed —
+- rc 0 (the clean exits): 8; rc 1 (the binds): 11; rc 2 (the CLI mistakes): 12; 0 site(s) raising a variable (the message/`rc` computed —
   the common SystemExit(str) prints the message and exits 1).
 
 The refusal texts (the literal SystemExit args, sorted):
@@ -659,7 +661,7 @@ argument is the drift (the bare `print()` pre-prompt blank is the
 loop's own). `--check` fails on any finding — the door holds or the
 wave explains itself.
 
-The door holds: 5 session-path files,
+The door holds: 2 session-path files,
 every print through `page_out`/`display` (the bare pre-prompt
 blinks excepted).
 

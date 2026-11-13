@@ -20,7 +20,11 @@ the Deye hybrids — packaged together as one Nix flake:
 
 The tools speak one vocabulary: the fake inverter serves from a profile, the
 cache fetches its selection from it, the scraper binds its metrics to it —
-and the client tool (`*-cli`: one-shot words, piped batch, the console) shares the family pattern (a
+and one client serves them all, `pvsuite-cli <tool>` (the daemon name or the
+short alias; the installed `modbus-cache-cli`/`modbus-scraper-cli`/
+`modbus-fake-cli`/`dashboard-cli` names are symlinks to the one dispatcher,
+the tool coming from the name): one-shot words, piped batch, the console. It
+shares the family pattern (a
 JSON-lines control server, a settings registry, an append-only audit trail,
 a reconnecting console session — TAB/`?` complete and describe every word,
 the registry's hierarchy nodes file the listings, the non-value reply lines
@@ -48,7 +52,9 @@ reference** — the modules, their option maps, the secrets discipline
 
 ```
 pv-suite/
-├── apps/          # the four tools — one self-contained dir each:
+├── apps/          # the four tools — one self-contained dir each — plus
+│   │             #   pvsuite-cli.py, the one client dispatcher (the tools'
+│   │             #   *-cli bins are symlinks to it)
 │   ├── dashboard/  #   the dashboard web UI + proxy server
 │   ├── scraper/    #   modbus-scraper exporter
 │   ├── cache/      #   modbus-cache proxy

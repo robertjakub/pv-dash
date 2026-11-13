@@ -29,7 +29,10 @@ artifacts. The pattern:
   `modbus-cache-cli`; the scraper image: `modbus-scraper`,
   `modbus-scraper-cli`; the dashboard image:
   `dashboard`, `dashboard-cli`), `bash` for interactive
-  runs
+  runs; the `*-cli` names are symlinks to the family dispatcher
+  (`pvsuite-cli.py`, copied to `/pv-suite` via the `cli` build context) —
+  the client comes from the invoked name, `pvsuite-cli <tool>` spells the
+  same thing when the plain script is on `PATH`
 - a **HEALTHCHECK** on every image: the Modbus tools answer over their
   unix control socket (`<tool>-cli ping` / `show version` — the check
   runs as root, a trusted peer over SO_PEERCRED, so no token is needed;

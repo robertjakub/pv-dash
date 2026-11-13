@@ -40,10 +40,10 @@ Every name in that list is stdlib (`argparse`, `ast`, `collections`,
 |---|---|---|---|
 | [`common/`](../../common/README.md) | the package (21 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
 | [`shared/profiles/`](../../shared/profiles/README.md) | 6 device-profile JSONs | none — stdlib only | data; the lint/format tool = `scripts/gates/profile.py` |
-| [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (10 modules) + 1 control clients | none — stdlib only (+ `common`) | proxy daemon |
-| [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (12 modules) + 1 control clients | none — stdlib only (+ `common`) | simulator |
-| [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (10 modules) + 1 control clients | none — stdlib only (+ `common`) | exporter |
-| [`apps/dashboard/`](../../apps/dashboard/README.md) | `bin/dashboard.py` + `lib/` (6 modules) + 1 control clients + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
+| [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (11 modules) + 1 control clients | none — stdlib only (+ `common`) | proxy daemon |
+| [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (13 modules) + 1 control clients | none — stdlib only (+ `common`) | simulator |
+| [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (11 modules) + 1 control clients | none — stdlib only (+ `common`) | exporter |
+| [`apps/dashboard/`](../../apps/dashboard/README.md) | `bin/dashboard.py` + `lib/` (7 modules) + 1 control clients + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 
 ## Runtime and deployment layers
 

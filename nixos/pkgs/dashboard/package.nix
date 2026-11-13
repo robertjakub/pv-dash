@@ -21,7 +21,7 @@ stdenv.mkDerivation (finalAttrs: {
     runHook preInstall
 
     install -Dm755 bin/dashboard.py $out/share/dashboard/dashboard.py
-    install -Dm755 bin/dashboard-cli.py $out/share/dashboard/dashboard-cli.py
+    install -Dm755 ${../../../apps/pvsuite-cli.py} $out/share/dashboard/dashboard-cli.py
     install -dm755 $out/share/dashboard/lib
     install -m644 lib/*.py lib/defaults.json lib/options.json $out/share/dashboard/lib/
     install -dm755 $out/share/dashboard/common

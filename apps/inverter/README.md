@@ -19,7 +19,7 @@ It ships three tools:
 | Tool | Purpose |
 |---|---|
 | `modbus-fake-inverter.py` | the server (also packaged as `modbus-fake-inverter`) |
-| `modbus-fake-cli.py` | console-style interactive session on the same control server (`modbus-fake-cli`) |
+| `modbus-fake-cli.py` | console-style interactive session on the same control server (`modbus-fake-cli`; a symlink to the family's `apps/pvsuite-cli.py` dispatcher — `pvsuite-cli inverter` spells the same client) |
 
 ## How it works
 
@@ -232,6 +232,10 @@ never drift.
 
 ### `modbus-fake-cli` — one-shot / batch / console
 
+The client bin is a symlink to the family's `apps/pvsuite-cli.py`
+dispatcher — `pvsuite-cli inverter` or `pvsuite-cli modbus-fake-inverter`
+spells the same client, the tool from the word.
+
 ```bash
 python3 apps/inverter/bin/modbus-fake-cli.py set pv 2500
 printf 'set pv 2500\nset soc 30\nshow pv\n' | python3 apps/inverter/bin/modbus-fake-cli.py --control-port 15599
@@ -398,7 +402,7 @@ logs.
 apps/inverter/
 ├── bin/
 │   ├── modbus-fake-inverter.py    # CLI entry, logging, wiring
-│   └── modbus-fake-cli.py         # console-style interactive control session
+│   └── modbus-fake-cli.py         # console-style interactive control session (a symlink to the family dispatcher, ../../pvsuite-cli.py)
 └── lib/
     ├── options.json    # the knob registry: the flags, the env twins, the live settings
     ├── options.py      # its loader: the Option rows, the control-grammar vocabulary

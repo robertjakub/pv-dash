@@ -4,12 +4,13 @@
 #
 # Build (the context = ../apps/cache, the entrypoint
 # = ../docker/entrypoints, the shared code = ../common, the shared example
-# files = ../extras/examples):
+# files = ../extras/examples, the pvsuite-cli dispatcher = ../apps):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
 #       --build-context shared=../shared \
 #       --build-context examples=../extras/examples \
-#       --build-context scripts=../docker --build-context common=../common ../apps/cache
+#       --build-context scripts=../docker --build-context common=../common \
+#       --build-context cli=../apps ../apps/cache
 #   # or: docker compose up -d modbus-cache
 #
 # Run:
@@ -41,6 +42,9 @@ COPY --from=common modbus/*.py common/modbus/
 COPY --from=shared suite/texts.json shared/suite/
 COPY --from=shared suite/protocol.json shared/suite/
 COPY --from=shared suite/wire.json shared/suite/
+# the family client dispatcher: the bin/modbus-cache-cli.py symlink in the
+# app context points at it (../../pvsuite-cli.py resolves here in-image)
+COPY --chown=pvsuite --from=cli pvsuite-cli.py pvsuite-cli.py
 COPY --chown=pvsuite bin/ cache/bin/
 COPY --chown=pvsuite lib/ cache/lib/
 COPY --chown=pvsuite examples/modbus-cache.conf cache/
@@ -52,7 +56,7 @@ COPY --chown=pvsuite --from=examples modbus-cache-filter.json config-defaults/se
 # at /config/modbus-auth.token (its clients' handshake and, when the
 # device speaks suite, the upstream handshake)
 RUN echo placeholder > config-defaults/modbus-auth.token
-RUN chmod +x cache/bin/*.py /usr/local/bin/pv-entrypoint \
+RUN chmod +x cache/bin/*.py pvsuite-cli.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/cache/bin/modbus-cache.py /usr/local/bin/modbus-cache \
     && ln -s /pv-suite/cache/bin/modbus-cache-cli.py /usr/local/bin/modbus-cache-cli
 

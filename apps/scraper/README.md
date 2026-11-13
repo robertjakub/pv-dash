@@ -145,7 +145,9 @@ in flags:
 The scraper runs the family's JSON-lines control server — **by default on
 the unix socket `/tmp/modbus-scraper-<listen-port>.socket`** (`0` switches
 it off, a TCP port number binds `127.0.0.1:PORT` instead). Talk to it with
-**`modbus-scraper-cli`** — one client, three modes (command words
+**`modbus-scraper-cli`** (a symlink to the family's `apps/pvsuite-cli.py`
+dispatcher — `pvsuite-cli scraper` or `pvsuite-cli modbus-scraper` spells the
+same client, the tool from the word) — one client, three modes (command words
 one-shot, piped stdin batch, a bare terminal the console):
 
 ```bash
@@ -384,7 +386,7 @@ Every scenario must end with the exporter serving correct metrics and
 apps/scraper/
 ├── bin/
 │   ├── modbus-scraper.py  # CLI, logging setup, signal handling, the control wiring
-│   └── modbus-scraper-cli.py     # console-style control session
+│   └── modbus-scraper-cli.py     # console-style control session (a symlink to the family dispatcher, ../../pvsuite-cli.py)
 ├── examples/
 │   ├── modbus-scraper.conf  # sample config in the set grammar
 │   └── metrics.json         # the phase rows' + the compute expressions' specs

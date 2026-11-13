@@ -3,11 +3,13 @@
 # build context (shared/profiles/).
 #
 # Build (the context = ../apps/inverter, the entrypoint
-# = ../docker/entrypoints, the shared code = ../common):
+# = ../docker/entrypoints, the shared code = ../common, the pvsuite-cli
+# dispatcher = ../apps):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-fake-inverter -t modbus-fake-inverter \
 #       --build-context shared=../shared \
-#       --build-context scripts=../docker --build-context common=../common ../apps/inverter
+#       --build-context scripts=../docker --build-context common=../common \
+#       --build-context cli=../apps ../apps/inverter
 #   # or: docker compose up -d
 #
 # Run:
@@ -35,6 +37,9 @@ COPY --from=common modbus/*.py common/modbus/
 COPY --from=shared suite/texts.json shared/suite/
 COPY --from=shared suite/protocol.json shared/suite/
 COPY --from=shared suite/wire.json shared/suite/
+# the family client dispatcher: the bin/modbus-fake-cli.py symlink in the
+# app context points at it (../../pvsuite-cli.py resolves here in-image)
+COPY --chown=pvsuite --from=cli pvsuite-cli.py pvsuite-cli.py
 COPY --chown=pvsuite bin/ inverter/bin/
 COPY --chown=pvsuite lib/ inverter/lib/
 COPY --chown=pvsuite examples/modbus-fake-inverter.conf inverter/modbus-fake-inverter.conf
@@ -44,7 +49,7 @@ COPY --chown=pvsuite examples/modbus-fake-inverter.conf inverter/modbus-fake-inv
 # at /config/modbus-auth.token (every client proves it right after connect)
 RUN mkdir -p config-defaults \
     && echo placeholder > config-defaults/modbus-auth.token
-RUN chmod +x inverter/bin/*.py /usr/local/bin/pv-entrypoint \
+RUN chmod +x inverter/bin/*.py pvsuite-cli.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/inverter/bin/modbus-fake-inverter.py /usr/local/bin/modbus-fake-inverter \
     && ln -s /pv-suite/inverter/bin/modbus-fake-cli.py /usr/local/bin/modbus-fake-cli
 

@@ -614,18 +614,17 @@ def secrets(rows):
 
 CONSOLE_SESSION_FILES = (
     'common/wire/cli.py',
-    'apps/cache/bin/modbus-cache-cli.py', 'apps/scraper/bin/modbus-scraper-cli.py',
-    'apps/inverter/bin/modbus-fake-cli.py', 'apps/dashboard/bin/dashboard-cli.py',
+    'apps/pvsuite-cli.py',
 )
 
 
 def naked_prints():
     """The console-print sweep: the cli session path prints through the
     pager's one door (page_out/display) — a naked print( carrying an
-    argument (or a file=/end= keyword) in common/wire/cli.py or a
-    bin/*-cli.py is the drift; the bare print() blank (the pre-prompt
-    breathing room) is the loop's own and stays. Returns (rel, line)
-    findings; --check fails on any."""
+    argument (or a file=/end= keyword) in common/wire/cli.py or the
+    pvsuite-cli dispatcher is the drift; the bare print() blank (the
+    pre-prompt breathing room) is the loop's own and stays. Returns
+    (rel, line) findings; --check fails on any."""
     out = []
     for rel in CONSOLE_SESSION_FILES:
         try:

@@ -6,7 +6,7 @@
 
 A single-page dashboard for home PV monitoring, fed by Prometheus. Part of
 the **pv-suite** family — the scraper, cache proxy, fake inverter and
-packaging overview live in the [suite root](../README.md).
+packaging overview live in the [suite root](../../README.md).
 
 ![Dashboard in demo mode](screenshots/demo.png)
 
@@ -152,8 +152,8 @@ control server.
 | `--auth-token` | off | the page's bearer token (the `?auth=` bootstrap sets the cookie); `file:<path>` welcome |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the HTTP caps (a total cap / the idle kick / the per-IP cap) |
 | `--metrics-server` / `--metrics-listen` | off / `127.0.0.1:9353` | the dashboard's own `/metrics` endpoint (a token is mandatory when it is on — F13) |
-| `--metrics-token` / `--metrics-acl` | off / `any` | the /metrics bearer (`file:<path>` welcome) / the connect ACL (the ip-prefix grammar — [docs/common/ACL.md](../docs/common/ACL.md)) |
-| `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `16` / `5` / `0` | the metrics caps |
+| `--metrics-token` / `--metrics-acl` | off / `any` | the /metrics bearer (`file:<path>` welcome) / the connect ACL (the ip-prefix grammar — [docs/specs/ACL.md](../../docs/specs/ACL.md)) |
+| `--metrics-max-clients` / `--metrics-client-timeout` / `--metrics-max-conn-per-ip` | `64` / `5` / `0` | the metrics caps |
 | `--control-port` | `/tmp/dashboard-<port>.socket` | the control server target (unix path or TCP port), `0` = off |
 | `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
 | `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`flush` is not a verb here) |
@@ -255,7 +255,7 @@ This page expects PV inverter metrics in Prometheus (`huawei_*_watts` —
 the scraper's `--metrics-prefix` default). The `scraper/` subproject ships
 a dependency-free
 Python exporter that polls the inverter over Modbus TCP and serves exactly
-those metrics — see [`../apps/scraper/README.md`](../apps/scraper/README.md):
+those metrics — see [`../scraper/README.md`](../scraper/README.md):
 
 ```bash
 python3 apps/scraper/bin/modbus-scraper.py --upstream <inverter-lan-ip>:502 --listen 0.0.0.0:9350
@@ -273,14 +273,14 @@ scrape_configs:
 The inverter accepts only one Modbus TCP client — the `cache/` subproject
 is an **experimental** caching proxy that multiplexes that one connection
 so the scraper can share it with other tools:
-[`../apps/cache/README.md`](../apps/cache/README.md).
+[`../cache/README.md`](../cache/README.md).
 
 ## Security
 
 Loopback is open, the LAN needs the bearer token (a token-less
 non-loopback bind refuses to start, F21), and TLS terminates at an
 authenticating reverse proxy. The full story is
-[docs/SECURITY.md](../docs/SECURITY.md).
+[docs/SECURITY.md](../../docs/SECURITY.md).
 
 ## Testing
 
@@ -303,7 +303,7 @@ and **zero tracebacks** in the logs.
 | `static/style.css` | all styling (dark/light themes, layout, flow diagram) |
 | `static/boot.js` / `static/i18n.js` | the config/i18n loader (must stay in `<head>`) / the translations |
 | `static/vendor/echarts.min.js` | vendored ECharts 5.5.1 (Apache-2.0) — no CDN needed |
-| `bin/dashboard.py` / `dashboard.conf` | static server + Prometheus proxy (serves `static/` by default) |
+| `bin/dashboard.py` | static server + Prometheus proxy (serves `static/` by default; the config sample is `examples/dashboard.conf`) |
 | `bin/dashboard-cli.py` | the control client: one-shot words / piped batch / the console session |
 | `lib/config.py` | settings resolution (CLI > env > the `dashboard.conf` set grammar > defaults) + the control-target resolution |
 | `lib/options.json` + `lib/options.py` | the knob registry and its loader (one source for the wire, the completions and the docs) |

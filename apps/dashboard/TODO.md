@@ -1,6 +1,6 @@
 # TODO (dashboard — the Done/history records)
 
-The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
+The open items live in the family-wide [TODO](../../docs/TODO.md) (tagged
 `[dashboard]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
@@ -189,14 +189,14 @@ The battery-always-on wave: **`--battery`/`$BATTERY` are gone** (the live
 `battery` with them) — the served `config.js` always carries the battery
 panels (the injection is unconditional now), and the dashboard UI
 redesign (the front end's batteryEnabled gate) is the open
-[docs/TODO.md](../docs/TODO.md) item.
+[docs/TODO.md](../../docs/TODO.md) item.
 
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (404 → ~300 lines) — the Files table folded into the Source
 layout, the Control wall became the command table; the NixOS section
 (the flake example + the stale option list — it predated the metrics
 endpoint, the dump knobs and the auth-token pair) moved to
-[docs/NIXOS.md (now nixos/README.md)](../nixos/README.md); the Testing section ADDED (the
+[docs/NIXOS.md (now nixos/README.md)](../../nixos/README.md); the Testing section ADDED (the
 control-fuzz suite + the /config.js fuzz pin).
 
 The metrics/acl family wave: the dashboard's own `/metrics` takes the

@@ -31,7 +31,7 @@ CACHE_DIR = os.path.join(REPO, 'apps', 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
 F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
-R = os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')
+R = os.path.join(REPO, 'shared', 'profiles', 'sun2000.json')
 
 CACHE_PORT = 15505 + BASE
 PORT = 15501 + BASE
@@ -2135,7 +2135,7 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     # profile's write-acl rule chain (the whitelist: the last matching rule
     # decides, a register no rule decides refuses) — the deye profile allows
     # the TOU schedule slots (148-177) and the grid-start registers (127-128)
-    deye = os.path.join(REPO, 'profiles', 'profiles', 'deye-sg05lp3.json')
+    deye = os.path.join(REPO, 'shared', 'profiles', 'deye-sg05lp3.json')
     start([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15584 + BASE), '--modbus-profile', deye,
            '--control-port', '0', '--allow-write'], log=os.path.join(SCRATCH, 'reg_deye_fake.log'))
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15584 + BASE),

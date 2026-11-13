@@ -50,7 +50,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm644 ${../../../extras/alerts}/scraper.yml $out/share/modbus-scraper/alerts.yml
     install -Dm644 ${../../../shared}/schema/acl-ip-prefix.schema.json $out/share/modbus-scraper/acl-ip-prefix.schema.json
     install -dm755 $out/share/modbus-scraper/profiles
-    install -m644 ${../../../profiles/profiles}/*.json $out/share/modbus-scraper/profiles/
+    install -m644 ${../../../shared/profiles}/*.json $out/share/modbus-scraper/profiles/
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-scraper \

@@ -1,6 +1,6 @@
 """Configuration plumbing shared by the family (stdlib only): the
 listen-address parser, the token-file loader, the device-profile
-resolution (the shared profiles/ schema from the profiles/ subproject),
+resolution (the shared profiles/ schema from shared/profiles),
 the set-grammar config-script loader, the resolver (the family's
 precedence: CLI flags > env > config script > defaults) and the
 control-token rules."""
@@ -669,13 +669,13 @@ def parse_secret(raw, label='secret'):
 def _profile_candidates(name):
     here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # .../common/settings -> the tree root
     return [os.path.join(here, 'profiles', name),                        # the bundled copy (the packaged share tree)
-            os.path.join(here, 'profiles', 'profiles', name),            # the profiles/ subproject (the dev tree)
+            os.path.join(here, 'shared', 'profiles', name),              # shared/profiles (the dev tree)
             os.path.join(os.path.dirname(here), 'profiles', name)]       # one up (an unpackaged suite tree)
 
 
 def default_profile_path(name='sun2000.json'):
     """The bundled device profile (packaged next to the tool's share tree)
-    or the shared profiles/ subproject at the repository root (dev tree)."""
+    or the suite's shared/profiles data dir at the repository root (dev tree)."""
     for candidate in _profile_candidates(name):
         if os.path.exists(candidate):
             return candidate
@@ -683,7 +683,7 @@ def default_profile_path(name='sun2000.json'):
 
 
 def resolve_profile_file(text, candidates=None):
-    """A profile name (sun2000, deye -> the shared profiles/ subproject) or
+    """A profile name (sun2000, deye -> shared/profiles) or
     a JSON path, passed through. `candidates` swaps the name walk for the
     caller's (the fake resolves its own embedded-copy-first list,
     lib/profile.py _profile_candidates) — the default is the shared

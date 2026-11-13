@@ -102,7 +102,7 @@ the inverter Modbus settings
 | `modbus-timeout` | `set modbus timeout` | settable | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | Modbus connect/read timeout in seconds |
 | `modbus-read-delay` | `set modbus read-delay` | settable | `s` | `--modbus-read-delay` / `MODBUS_READ_DELAY` | seconds between consecutive device reads within a poll cycle |
 | `modbus-merge-gap` | `set modbus merge-gap` | settable | `registers` | `--modbus-merge-gap` / `MODBUS_MERGE_GAP` | max register gap when merging the profile's source ranges into block reads; the plan rebuilds |
-| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON (a bare name resolves in profiles/profiles/) |
+| `modbus-profile` | `set modbus profile` | settable | `\<file>` | `--modbus-profile` / `MODBUS_PROFILE` | device profile JSON (a bare name resolves in shared/profiles/) |
 | `grid-positive-import` | `set modbus grid-positive-import` | settable | `on\|off` | `--grid-positive-import` / `GRID_POSITIVE_IMPORT` | grid register positive when importing |
 | `modbus-interval` | `set modbus interval` | settable | `s` | `--modbus-interval` / `MODBUS_INTERVAL` | seconds between polls of the upstream |
 

@@ -39,7 +39,7 @@ Every name in that list is stdlib (`argparse`, `ast`, `collections`,
 | Subproject | First-party code | Third-party runtime | Notes |
 |---|---|---|---|
 | [`common/`](../../common/README.md) | the package (21 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
-| [`profiles/`](../../profiles/README.md) | 6 device-profile JSONs | none — stdlib only | data; the lint/format tool = `scripts/lint/profile.py` |
+| [`shared/profiles/`](../../shared/profiles/README.md) | 6 device-profile JSONs | none — stdlib only | data; the lint/format tool = `scripts/lint/profile.py` |
 | [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (10 modules) + 1 control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (12 modules) + 1 control clients | none — stdlib only (+ `common`) | simulator |
 | [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (10 modules) + 1 control clients | none — stdlib only (+ `common`) | exporter |
@@ -79,7 +79,7 @@ python3 scripts/generators/sbom.py --check
 grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib | sort -u
 
 # the container layer
-docker build -t pv-sbom-check --build-context profiles=../profiles \
+docker build -t pv-sbom-check \
     --build-context scripts=../docker --build-context common=../common ../cache   # or the others
 docker run --rm pv-sbom-check sh -c 'apk info -v | sort'                          # the apk set
 

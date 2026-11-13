@@ -428,7 +428,7 @@
       "flag": "--modbus-profile",
       "env": "MODBUS_PROFILE",
       "conv": "str",
-      "setting-help": "device profile JSON (a bare name resolves in profiles/profiles/)",
+      "setting-help": "device profile JSON (a bare name resolves in shared/profiles/)",
       "values": [
         "default"
       ],

@@ -12,7 +12,7 @@ stack can be exercised without hardware. Through **inverter profiles** it
 can emulate different devices: the shipped default profile is the
 `sun2000` (Huawei SUN2000) map, and Deye hybrid profiles are included as
 well — see
-[profiles/README.md](../profiles/README.md).
+[shared/profiles/README.md](../shared/profiles/README.md).
 
 It ships three tools:
 
@@ -79,7 +79,7 @@ The fake doesn't hardcode any device layout: the simulator computes
 **named physical values** (`pv-power`, `grid-power`, `battery-soc`, …)
 and the **inverter profile** maps each name onto a register address and
 encoding. The format, the semantics and the shipped devices are documented
-once in [profiles/README.md](../profiles/README.md). `show registers`
+once in [shared/profiles/README.md](../shared/profiles/README.md). `show registers`
 prints the loaded profile as a table, `set modbus profile <name|path>` swaps it
 live, `--modbus-profile` / `MODBUS_PROFILE` pick it at start; `clear modbus
 profile` returns to the configured map.

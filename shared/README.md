@@ -13,6 +13,7 @@ leans on).
 | `suite/options.json` | the option registries' canon — per knob, the family-wide fields: a block may carry every row key but the three placement keys (`name` — the flat name IS the block's key; `only`; `shared` — the ref itself), so the prose, the wiring that agrees (`flag`, `env`, `conv`, `min`/`max`, the marks) and the tuning that agrees (`default`, the `alias`) ride together; a registry row references its block with `"shared": "<name>"` and the loader folds the block under the row's own fields (the row's inline field wins — the per-tool override). The `show`/`commands` sections are the flat word -> text maps the show/command rows fold from, or the same fold one shape up — a dict block carrying the row's fields (`internal`, `hidden`, ...). One edit updates every tool's --help, man page, wire help and docs. `scripts/lint/options.py --check` gates it both ways: every ref resolves, every block referenced, a block never wears a placement key or an unknown key, the ≥3-tool byte-identical text must ref, and the gated fields stay byte-identical across the four registries (or ride the lint's named exemption) |
 | `suite/protocol.json` | the Modbus family's one shared tree: the protocol limits (max_pdu/max_count/max_bits/max_registers/socket_timeout), the unit range, the read/write FC policy, the exception codes and the registers' type->words map — `common/modbus/protocol.py` loads it at the tree root, the three Modbus tools' `statics.py` project it, the `modbus timeout` knobs ride its socket_timeout |
 | `suite/wire.json` | the control wire's own defaults — a flat `cli_*` tree (the timeout/keepalive/reconnect cluster, the session's idle cap and the line cap; one home for the family) — `common/wire/control.py` loads it at the tree root, the tools' `statics.py` alias it |
+| [`profiles/`](profiles/README.md) | the device profiles — one JSON format, one home: the fake inverter serves from it, the cache fetches its selection from it, the scraper binds its metrics to it; `scripts/lint/profile.py` (the lint verb + the canonical `format`) keeps the six shipped JSONs in shape |
 | [`schema/`](schema/README.md) | the shared JSON Schemas (draft 2020-12) — a schema lives here when the file it describes is shared; today that is the standalone acl file's two gates (the [ip-prefix](../extras/examples/README.md) connect gate + the write-registers gate), validated by `scripts/validate_json.py` |
 
 How the tree is found: the loaders read the suite JSONs under
@@ -27,11 +28,8 @@ How the tree is found: the loaders read the suite JSONs under
 - **docker image** — the `shared=` named build context — the suite
   texts ride at `/pv-suite/shared/suite/`
 
-Deliberately *not* here: [`profiles/`](../profiles/README.md) (the
-device profiles — one JSON format with a linter and a formatter of
-their own) stays its own root dir, while
-[`extras/examples/`](../extras/examples/README.md) (the sample files
-the tools' `file:` gates point at) and
+Deliberately *not* here: [`extras/examples/`](../extras/examples/README.md)
+(the sample files the tools' `file:` gates point at) and
 [`extras/alerts/`](../extras/alerts/README.md) (the Prometheus rule
 pack — shipped by the watched exporters' packages, loaded by no tool)
 live under `extras/` with the other operator-side packs; the

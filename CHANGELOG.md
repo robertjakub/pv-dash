@@ -155,6 +155,29 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **The device profiles fold into `shared/`** — `profiles/profiles/` +
+  the README move to `shared/profiles/` and the root `profiles/` dir
+  retires (it had been pure data since the lint/ merge took its tools;
+  the undecided long game from the shared/ wave closes). The dev-tree
+  candidate in both profile walks (`common/settings/config.py`'s shared
+  resolver and the fake's own `apps/inverter/lib/profile.py` list)
+  re-points at `<tree>/shared/profiles/` — the packaged layouts are
+  unchanged, the tools still carry the JSONs flat as `profiles/` beside
+  their lib. The three Modbus `package.nix` install lines read the JSONs
+  from `../../../shared/profiles`; the docker images COPY them off the
+  existing `shared=` named context and the separate `profiles=`
+  build context dies (the three Dockerfile headers, the demo and prod
+  composes' `additional_contexts`, docker/README's recipes). The SBOM
+  speaks the shared data as one component (`pv-suite:profiles` →
+  `pv-suite:shared`, the scan dir follows, the pair regenerated). The
+  registry help string ("a bare name resolves in shared/profiles/")
+  re-renders the MANUAL pages, the conf examples and the env examples;
+  the README table/tree, shared/README (the boundary ruling drops the
+  profiles exception), extras/README, common/README, docs/SECURITY.md,
+  docs/common/MODBUS.md and the scripts README follow. Verified: the
+  lint gates + the battery runner green, the nix builds read the new
+  path.
+
 - **The lint/ directory speaks one CLI grammar** — profile.py's, all
   five members: `lint` is the default verb and never writes (acl.py's
   and options.py's write-by-default bare runs retire — the write is the

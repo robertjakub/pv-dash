@@ -5,7 +5,7 @@ F16): one rule file per watched exporter, every alert naming the audit
 events and the log lines it correlates with, so a fired page tells the
 operator where the trail lives. No tool loads these files — the consumer
 is the Prometheus collector; each watched exporter's package ships its
-half (the same ruling shape as [`profiles/`](../../profiles/README.md) and
+half (the same ruling shape as [`shared/profiles/`](../../shared/profiles/README.md) and
 [`extras/examples/`](../../extras/examples/README.md), the other dirs no tool
 owns).
 

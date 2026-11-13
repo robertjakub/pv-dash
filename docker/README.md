@@ -37,10 +37,10 @@ artifacts. The pattern:
   a live `set control-port off` on a running container, by design; a
   later `set control-port <unix-path>` re-arms it), the
   Prometheus image probes `/-/ready` with busybox wget
-- the shared [`profiles/`](../profiles/README.md) JSON files copied flat to
-  `/pv-suite/profiles/` (the subproject is pure data — its lint/format
-  tool lives in `scripts/lint/profile.py`) — the profile resolution finds
-  them relative to the checkout layout
+- the shared [`profiles/`](../shared/profiles/README.md) JSON files copied
+  flat to `/pv-suite/profiles/` (pure data, home `shared/profiles/`; the
+  linter/formatter lives in `scripts/lint/profile.py`) — the profile
+  resolution finds them relative to the checkout layout
 - the **config volume** (`/config`, `VOLUME` + `ENTRYPOINT
   pv-entrypoint`): the entrypoint seeds it with the **required file
   artifacts only** — the generated `metrics.token`, the generated
@@ -50,8 +50,9 @@ artifacts. The pattern:
   [env or the config volume?](#env-or-the-config-volume) for the split:
   the env twins (and the per-tool env files) cover the knobs, the volume
   holds the file-shaped artifacts.
-- the build context = the subproject; the profiles, the entrypoint and the
-  shared [`common/`](../common/README.md) package ride in as named build
+- the build context = the subproject; the entrypoint, the shared
+  [`common/`](../common/README.md) package and the shared data (the
+  profiles among it) ride in as named build
   contexts (`additional_contexts` in the compose, `--build-context` for
   plain docker builds) — common lands at `/pv-suite/common/`, next to each
   tool's `lib/`
@@ -255,7 +256,6 @@ The demo device for development and testing — see the
 ```bash
 cd docker
 docker build -f ../docker/Dockerfile.modbus-fake-inverter -t modbus-fake-inverter \
-    --build-context profiles=../profiles \
     --build-context shared=../shared \
     --build-context scripts=../docker --build-context common=../common ../inverter
 docker run --rm -p 127.0.0.1:5502:5502 modbus-fake-inverter   # loopback-published, serves on 0.0.0.0:5502 in the container
@@ -281,7 +281,6 @@ from the image; the volume carries `/config/selection.json` (`SELECTION`)
 ```bash
 cd docker
 docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
-    --build-context profiles=../profiles \
     --build-context shared=../shared \
     --build-context scripts=../docker --build-context common=../common ../cache
 docker run --rm -p 127.0.0.1:15502:15502 modbus-cache    # upstream defaults to modbus-fake-inverter:5502 (the image's UPSTREAM env)
@@ -308,7 +307,6 @@ there, it survives recreation; override the conf's knobs with
 ```bash
 cd docker
 docker build -f ../docker/Dockerfile.modbus-scraper -t modbus-scraper \
-    --build-context profiles=../profiles \
     --build-context shared=../shared \
     --build-context scripts=../docker --build-context common=../common ../scraper
 docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper    # upstream defaults to modbus-cache:15502 (the image's UPSTREAM env)

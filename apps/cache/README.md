@@ -280,8 +280,8 @@ ids are validated on every forwarded request before anything is cached.
 The proxy caches the registers listed in the **device profile** — the same
 shared schema the [fake inverter](../apps/inverter/README.md) serves and the
 [scraper](../apps/scraper/README.md) scrapes; the shipped profiles live in the
-suite's [`profiles/`](../profiles/) subproject (`sun2000.json` by default).
-The format is documented in [profiles/README.md](../profiles/README.md).
+suite's [`shared/profiles/`](../shared/profiles/) data dir (`sun2000.json` by default).
+The format is documented in [shared/profiles/README.md](../shared/profiles/README.md).
 Resolution: `--modbus-profile` flag, env `MODBUS_PROFILE`, config `set modbus profile`,
 then the bundled copy; the file is re-read on `SIGHUP`.
 

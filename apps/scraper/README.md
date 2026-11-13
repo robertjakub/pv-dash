@@ -91,7 +91,7 @@ set system log-level INFO
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
 | `--modbus-auth` / `--modbus-auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/common/MODBUS.md](../docs/common/MODBUS.md) |
-| `--modbus-profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `profiles/profiles/`); live-swappable with `set modbus profile` |
+| `--modbus-profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `shared/profiles/`); live-swappable with `set modbus profile` |
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
 | `--metrics-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
 | `--max-kwp` / `--max-grid-kw` | `6` / `12` | the sanity caps in kW: above the cap → HTTP 503 + error log; `0` = off |
@@ -251,8 +251,8 @@ poll interval — tune them to yours.
 *Where* the primary values live comes from a **device profile** — the same
 shared schema the [fake inverter](../apps/inverter/README.md) serves and the
 [cache](../apps/cache/README.md) polls; the shipped profiles live in the suite's
-[`profiles/`](../profiles/) subproject (`sun2000.json` by default); the
-format is documented in [profiles/README.md](../profiles/README.md).
+[`shared/profiles/`](../shared/profiles/) data dir (`sun2000.json` by default); the
+format is documented in [shared/profiles/README.md](../shared/profiles/README.md).
 Resolution: `--modbus-profile` flag, env `MODBUS_PROFILE`, config `set modbus profile`,
 then the bundled copy; re-read on `SIGHUP`. The live control surface swaps
 it at runtime: `set modbus profile <file-or-name>` loads the new map,

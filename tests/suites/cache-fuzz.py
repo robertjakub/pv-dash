@@ -36,7 +36,7 @@ try:
     procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % PORT,
                                    '--listen', '127.0.0.1:%d' % CACHE_PORT, '--modbus-interval', '1',
                                    '--allow-write', '--modbus-profile',
-                                   os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')],
+                                   os.path.join(REPO, 'shared', 'profiles', 'sun2000.json')],
                                   stdout=open(os.path.join(SCRATCH, 'fuzz_cache.log'), 'w'), stderr=subprocess.STDOUT))
     time.sleep(2)
 

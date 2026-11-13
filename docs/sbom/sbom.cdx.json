@@ -16,7 +16,7 @@
       "properties": [
         {
           "name": "pv-suite:scope",
-          "value": "the whole flake: dashboard, scraper, cache, inverter, profiles, common"
+          "value": "the whole flake: dashboard, scraper, cache, inverter, shared, common"
         }
       ]
     }
@@ -40,9 +40,9 @@
       ]
     },
     {
-      "bom-ref": "pv-suite:profiles",
+      "bom-ref": "pv-suite:shared",
       "type": "file",
-      "name": "profiles",
+      "name": "shared",
       "version": "0.4.3",
       "licenses": [
         {
@@ -52,7 +52,7 @@
       "properties": [
         {
           "name": "pv-suite:content",
-          "value": "6 device-profile JSONs (data only — the lint/format tool lives in scripts/lint/profile.py)"
+          "value": "the shared data the tools load — 6 device-profile JSONs (shared/profiles), the suite JSONs (shared/suite), the acl schemas (shared/schema); the lint/format tool lives in scripts/lint/profile.py)"
         }
       ]
     },
@@ -248,7 +248,7 @@
         "pv-suite:modbus-scraper",
         "pv-suite:modbus-cache",
         "pv-suite:modbus-fake-inverter",
-        "pv-suite:profiles",
+        "pv-suite:shared",
         "pv-suite:common"
       ]
     },
@@ -256,21 +256,21 @@
       "ref": "pv-suite:modbus-cache",
       "dependsOn": [
         "pv-suite:common",
-        "pv-suite:profiles"
+        "pv-suite:shared"
       ]
     },
     {
       "ref": "pv-suite:modbus-scraper",
       "dependsOn": [
         "pv-suite:common",
-        "pv-suite:profiles"
+        "pv-suite:shared"
       ]
     },
     {
       "ref": "pv-suite:modbus-fake-inverter",
       "dependsOn": [
         "pv-suite:common",
-        "pv-suite:profiles"
+        "pv-suite:shared"
       ]
     },
     {
@@ -284,7 +284,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pv-suite:profiles",
+      "ref": "pv-suite:shared",
       "dependsOn": []
     },
     {

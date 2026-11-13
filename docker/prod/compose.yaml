@@ -1,7 +1,7 @@
 # The pv-suite Modbus tools as compose services — the PRODUCTION shape:
 # the real deployment against real hardware. The same three tool images
 # the demo stack runs (the Dockerfiles are the parent directory's
-# Dockerfile.<daemon> files; the shared profiles/, the entrypoint and the
+# Dockerfile.<daemon> files; the entrypoint and the
 # common/ package + shared/ ride in as named contexts) — only the wiring differs:
 #
 #   - NO fake inverter: the cache's UPSTREAM points at the real device
@@ -54,7 +54,6 @@ services:
       context: ../../apps/cache
       dockerfile: ../../docker/Dockerfile.modbus-cache
       additional_contexts:
-        profiles: ../../profiles
         scripts: ..
         common: ../../common
         shared: ../../shared
@@ -85,7 +84,6 @@ services:
       context: ../../apps/scraper
       dockerfile: ../../docker/Dockerfile.modbus-scraper
       additional_contexts:
-        profiles: ../../profiles
         scripts: ..
         common: ../../common
         shared: ../../shared

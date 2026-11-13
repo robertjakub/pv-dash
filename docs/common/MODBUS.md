@@ -397,10 +397,10 @@ FC1/FC2 spaces). Scale semantics: wire = value × scale (a `bit` entry
 serves `1` when the scaled value is nonzero; the decode divides by the
 gain).
 
-Device register maps live in `profiles/profiles/*.json`
+Device register maps live in `shared/profiles/*.json`
 (`sun2000.json`, `demo-fc4.json`, `deye-sg03lp1.json`,
 `deye-sg04lp3.json`, `deye-sg05lp3.json`); the schema is
-`profiles/README.md`. Per entry: `name`, `register`, `type`, optional
+`shared/profiles/README.md`. Per entry: `name`, `register`, `type`, optional
 `fc` — word types `3` (default) or `4`, `bit` entries `1` (default) or
 `2` — optional per-entry `ttl`, `scale`, `desc`. A
 profile may carry a top-level `acl.write` gate — an optional `desc` and

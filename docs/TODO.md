@@ -588,7 +588,7 @@ re-open — is the history half:
   register/coil/discrete stay undumped; `show registers` gains the fc
   column + per-space pin markers (today the overlay `*` misfires on fc4
   rows); reset/SIGUSR1/inspect count the fourth map; the suite drives
-  `profiles/profiles/demo-fc4.json` for it.
+  `shared/profiles/demo-fc4.json` for it.
 - **the dongle latency profile** — a persistent slow-reply
   mode (the laggy-modem character: every response delayed, not dropped) to
   exercise modbus-read-delay and poll pacing against a realistic SDongle — the
@@ -760,7 +760,7 @@ re-open — is the history half:
   (the `scraper` section since moved to `lib/metrics.json`, merged in
   memory over the configured spec),
   the poll-latency gauges, the shipped FC4 profile
-  (`profiles/profiles/demo-fc4.json`) and the per-phase chain (the
+  (`shared/profiles/demo-fc4.json`) and the per-phase chain (the
   metrics + the dashboard's phase strip); the scrape README carries the
   F15 privacy note.
 - **the read-only control role** — the former open item ("a second token

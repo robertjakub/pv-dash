@@ -5,7 +5,7 @@ The spec is **sectioned** (docs/TODO.md — the metrics.json sections):
 
 - `"metrics"` — the metric tree: one entry per metric, the entry's own
   field says what feeds it — `"profile"` names a device-profile register
-  (profiles/profiles schema) the metric is read from, `"expr"` derives it
+  (shared/profiles schema) the metric is read from, `"expr"` derives it
   per poll (over the declared inputs — pv, grid, batt, soc and
   every profile-bound metric key; an optional `"when"` gates the presence);
   compiled once at startup (lib/expr.py); the exported name is

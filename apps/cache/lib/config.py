@@ -198,7 +198,7 @@ def render_write_acl(desc, rules):
 
 def load_registers_file(path):
     """Device profile: {"registers": [{"name", "register", "type", "fc", ...}]} —
-    the shared schema from the profiles/ subproject. Returns the full
+    the shared schema from shared/profiles. Returns the full
     (ranges, names) map; which entries are actually fetched is the
     selection file's job (load_selection). "type" gives the word width
     (i16/u16 = 1 register word, i32/u32 and the swap/float variants = 2,

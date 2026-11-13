@@ -22,9 +22,8 @@ grammar).
 
 ## The fenced dirs (NOT candidates)
 
-- **profiles/** — runtime data: the fake loads it (`--profile`), the
-  tests resolve it from `__file__`.
-- **shared/** — runtime data the tools load (texts, schema, tags).
+- **shared/** — runtime data the tools load (the device profiles under
+  `profiles/`, the texts/schema/tags under `suite/`, the schemas).
 - **docker/** — build machinery: the Dockerfiles, the SBOM embeds
   their paths, the compose contexts reach into the sibling dirs.
 - **tests/, scripts/, docs/** — the gates, the generators, the

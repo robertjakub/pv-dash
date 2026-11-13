@@ -14,7 +14,7 @@ parsed. lint exits 1 when anything is off; format exits 1 when a file is
 not valid JSON, and --check/--diff report the layout drift without
 touching the files (rc 1 when anything is off-form).
 
-  python3 scripts/lint/profile.py                  # lint profiles/profiles/*.json
+  python3 scripts/lint/profile.py                  # lint shared/profiles/*.json
   python3 scripts/lint/profile.py my.json          # lint specific files
   python3 scripts/lint/profile.py format my.json   # reformat files in place
   python3 scripts/lint/profile.py format --check   # the drift report only, rc 1 = off-form
@@ -307,7 +307,7 @@ def main():
     mode, check, diff, paths = grammar(sys.argv[1:])
     if mode == 'usage':
         return 2
-    paths = paths or sorted(glob.glob(os.path.join(REPO, 'profiles', 'profiles', '*.json')))
+    paths = paths or sorted(glob.glob(os.path.join(REPO, 'shared', 'profiles', '*.json')))
     if mode == 'format':
         return cmd_format(paths, write=not check and not diff, diff=diff)
     return cmd_lint(paths)

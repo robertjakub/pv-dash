@@ -1084,7 +1084,7 @@ try:
           and r.stdout.startswith('% error: unknown setting bogus'), r.stdout.strip())
 
     # 2f. register-map profiles: the fake serves the SUN2000 layout from
-    # profiles/profiles/sun2000.json by default; a custom profile remaps names onto
+    # shared/profiles/sun2000.json by default; a custom profile remaps names onto
     # different registers (with per-entry type/scale) to emulate other devices
     import json as _json
     prof = os.path.join(SCRATCH, 'scr_prof_custom.json')

@@ -3,7 +3,7 @@
 
 The simulator computes NAMED physical values (pv-power, device-temperature,
 grid-power, battery-soc, ...); a profile maps each name onto a wire address
-and an encoding. The shipped sun2000 profile (profiles/profiles/sun2000.json)
+and an encoding. The shipped sun2000 profile (shared/profiles/sun2000.json)
 reproduces the classic SUN2000/Meter/LUNA2000 layout byte for byte; a custom
 profile reuses the names on different registers to emulate a different
 inverter, battery or meter. Everything about an entry lives in the JSON —
@@ -34,10 +34,10 @@ import struct
 from common.modbus.protocol import PROTOCOL
 from common.settings.config import resolve_profile_file
 
-# The suite's shared device profiles live in the profiles/profiles/ data dir
-# of the profiles/ subproject at the repository root; a packaged tool carries
-# the JSON files flat, as a profiles/ dir of its own. Every profile there is
-# addressable by its bare name (deye -> deye.json).
+# The suite's shared device profiles live in the shared/profiles/ data dir
+# at the repository root; a packaged tool carries the JSON files flat, as a
+# profiles/ dir of its own. Every profile there is addressable by its bare
+# name (deye -> deye.json).
 
 
 def _profile_candidates(name):
@@ -46,7 +46,7 @@ def _profile_candidates(name):
     root = os.path.dirname(up)                                           # the repo root
     return [os.path.join(here, 'profiles', name),            # the embedded copy (the nix share tree)
             os.path.join(up, 'profiles', name),              # the suite's data dir, flat (the docker image)
-            os.path.join(root, 'profiles', 'profiles', name)]  # the dev tree (the subproject's data dir)
+            os.path.join(root, 'shared', 'profiles', name)]  # the dev tree (shared/profiles)
 
 
 def resolve_profile(text):
@@ -57,7 +57,7 @@ def resolve_profile(text):
 
 
 def profile_label(path):
-    """The short name for a profile from the profiles/ subproject, the path
+    """The short name for a profile from shared/profiles, the path
     otherwise."""
     for candidate in _profile_candidates(os.path.basename(path)):
         if os.path.abspath(candidate) == os.path.abspath(path):

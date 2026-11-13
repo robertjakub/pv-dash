@@ -1,12 +1,11 @@
 # Fake Inverter Simulator in an alpine container — stdlib-only, no pip.
 # Runs as the unprivileged user `pvsuite`; the profiles come from the shared
-# profiles/ directory via a named build context.
+# build context (shared/profiles/).
 #
-# Build (the context = ../inverter, the profiles = ../profiles, the entrypoint
+# Build (the context = ../inverter, the entrypoint
 # = ../docker/entrypoints, the shared code = ../common):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-fake-inverter -t modbus-fake-inverter \
-#       --build-context profiles=../profiles \
 #       --build-context shared=../shared \
 #       --build-context scripts=../docker --build-context common=../common ../inverter
 #   # or: docker compose up -d
@@ -29,7 +28,7 @@ RUN apk add --no-cache python3 bash su-exec \
     && adduser -D pvsuite
 
 WORKDIR /pv-suite
-COPY --chown=pvsuite --from=profiles profiles/profiles/ profiles/
+COPY --chown=pvsuite --from=shared profiles/ profiles/
 COPY --from=scripts entrypoints/entrypoint.sh /usr/local/bin/pv-entrypoint
 COPY --from=common *.py common/
 COPY --from=common modbus/*.py common/modbus/

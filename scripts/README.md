@@ -111,7 +111,7 @@ prose gates apart from the runners:
 - **[`lint/profile.py`](lint/profile.py)** — the device profiles: the
   schema + style lint (the default verb) and `format`, the canonical
   in-place rewrite (`--check`/`--diff` report the drift without writing).
-  Bare run lints `profiles/profiles/*.json`.
+  Bare run lints `shared/profiles/*.json`.
 - **`validate_json.py`** — the JSON documents against a JSON Schema
   (stdlib only): the loader-valid ⊂ schema-valid contract.
 - **`audit_verify.py`** — the audit trail's chained-hash verifier

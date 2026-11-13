@@ -32,7 +32,7 @@ SBOM_CDX = os.path.join(REPO, 'docs', 'sbom', 'sbom.cdx.json')
 VENDOR = os.path.join(REPO, 'apps', 'dashboard', 'static', 'vendor', 'echarts.min.js')
 
 # the shipped tree, one scan per subproject (the claim is per subproject)
-SCAN_DIRS = ('common', 'profiles', 'cache', 'inverter', 'scraper', 'dashboard')
+SCAN_DIRS = ('common', 'shared', 'cache', 'inverter', 'scraper', 'dashboard')
 
 # the reviewed stdlib surface — a new import fails the generation until it
 # is reviewed in here; every name is cross-checked against
@@ -181,8 +181,8 @@ def tool_facts():
                                        for dirpath, dirs, files in os.walk(os.path.join(REPO, 'common'))
                                        for f in files
                                        if f.endswith('.py') and f != '__init__.py'])}
-    facts['profiles'] = {
-        'jsons': len([f for f in os.listdir(os.path.join(REPO, 'profiles', 'profiles'))
+    facts['shared'] = {
+        'jsons': len([f for f in os.listdir(os.path.join(REPO, 'shared', 'profiles'))
                       if f.endswith('.json')]),
     }
     return facts
@@ -200,10 +200,10 @@ def render_cdx(f):
         {'bom-ref': 'pv-suite:common', 'type': 'library', 'name': 'common', 'version': v,
          'licenses': bsd,
          'properties': [{'name': 'pv-suite:deps', 'value': 'python-stdlib only'}]},
-        {'bom-ref': 'pv-suite:profiles', 'type': 'file', 'name': 'profiles', 'version': v,
+        {'bom-ref': 'pv-suite:shared', 'type': 'file', 'name': 'shared', 'version': v,
          'licenses': bsd,
          'properties': [{'name': 'pv-suite:content',
-                         'value': '%d device-profile JSONs (data only — the lint/format tool lives in scripts/lint/profile.py)' % f['tools']['profiles']['jsons']}]},
+                         'value': 'the shared data the tools load — %d device-profile JSONs (shared/profiles), the suite JSONs (shared/suite), the acl schemas (shared/schema); the lint/format tool lives in scripts/lint/profile.py)' % f['tools']['shared']['jsons']}]},
         {'bom-ref': 'pv-suite:modbus-cache', 'type': 'application', 'name': 'modbus-cache', 'version': v,
          'licenses': bsd},
         {'bom-ref': 'pv-suite:modbus-scraper', 'type': 'application', 'name': 'modbus-scraper', 'version': v,
@@ -263,18 +263,18 @@ def render_cdx(f):
                 'licenses': bsd,
                 'properties': [
                     {'name': 'pv-suite:scope',
-                     'value': 'the whole flake: dashboard, scraper, cache, inverter, profiles, common'}]}},
+                     'value': 'the whole flake: dashboard, scraper, cache, inverter, shared, common'}]}},
         'components': comps,
         'dependencies': [
             {'ref': 'pv-suite',
              'dependsOn': ['pv-suite:dashboard', 'pv-suite:modbus-scraper', 'pv-suite:modbus-cache',
-                           'pv-suite:modbus-fake-inverter', 'pv-suite:profiles', 'pv-suite:common']},
-            {'ref': 'pv-suite:modbus-cache', 'dependsOn': ['pv-suite:common', 'pv-suite:profiles']},
-            {'ref': 'pv-suite:modbus-scraper', 'dependsOn': ['pv-suite:common', 'pv-suite:profiles']},
-            {'ref': 'pv-suite:modbus-fake-inverter', 'dependsOn': ['pv-suite:common', 'pv-suite:profiles']},
+                           'pv-suite:modbus-fake-inverter', 'pv-suite:shared', 'pv-suite:common']},
+            {'ref': 'pv-suite:modbus-cache', 'dependsOn': ['pv-suite:common', 'pv-suite:shared']},
+            {'ref': 'pv-suite:modbus-scraper', 'dependsOn': ['pv-suite:common', 'pv-suite:shared']},
+            {'ref': 'pv-suite:modbus-fake-inverter', 'dependsOn': ['pv-suite:common', 'pv-suite:shared']},
             {'ref': 'pv-suite:dashboard', 'dependsOn': ['echarts']},
             {'ref': 'pv-suite:common', 'dependsOn': []},
-            {'ref': 'pv-suite:profiles', 'dependsOn': []},
+            {'ref': 'pv-suite:shared', 'dependsOn': []},
             {'ref': 'echarts', 'dependsOn': ['zrender']},
             {'ref': 'zrender', 'dependsOn': []},
             {'ref': 'image:modbus-fake-inverter',
@@ -302,7 +302,7 @@ def render_md(f):
     ref, rev = f['nix']['ref'], f['nix']['rev']
     tag, apks = f['docker']['tag'], f['docker']['apks']
     ech, zr = f['vendor']['echarts'], f['vendor']['zrender']
-    common, profiles = f['tools']['common'], f['tools']['profiles']
+    common, shared = f['tools']['common'], f['tools']['shared']
     cache, inverter = f['tools']['cache'], f['tools']['inverter']
     scraper, dashboard = f['tools']['scraper'], f['tools']['dashboard']
 
@@ -345,13 +345,13 @@ grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter app
 | Subproject | First-party code | Third-party runtime | Notes |
 |---|---|---|---|
 | [`common/`](../../common/README.md) | the package (%(common_modules)d modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
-| [`profiles/`](../../profiles/README.md) | %(profiles_jsons)d device-profile JSONs | none — stdlib only | data; the lint/format tool = `scripts/lint/profile.py` |
+| [`shared/profiles/`](../../shared/profiles/README.md) | %(shared_jsons)d device-profile JSONs | none — stdlib only | data; the lint/format tool = `scripts/lint/profile.py` |
 | [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (%(cache_modules)d modules) + %(cache_clients)d control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (%(inverter_modules)d modules) + %(inverter_clients)d control clients | none — stdlib only (+ `common`) | simulator |
 | [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (%(scraper_modules)d modules) + %(scraper_clients)d control clients | none — stdlib only (+ `common`) | exporter |
 | [`apps/dashboard/`](../../apps/dashboard/README.md) | `bin/dashboard.py` + `lib/` (%(dashboard_modules)d modules) + %(dashboard_clients)d control clients + the static page | **Apache ECharts %(ech)s** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 """ % {'common_modules': common['modules'],
-       'profiles_jsons': profiles['jsons'],
+       'shared_jsons': shared['jsons'],
        'cache_modules': cache['modules'], 'cache_clients': cache['clients'],
        'inverter_modules': inverter['modules'], 'inverter_clients': inverter['clients'],
        'scraper_modules': scraper['modules'], 'scraper_clients': scraper['clients'],
@@ -393,7 +393,7 @@ python3 scripts/generators/sbom.py --check
 grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib | sort -u
 
 # the container layer
-docker build -t pv-sbom-check --build-context profiles=../profiles \\
+docker build -t pv-sbom-check \\
     --build-context scripts=../docker --build-context common=../common ../cache   # or the others
 docker run --rm pv-sbom-check sh -c 'apk info -v | sort'                          # the apk set
 

@@ -4,7 +4,7 @@
 # Dockerfiles are the parent directory's Dockerfile.<daemon> files
 # (dockerfile: ../../docker/... from the subproject context — the subproject
 # contexts carry no Dockerfile of their own; compose resolves the
-# dockerfile relative to the context); the shared profiles/ directory, the entrypoint
+# dockerfile relative to the context); the entrypoint
 # and the common/ package + shared/ ride in as named contexts. The production shape
 # (real device, the three services + your external collector) is the sibling
 # prod/ stack — see ../README.md.
@@ -56,7 +56,6 @@ services:
       context: ../../apps/inverter
       dockerfile: ../../docker/Dockerfile.modbus-fake-inverter
       additional_contexts:
-        profiles: ../../profiles
         scripts: ..
         common: ../../common
         shared: ../../shared
@@ -80,7 +79,6 @@ services:
       context: ../../apps/cache
       dockerfile: ../../docker/Dockerfile.modbus-cache
       additional_contexts:
-        profiles: ../../profiles
         scripts: ..
         common: ../../common
         shared: ../../shared
@@ -109,7 +107,6 @@ services:
       context: ../../apps/scraper
       dockerfile: ../../docker/Dockerfile.modbus-scraper
       additional_contexts:
-        profiles: ../../profiles
         scripts: ..
         common: ../../common
         shared: ../../shared

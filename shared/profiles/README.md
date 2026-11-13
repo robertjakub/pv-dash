@@ -3,7 +3,7 @@
 One device-profile home for the whole suite: the fake inverter serves from
 it, the cache fetches its selection from it, the scraper binds its metrics
 to it. Every consumer resolves a bare name (`sun2000`, `deye-sg04lp3`)
-against the JSON files in `profiles/profiles/` first, then its own packaged
+against the JSON files in `shared/profiles/` first, then its own packaged
 copy. Every fact lives in the JSON — no hardcoded tables anywhere in the
 suite; a profile is addressed by bare name (this directory) or by path.
 
@@ -14,7 +14,7 @@ from the repo root):
 ```bash
 python3 scripts/lint/profile.py                          # lint all shipped profiles
 python3 scripts/lint/profile.py my-device.json           # lint one file
-python3 scripts/lint/profile.py format profiles/profiles/deye-sg03lp1.json
+python3 scripts/lint/profile.py format shared/profiles/deye-sg03lp1.json
 python3 scripts/lint/profile.py format --check           # the layout drift only, rc 1 = off-form
 python3 scripts/lint/profile.py format --diff            # the unified diff, no write
 ```

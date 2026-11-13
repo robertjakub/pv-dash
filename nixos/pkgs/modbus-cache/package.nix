@@ -52,7 +52,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm644 ${../../../shared}/schema/modbus-cache-filter.schema.json $out/share/modbus-cache/modbus-cache-filter.schema.json
     install -Dm644 ${../../../extras/alerts}/cache.yml $out/share/modbus-cache/alerts.yml
     install -dm755 $out/share/modbus-cache/profiles
-    install -m644 ${../../../profiles/profiles}/*.json $out/share/modbus-cache/profiles/
+    install -m644 ${../../../shared/profiles}/*.json $out/share/modbus-cache/profiles/
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/
     makeWrapper ${lib.getExe python3} $out/bin/modbus-cache \

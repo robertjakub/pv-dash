@@ -1152,15 +1152,19 @@ def main():
         # EOF's) — the tty edition, the piped stdin is the batch now
         m_pty, p_cli = pty_cli(os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py'),
                                24, 80, env_extra={'CTL': msock})
-        time.sleep(1.0)          # the banner + the prompt
+        out = pty_read(m_pty, quiet=0.4, limit=8.0)   # the banner + the prompt (the read rides the drain)
         pty_send(m_pty, 'logout\n')
+        # the wait must READ while it polls: the exit's terminal restore is
+        # a TCSADRAIN that blocks on the un-read echo (the master must drain)
         closed = False
-        try:
-            p_cli.wait(timeout=5)
-            closed = True
-        except subprocess.TimeoutExpired:
+        deadline = time.time() + 8
+        while time.time() < deadline:
+            out += pty_read(m_pty, quiet=0.1, limit=0.3)
+            if p_cli.poll() is not None:
+                closed = True
+                break
+        if not closed:
             p_cli.kill()
-        out = pty_read(m_pty)
         os.close(m_pty)
         check('fake_cli: logout closes the session', closed and p_cli.returncode == 0
               and 'fake-inverter' in out, repr(out[-120:] if out else 'no output'))

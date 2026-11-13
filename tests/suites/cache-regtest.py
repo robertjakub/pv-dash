@@ -603,7 +603,10 @@ try:
           cli_mod.cap_line('short', 70) == 'short' and cli_mod.cap_line('x' * 10, 3) == 'x' * 10,
           (cli_mod.cap_line('short', 70), cli_mod.cap_line('x' * 10, 3)))
 
-    PTY_CTL, PTY_LISTEN, PTY_DEAD = 15521 + BASE, 15522 + BASE, 15598 + BASE
+    # 15545/15546 are free: the fc4 section below owns 15521/15522 for its
+    # whole life (this daemon never shuts down mid-suite), so the two legs
+    # must not share them
+    PTY_CTL, PTY_LISTEN, PTY_DEAD = 15545 + BASE, 15546 + BASE, 15598 + BASE
 
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15512 + BASE),
            '--listen', '127.0.0.1:%d' % PTY_LISTEN, '--modbus-interval', '1', '--modbus-profile', R,
@@ -2003,12 +2006,12 @@ import lib.control as C
 class Stub(C.ControlServer):
     def __init__(self, key):
         self.config_path = os.path.join(SCRATCH, 'reg_reload_mode.conf')
-        self.overridden = {'interval'}
+        self.overridden = {'modbus-unit'}
         class _Proxy:
             dump_key = key   # the reload state file seals only under dump-key
         self.proxy = _Proxy()
     def dump_settings(self):
-        return {'interval': '7'}
+        return {'modbus-unit': '7'}
 Stub(None)._save_reload_state()
 st = os.stat(os.path.join(SCRATCH, 'reg_reload_mode.conf.reload'))
 assert st.st_mode & 0o777 == 0o600, oct(st.st_mode)
@@ -2020,7 +2023,7 @@ os.unlink(os.path.join(SCRATCH, 'reg_reload_mode.conf.reload'))
 import json as _js
 d = _js.loads(sealed)
 assert d.get('version') == 2 and d.get('cipher') == 'sha256-ctr' and d.get('box') and d.get('mac'), d.keys()
-assert 'interval' not in sealed and sealed.count('{') == 1, sealed[:120]
+assert 'modbus-unit' not in sealed and sealed.count('{') == 1, sealed[:120]
 print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 ''' % (REPO, CACHE_DIR)], capture_output=True, text=True, timeout=15)
     check('reload: the state file saves 0600 (F23, the F18 posture) and seals under dump-key',
@@ -2031,26 +2034,32 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     back = None
     for _ in range(100):
         try:
-            back = ctl_cmd('show unit', 15582 + BASE)
+            back = ctl_cmd('show modbus-unit', 15582 + BASE)
             break
         except Exception:
             time.sleep(0.1)
     check('reload: the fresh resolve takes the config edit (unit=7), the override still rides',
-          back is not None and back.startswith('ok unit=7')
+          back is not None and back.startswith('ok modbus-unit=7')
           and ctl_cmd('show modbus-interval', 15582 + BASE).startswith('ok modbus-interval=7.00s'),
           repr((back or '')[-200:]))
     # the console path: the reload's bye frame rides utf-8 and the notice decodes it (no raw \u escapes)
-    p = subprocess.Popen([sys.executable, K, '--control-port', '%d' % (15582 + BASE)], stdin=subprocess.PIPE,
-                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                         env={**os.environ, 'CLI_KEEPALIVE': '0.2', 'CONTROL_TOKEN': 'sekrit'})
-    time.sleep(1.0)
-    p.stdin.write('request reload\n')
-    p.stdin.flush()
-    time.sleep(3.0)          # stdin stays open: the console lives at the prompt until the bye notice exits it
-    out, _ = p.communicate(timeout=25)
+    # (a tty is the console now — the piped stdin is the batch, the notice rides the session)
+    m_r, p_r = pty_cli(K, 24, 80, port=15582 + BASE, env_extra={'CLI_KEEPALIVE': '0.2', 'CONTROL_TOKEN': 'sekrit'})
+    out_r = pty_read(m_r, quiet=0.4, limit=8.0)
+    pty_send(m_r, 'request reload\n')
+    closed_r = False
+    deadline_r = time.time() + 20
+    while time.time() < deadline_r:
+        out_r += pty_read(m_r, quiet=0.2, limit=0.5)
+        if p_r.poll() is not None:
+            closed_r = True
+            break
+    if not closed_r:
+        p_r.kill()
+    os.close(m_r)
     check('reload: the console prints the notice and exits clean (utf-8, no raw escapes)',
-          p.returncode == 0 and 'daemon exit: the modbus-cache proxy is reloading' in out
-          and '\u2014' in out and '\\u2014' not in out, repr(out[-160:]))
+          closed_r and p_r.returncode == 0 and 'daemon exit: the modbus-cache proxy is reloading' in out_r
+          and '\u2014' in out_r and '\\u2014' not in out_r, repr(out_r[-160:]))
     back = None
     for _ in range(100):
         try:
@@ -2098,17 +2107,24 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('alias: show write-acl (the flat wire name) answers', r.startswith('ok write-acl=none'), r[:80])
     r = cli('set write acl any\nquit\n', port=15532 + BASE)
     check('alias: the cli translates the alias spelling (set write acl any)', r.returncode == 0
-          and '\ncache:%d > ' % (15532 + BASE) in r.stdout, repr(r.stdout[-200:]))
+          and 'ok write-acl=any' in r.stdout and 'cache:' not in r.stdout, repr(r.stdout[-200:]))
     b = wr6(47415, 5, port=15531 + BASE)
     check('alias: the write passes through the aliased set', b == bytes.fromhex('06b9370005'), b.hex())
     r = cli('clear write acl\nshow write-acl\nquit\n', port=15532 + BASE)
     check('alias: the cli translates the alias clear', r.returncode == 0, repr(r.stdout[-200:]))
     r = ctl_cmd('show write-acl', 15532 + BASE)
     check('alias: clear write acl restores none', r.startswith('ok write-acl=none'), r[:80])
-    r = cli('write ?\nquit\n', port=15532 + BASE)
+    m_a, p_a = pty_cli(K, 24, 200, port=15532 + BASE, env_extra={'CONTROL_TOKEN': 'sekrit'})
+    out_a = pty_read(m_a, quiet=0.4, limit=8.0)   # the wide console keeps the row off the cap: the alias marker must show
+    pty_send(m_a, 'write ?\n')
+    out_a += pty_read(m_a, quiet=0.4, limit=8.0)
+    pty_send(m_a, 'quit\n')
+    pty_read(m_a)
+    p_a.wait(timeout=10)
+    os.close(m_a)
     check('alias: the cli ? lists the aliased row under the walk-on, the ? shape',
-          'clients allowed to write (requires allow-write)' in r.stdout
-          and '(the alias of write-acl)' in r.stdout, repr(r.stdout[-300:]))
+          'clients allowed to write (requires allow-write)' in out_a
+          and '(the alias of write-acl)' in out_a, repr(out_a[-300:]))
     r = ctl_cmd('help write-acl', 15532 + BASE)
     check('alias: help write-acl describes the row', r.startswith('ok write-acl -'), r[:80])
     r = ctl_cmd('show write', 15532 + BASE)

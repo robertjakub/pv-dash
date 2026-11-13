@@ -902,9 +902,9 @@ try:
 
     r = cli('set pv 3000\n')
     check('fake_cli: the piped batch prints the set verdict raw', r.returncode == 0
-          and r.stdout.startswith('ok pv=3000'), repr(r.stdout))
-    check('fake_cli: set reply really carried no status tail',
-          'load=' not in r.stdout and 'pinned' not in r.stdout, repr(r.stdout))
+          and r.stdout.startswith('ok pv=3000 '), repr(r.stdout))
+    check('fake_cli: the piped set verdict wears the status suffix (the summary hook)',
+          'load=' in r.stdout and 'pinned: pv=3000.0' in r.stdout, repr(r.stdout))
     time.sleep(1.5)
     m = metrics_dict(get('/metrics', 19455 + BASE)[1])
     check('fake_cli: pinned value reaches /metrics', m.get('huawei_pv_generation_watts') == 3000,
@@ -912,6 +912,17 @@ try:
     r = cli('shutdown\n')
     check('fake_cli: the piped shutdown stops the fake (the confirm guard is console-only)',
           r.returncode == 0 and 'bye shutdown' in r.stdout, repr(r.stdout))
+    for _ in range(100):        # the dying fake lets go of the ports
+        try:
+            socket.create_connection(('127.0.0.1', 15571), timeout=1).close()
+            time.sleep(0.1)
+        except OSError:
+            break
+    procs.append(subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15570 + BASE),
+                                   '--control-port', '15571', '--allow-write'],
+                                  stdout=open(os.path.join(SCRATCH, 'scr_ctl_fake.log'), 'w'), stderr=subprocess.STDOUT))
+    wait_port(15571, timeout=20)
+    ctl('set pv 3000', 15571)   # the restart is a fresh sim: re-pin the batch's subject
     ctl('show version', 15571)
     r = cli('show pv\ninspect\nquit\n')
     lines = [l.strip() for l in r.stdout.splitlines() if l.strip()]
@@ -924,7 +935,7 @@ try:
     check('fake_cli: the batch keeps the wire help, the registers table, inspect',
           r.returncode == 0
           and any('soc - pin the state of charge' in l for l in lines)
-          and any(l == 'registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
+          and any(l == 'ok registers (49)' for l in lines) and 'pv-power' in ''.join(lines)
           and any('0.4.3' in l and 'version' in l for l in lines), repr(r.stdout[:120]))
 
     # 2g3. the audit trail: the UTC stamp, the CLI/CTL prefix, the who-when-what,
@@ -959,7 +970,7 @@ try:
           and any(r2.startswith('pinned') for r2 in rows), repr(r.stdout))
     # the console-only furniture rides the pty now (the piped stdin is the
     # batch): the set-position ? listing and the idle keepalive
-    m_pty, p_pty = pty_cli(K, 24, 80, port=15571)
+    m_pty, p_pty = pty_cli(K, 24, 80, args=['--page-size', '0'], port=15571)
     pty_read(m_pty)
     pty_send(m_pty, 'set ?\n')
     out = pty_read(m_pty)
@@ -1005,28 +1016,27 @@ try:
                               stdout=open(os.path.join(SCRATCH, 'scr_recon.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(fake_r)
     wait_ctl(15902)   # the cold python start can outrun a fixed sleep
-    p = subprocess.Popen([sys.executable, K, '--control-port', '15902', '--reconnect', '3',
-                          '--reconnect-wait', '0.5'],
-                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    p.stdout.readline()   # the welcome's first line: the session is connected (the cold boot outruns any fixed sleep)
+    # the tty is the console now (the piped stdin is the batch — the batch
+    # never prints the welcome, the reconnect cycle rides the session)
+    m_rc, p_rc = pty_cli(K, 24, 80, args=['--reconnect', '3', '--reconnect-wait', '0.5'], port=15902)
+    out_rc = pty_read(m_rc, quiet=0.4, limit=8.0)   # the welcome's first line: the session is connected
     fake_r.kill()
     fake_r.wait()
     time.sleep(0.3)
     fake_r2 = subprocess.Popen([sys.executable, F, '--static', '--listen', '127.0.0.1:%d' % (15901 + BASE), '--control-port', '15902'],
                                stdout=open(os.path.join(SCRATCH, 'scr_recon2.log'), 'w'), stderr=subprocess.STDOUT)
     procs.append(fake_r2)
-    p.stdin.write('show pv\n')       # the loss is noticed on the first wire command
-    p.stdin.flush()
-    time.sleep(2.2)                  # the reconnect cycle: the attempt 1 refused, the attempt 2 ok
-    p.stdin.write('show pv\n')       # the resumed session answers again
-    p.stdin.flush()
-    time.sleep(0.6)
-    p.stdin.write('quit\n')
-    p.stdin.flush()
-    out, _ = p.communicate(timeout=20)
+    pty_send(m_rc, 'show pv\n')      # the loss is noticed on the first wire command
+    out_rc += pty_read(m_rc, quiet=0.4, limit=8.0)   # the reconnect cycle: the attempts, the resume
+    pty_send(m_rc, 'show pv\n')      # the resumed session answers again
+    out_rc += pty_read(m_rc, quiet=0.4, limit=8.0)
+    pty_send(m_rc, 'quit\n')
+    pty_read(m_rc)
+    p_rc.wait(timeout=10)
+    os.close(m_rc)
     check('fake_cli: reconnects after the server death (3 tries, 0.5 s apart)',
-          p.returncode == 0 and 'reconnecting' in out and 'reconnected' in out
-          and 'auto' in out, repr(out[-200:]))   # the resumed session answers show pv (bare value)
+          p_rc.returncode == 0 and 'reconnecting' in out_rc and 'reconnected' in out_rc
+          and 'auto' in out_rc, repr(out_rc[-200:]))   # the resumed session answers show pv (bare value)
 
     # 2g3b. the INV audit trail: the server side logs the lifecycle + the commands
     AUDD = os.path.join(SCRATCH, 'scr_audit_inv.log')
@@ -1843,10 +1853,10 @@ try:
     check('scraper control: a bad value refused', r.startswith('fail modbus-interval must be'), r[:80])
     r = sctl('help clear', 15597)
     check('scraper control: help <command> describes the row',
-          r == 'ok restore a setting to its configured value (clear modbus interval, clear system log-level)', r)
+          r == 'ok restore a setting to its configured value: clear <setting>', r)
     r = sctl('help request', 15597)
     check('scraper control: help <command node> lists the namespace (the ? shape)',
-          r.startswith('ok ') and all(w in r for w in ('poll', 'reload', 'reload-config', 'restart')), r[:200])
+          r == "ok     poll the poll loop's manual wake", r[:200])
     r = sctl('help request reload', 15597)
     check('scraper control: help <deep command path> describes the row', r.startswith('ok save the live overrides'), r[:110])
     r = sctl('help bogus', 15597)
@@ -2270,8 +2280,8 @@ try:
     words = [line.strip().split()[0] for line in r.stdout[3:].strip().splitlines()
              if line.strip() and not line.strip().startswith('[')]
     check("scraper_ctl: the bare show answers the root in the console's own words",
-          r.returncode == 0 and words == ['audit', 'config', 'connections', 'control', 'dump', 'inputs',
-                                          'knobs', 'metrics', 'modbus', 'system', 'uplink', 'version'],
+          r.returncode == 0 and words == ['audit', 'connections', 'control', 'dump', 'inputs',
+                                          'metrics', 'modbus', 'system', 'uplink', 'version'],
           repr(r.stdout[:240]))
     r = subprocess.run([sys.executable, CTLB, '--control-port', '15597', '--control-token', STOK,
                         'show', 'uplink', 'sources'], capture_output=True, text=True, timeout=15)

@@ -23,6 +23,12 @@ is the record). One tool, three abilities:
                  default path derives the family's ctl way:
                  /tmp/modbus-replay-<listen-port>.socket.
 
+The value dumps under the lines cap at 16 words a block (the
+conversations' diagram stays readable under a poller's repeats; the
+answer index dumps the full block always) — --values-cap N|all
+reshapes the cap (all = the whole block, everywhere the values
+render).
+
 Both trace shapes read the same (the binary PVMB blocks or the JSON v1
 lines — the first bytes pick the walk). The reader refuses with clean
 one-liners; ^C ends the live view with a zero exit."""
@@ -47,6 +53,7 @@ from lib.trace import (HDR_HEAD, KIND_RAW_C2D, KIND_RAW_D2C, KIND_REQ,
                        parse_binary_header)
 
 DEFAULT_FEED = '/tmp/modbus-replay-%d.socket' % DEFAULT_LISTEN_PORT
+DEFAULT_VALUES_CAP = 16   # the capped dumps' word cap — --values-cap N|all reshapes it
 
 
 def stamp(ts):
@@ -61,8 +68,8 @@ def stamp(ts):
 def value_lines(addr, data, cap=None):
     """The values' dump: 8 hex words a line, each line prefixed with
     its first register's address (the hexdump's shape — no per-word
-    prefixes); cap = the word cap for the conversations (None = the
-    full block, the answer index's render)."""
+    prefixes); cap = the word cap (--values-cap, the conversations'
+    shape; None = the full block, the answer index's render)."""
     count = len(data) // 2
     if not count:
         return []
@@ -145,13 +152,14 @@ def answer_index(idx):
         block_under(value_block(req_pdu, rsp_pdu))
 
 
-def conversations(idx):
+def conversations(idx, cap=DEFAULT_VALUES_CAP):
     """The query->answer diagram: one block per (session, conn) — the
     head names both ends of the pipe, one line per exchange, the
     unpaired records marked in place; every packet line names its
     source host:port and its #conn:txn pairing key (the record's own
     peer, the txn the MBAP head carries — a response echoing a foreign
-    id shows right there), the concurrency named."""
+    id shows right there), the concurrency named. The value blocks cap
+    at `cap` words (None = the full block — --values-cap all)."""
     print()
     print('--- the conversations ---')
     blocks = {}
@@ -199,7 +207,7 @@ def conversations(idx):
                          rsp['peer'] or 'unknown', conn_txn(rsp),
                          frame_words(rsp, False), latency * 1000.0))
                 if len(r['raw']) >= 8 and len(rsp['raw']) >= 8:
-                    block_under(value_block(r['raw'][7:], rsp['raw'][7:], cap=16))
+                    block_under(value_block(r['raw'][7:], rsp['raw'][7:], cap=cap))
             elif r['kind'] == KIND_RSP:
                 if r['no'] not in rsp_targets:
                     print('  #%d %s  %s  %s  rsp  %s  (orphan — no request recorded)'
@@ -257,12 +265,13 @@ def recv_exact(sock, n):
     return buf
 
 
-def live(sock_path, values=False):
+def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP):
     """The feed: connect, the header (the same peek a file gets), then
     the records as they land — the conversations render realtime. The
     values (the address-prefixed words, the bit strings) ride only with
     --values: a busy feed stays one line a frame; the trace file has
-    everything, the file views dump the values always."""
+    everything, the file views dump the values always. The value blocks
+    cap at `cap` words (--values-cap; None = the full block)."""
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         sock.connect(sock_path)
@@ -331,7 +340,7 @@ def live(sock_path, values=False):
                     print('  #%d %s  %s  %s  rsp  %s  (%.1fms)'
                           % (no, when, src, ct, words, latency * 1000.0))
                     if values and len(req[3]) >= 8 and len(rec['raw']) >= 8:
-                        block_under(value_block(req[3][7:], rec['raw'][7:], cap=16))
+                        block_under(value_block(req[3][7:], rec['raw'][7:], cap=cap))
             else:
                 print('  #%d %s  %s  %s  raw  %s (%d byte(s))'
                       % (no, when, src, ct, rec['note'] or 'framing lost',
@@ -339,6 +348,22 @@ def live(sock_path, values=False):
     except ConnectionError:
         print('--- the feed closed (the daemon stopped, or the capture '
               'outpaced this viewer — the trace file has everything) ---')
+
+
+def values_cap(text):
+    """--values-cap's parse: `all` = the full block (the 'all' string,
+    resolved by the caller), an integer >= 1 = the word cap; anything
+    else refuses at the parse (exit 2 — the CLI misuse)."""
+    if text == 'all':
+        return 'all'
+    try:
+        n = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError('%r is not a word count or all' % text)
+    if n < 1:
+        raise argparse.ArgumentTypeError(
+            'the word cap counts from 1 (all = the full block)')
+    return n
 
 
 def validate(args):
@@ -353,6 +378,10 @@ def validate(args):
     if args.values and args.socket is None:
         problems.append('--values rides the live view — the file views dump the '
                         'values always (the file is the artifact, studied at leisure)')
+    if args.socket is not None and args.values_cap is not None and not args.values:
+        problems.append('--values-cap shapes the values dump — the live view '
+                        'dumps the values only with --values (the file views '
+                        'dump always, the cap reshapes them there alone)')
     if args.out and not args.to:
         problems.append('-o writes the converted trace — it needs --to')
     if args.to and not args.out:
@@ -384,6 +413,12 @@ def main():
                         'exchanges (the address-prefixed words, the bit '
                         'strings) — off by default, a busy feed stays one '
                         'line a frame (the file views always dump them)')
+    p.add_argument('--values-cap', type=values_cap, default=None, metavar='N|all',
+                   help='the word cap for the values dumps that cap (the '
+                        'conversations, the live view\'s --values dump; the '
+                        'answer index dumps the full block always) — the '
+                        'default 16 keeps the diagram readable, all dumps '
+                        'the whole block, an integer >= 1 spells the cap')
     p.add_argument('--to', choices=('json', 'binary'),
                    help='convert the trace to the other shape (with -o OUT)')
     p.add_argument('-o', '--out', help='the converted trace\'s path (0600)')
@@ -400,16 +435,18 @@ def main():
         for problem in problems:
             print('modbus-replay-dump: %s' % problem, file=sys.stderr)
         raise SystemExit(1)
+    cap = DEFAULT_VALUES_CAP if args.values_cap is None \
+        else (None if args.values_cap == 'all' else args.values_cap)
     try:
         if args.socket is not None:
-            live(args.socket, values=args.values)
+            live(args.socket, values=args.values, cap=cap)
         elif args.to:
             convert(args.trace, args.to, args.out)
         else:
             idx = TraceIndex(args.trace)
             print('%s: %s' % (args.trace, idx.summary()))
             answer_index(idx)
-            conversations(idx)
+            conversations(idx, cap=cap)
     except KeyboardInterrupt:
         print('--- stopped ---')
         raise SystemExit(0)

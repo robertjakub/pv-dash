@@ -580,6 +580,48 @@ check('the refused write rode its exception into the views',
       and 'exception 1' in r.stdout, '')
 
 print()
+print('== the values cap (--values-cap) ==')
+
+# its own wide read (20 words — the static trace's reads are small) on
+# a fresh capture: the wide trace is its own file, TRACE stays the
+# earlier pins' subject
+TRACE_WIDE = os.path.join(SCRATCH, 'replay-trace-wide.pvmb')
+p_wide = daemon(['--listen', '127.0.0.1:%d' % PORT_CAP, '--upstream', '127.0.0.1:%d' % PORT_FAKE,
+                 '--capture', TRACE_WIDE], LOG % 'wide')
+check('the wide capture came up', wait_port(PORT_CAP))
+wide = raw_exchange(PORT_CAP, struct.pack('>BHH', 3, 32064, 20), TXN['other'])
+check('the wide read answered (20 words)', len(wide) > 7 and wide[8] == 40, wide.hex())
+p_wide.send_signal(signal.SIGTERM)
+p_wide.wait(timeout=10)
+
+r = subprocess.run([sys.executable, DUMP, TRACE_WIDE], capture_output=True, text=True)
+check('the conversations cap at 16 words by default (+4 more), the answer index full',
+      '(+4 more)' in r.stdout and '32080:  ' in r.stdout,
+      next((l for l in r.stdout.splitlines() if '(+' in l), r.stdout[:140]))
+r = subprocess.run([sys.executable, DUMP, TRACE_WIDE, '--values-cap', 'all'],
+                   capture_output=True, text=True)
+check('--values-cap all renders the whole block (the marker gone, the index full)',
+      r.returncode == 0 and '(+' not in r.stdout and '32080:  ' in r.stdout,
+      next((l for l in r.stdout.splitlines() if '32080:' in l), '-'))
+r = subprocess.run([sys.executable, DUMP, TRACE_WIDE, '--values-cap', '8'],
+                   capture_output=True, text=True)
+check('--values-cap 8 moves the cap (+12 more)', '(+12 more)' in r.stdout,
+      next((l for l in r.stdout.splitlines() if '(+' in l), '-'))
+r = subprocess.run([sys.executable, DUMP, TRACE_WIDE, '--values-cap', '0'],
+                   capture_output=True, text=True)
+check('--values-cap 0 refuses (the CLI misuse, rc 2)', r.returncode == 2,
+      (r.stderr.strip().splitlines() or ['-'])[-1])
+r = subprocess.run([sys.executable, DUMP, TRACE_WIDE, '--values-cap', 'x'],
+                   capture_output=True, text=True)
+check('--values-cap x refuses (the CLI misuse, rc 2)', r.returncode == 2,
+      (r.stderr.strip().splitlines() or ['-'])[-1])
+r = subprocess.run([sys.executable, DUMP, '--socket', '/tmp/no-such-feed-%d.socket' % BASE,
+                    '--values-cap', '8'], capture_output=True, text=True)
+check('the live view refuses --values-cap without --values (rc 1)',
+      r.returncode == 1 and '--values-cap shapes the values dump' in r.stderr,
+      (r.stderr.strip().splitlines() or ['-'])[-1])
+
+print()
 print('== replay: the trace back on the wire ==')
 
 # the replay's feed subscribes before the queries: the served session
@@ -678,6 +720,15 @@ check('the values-viewed capture pipes the wire', livev_again == frames['fc3'],
 time.sleep(1.0)
 p_livev.send_signal(signal.SIGTERM)
 p_livev.wait(timeout=10)
+p_livecapw = start([sys.executable, DUMP, '--socket', FEED_CAP, '--values',
+                    '--values-cap', '4'], log=LOG % 'livecapw')
+time.sleep(1.0)
+livecapw_again = raw_exchange(PORT_CAP, struct.pack('>BHH', 3, 32064, 20), TXN['other'])
+check('the cap-viewed capture pipes the wide read', len(livecapw_again) > 7
+      and livecapw_again[8] == 40, livecapw_again.hex())
+time.sleep(1.0)
+p_livecapw.send_signal(signal.SIGTERM)
+p_livecapw.wait(timeout=10)
 p_livecap.send_signal(signal.SIGTERM)
 p_livecap.wait(timeout=10)
 live_log = read_log(LOG % 'live')
@@ -696,6 +747,10 @@ livev_log = read_log(LOG % 'livev')
 check('the live view dumps the values under --values',
       '32064:  ' in livev_log and 'rsp' in livev_log,
       next((l for l in livev_log.splitlines() if '32064:' in l), '-')[:100])
+livecapw_log = read_log(LOG % 'livecapw')
+check('the live view honors --values-cap (the wide read capped at 4, +16 more)',
+      '32064:  ' in livecapw_log and '(+16 more)' in livecapw_log,
+      next((l for l in livecapw_log.splitlines() if '(+' in l), '-')[:120])
 
 r = subprocess.run([sys.executable, DUMP, EXAMPLE, '--values'],
                    capture_output=True, text=True)
@@ -706,16 +761,18 @@ check('the dump: --values refused on the file views',
 print()
 print('== the posture ==')
 
-for name, proc in (('cap', p_cap), ('rep', p_rep), ('rep0', p_rep0), ('pass', p_pass), ('fake', p_fake)):
+for name, proc in (('cap', p_cap), ('rep', p_rep), ('rep0', p_rep0), ('pass', p_pass),
+                   ('wide', p_wide), ('fake', p_fake)):
     check('%s: alive at the end' % name, proc.poll() is None or proc.returncode == 0,
           str(proc.returncode))
-for name in ('cap', 'rep', 'rep0', 'pass', 'fake', 'warn', 'live', 'livev', 'livecap'):
+for name in ('cap', 'rep', 'rep0', 'pass', 'fake', 'warn', 'wide', 'live', 'livev',
+             'livecapw', 'livecap'):
     log = read_log(LOG % name)
     check('%s: zero tracebacks' % name, 'Traceback' not in log)
-for name in ('cap', 'rep', 'rep0', 'pass'):
+for name in ('cap', 'rep', 'rep0', 'pass', 'wide'):
     check('%s: the loopback bind stayed silent' % name,
           'NOT loopback' not in read_log(LOG % name))
-for name in ('cap', 'rep'):
+for name in ('cap', 'rep', 'wide'):
     check('%s: the record feed logged' % name, 'the record feed on' in read_log(LOG % name))
 rep_log = read_log(LOG % 'rep')
 check('the miss logged with the request spelled out',

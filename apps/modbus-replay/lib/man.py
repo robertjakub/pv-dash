@@ -151,7 +151,11 @@ the device\'s peers), one line per exchange (request \\-> response,
 each packet\'s source host:port and its #conn:txn pairing key, both
 frame numbers, the recorded latency), the concurrent connections
 named, the unpaired records marked in place (no answer recorded /
-orphan / the raw handshake lines).
+orphan / the raw handshake lines). The value dumps under the lines cap
+at 16 words a block \\(em a poller\'s repeats keep the diagram readable
+\\(em and \\fB--values\\-cap\\fR \\fIN|all\\fR reshapes the cap
+(\\fBall\\fR the full block); the answer index dumps the whole block
+always.
 .PP
 The converter (\\fB--to json|binary \\-o OUT\\fR): either shape reads,
 the other writes \\(em the raw bytes are the one truth (the JSON side
@@ -167,7 +171,8 @@ host:port and its #conn:txn pairing key; a request prints pending, its
 response completes the exchange with the latency. The value dumps (the
 address\\-prefixed words, the bit strings) ride only with
 \\fB--values\\fR \\(em off by default, a busy feed stays one line a
-frame (the file views dump the values always). Bare \\fB--socket\\fR
+frame (the file views dump the values always), the same
+\\fB--values\\-cap\\fR word cap shapes them. Bare \\fB--socket\\fR
 spells the derived default
 (/tmp/modbus\\-replay\\-<listen\\-port>.socket)."""
     signals = """.SH SIGNALS

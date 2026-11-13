@@ -3,6 +3,32 @@
 The open items live in the family-wide [docs/TODO.md](../../docs/TODO.md);
 this file keeps the tool's done/history records, newest first.
 
+## 2026-11-13 — the values cap, reshapeable (--values-cap N|all)
+
+The value dumps under the lines always capped at 16 words a block — the
+conversations showed two 8-word lines and `…(+N more)` on a wider read
+(a 38-register poll rendered 16 words + `(+22 more)`), the answer index
+dumped the full block. The split stays (the ruling): all values once in
+the index — one block per unique query, whatever the ask count — and a
+peek in the conversations, whose job is the flow diagram; a poller's
+repeats would turn it into a wall of hexdumps. What the reader lacked
+was the escape hatch. Now `--values-cap N|all` reshapes the cap
+wherever the values render: the conversations (the file views, no
+companion flag needed — they dump by default) and the live view's
+`--values` dump (where `--values-cap` without `--values` refuses — the
+cap shapes the dump, it turns nothing on). `all` dumps the whole block;
+an integer ≥ 1 spells the cap; anything else refuses at the parse (rc
+2, the CLI misuse — the shape renders as `.BI --values-cap " N|all"` on
+the man page, `common/render/manpage.py` now honors a typed flag's
+explicit metavar, which moved no other row). The default 16 rides one
+constant (`DEFAULT_VALUES_CAP` beside `DEFAULT_FEED`); the answer index
+stays uncapped on purpose (it is the reference render — capping it
+would degrade its job). The suite captures a 20-register read against
+the fake and pins the default cap (+4 more, the index's third line
+present), `all` (the marker gone), `8` (+12 more), both parse refusals,
+the live companion refusal, the live view capped at 4 on the wide read
+(+16 more), and the summary/loopback/feed posture for the new capture.
+
 ## 2026-11-13 — the dump's views name each packet's source
 
 The trace records always carried the packet's own `peer` (the client

@@ -183,6 +183,15 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **The battery runner's trio wraps flat** — `tests/battery_kill.py`
+  joins the wrapper row (`battery.py`, `battery_status.py`): the
+  killer was the one tests/ tool whose docs spelling went through the
+  nested home (`python3 tests/battery/battery_kill.py`), the runner's
+  README documented the exception and the ruling closes it — every
+  tests/ script follows the one structure (the thin runpy wrapper at
+  `tests/<name>.py`, the body in `tests/suites/` or `tests/battery/`),
+  the killer's own docstring invocations and the battery README follow.
+
 - **The docs redo flies** — the full audit's work order
   (docs/history/docs-redo.md): `docs/common/` becomes `docs/specs/`
   (the dir name collided with the `common/` package it documents; the

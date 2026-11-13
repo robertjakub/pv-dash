@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """The thin wrapper: the real runner lives in tests/battery/battery.py — the
 docs spelling and release.py's call stay here (the runpy twin of the ten
-suite wrappers). The status viewer: tests/battery_status.py."""
+suite wrappers). The status viewer: tests/battery_status.py; the killer:
+tests/battery_kill.py."""
 import os
 import runpy
 import sys

@@ -192,7 +192,18 @@ byte-identical) and the live view (`--socket` — the feed renders
 realtime, every packet line naming its source host:port and its
 `#conn:txn` key; a request prints `pending`, its response completes the
 exchange; the value dumps ride only with `--values` — off by default,
-the file views always dump them; `^C` ends it clean). The value dumps
+the file views always dump them; `^C` ends it clean). The live view
+also records: `--record FILE` saves the feed to a trace file while it
+renders — the received PVMB blocks land verbatim (0600, flushed and
+appended across recorder sessions, the feed's per-connect header the
+session boundary), a record in the file is byte-identical to the one
+the daemon's own `--capture` writes, and any reader takes the file for
+captured (the views, the converter, `--replay`). `--quiet` drops the
+per-record render — the recorder runs silent, the banners and the save
+tally stay. The feed is the family's one record contract: the cache's
+`trace-socket` subscribes the same way, so the cache's live wire
+records to a file with
+`--socket /tmp/modbus-cache-<listen-port>-trace.socket --record …`. The value dumps
 under the lines cap at 16 words a block — a poller's repeats keep the
 conversations readable; `--values-cap N|all` reshapes the cap (`all`
 the full block) wherever the values render, and the answer index dumps
@@ -217,6 +228,9 @@ python3 apps/modbus-replay/bin/modbus-replay-dump.py sun2000-morning.pvmb --valu
 python3 apps/modbus-replay/bin/modbus-replay-dump.py sun2000-morning.pvmb --to json -o sun2000-morning.jsonl
 # live: the conversations render off the running daemon's record feed
 python3 apps/modbus-replay/bin/modbus-replay-dump.py --socket
+# live: the feed saved to a trace file while it renders (the cache's feed too)
+python3 apps/modbus-replay/bin/modbus-replay-dump.py --socket --record live.pvmb
+python3 apps/modbus-replay/bin/modbus-replay-dump.py --socket /tmp/modbus-cache-15502-trace.socket --record cache-live.pvmb --quiet
 ```
 
 Exit codes: `0` = ran (SIGTERM/SIGINT: the graceful shutdown); `1` =

@@ -174,7 +174,25 @@ address\\-prefixed words, the bit strings) ride only with
 frame (the file views dump the values always), the same
 \\fB--values\\-cap\\fR word cap shapes them. Bare \\fB--socket\\fR
 spells the derived default
-(/tmp/modbus\\-replay\\-<listen\\-port>.socket)."""
+(/tmp/modbus\\-replay\\-<listen\\-port>.socket).
+.PP
+The recorder (\\fB--record\\fR FILE, on the live view): the feed's
+bytes land in the file verbatim while the conversations render \\(em
+the header block at connect, then one length\\-framed crc\\-checked
+block per record, flushed per record (a killed recorder leaves a
+readable trace). The write is the wire's bytes, one copy: a record the
+file holds is byte\\-identical to the one the daemon's own
+\\fB--capture\\fR writes, and any family reader takes the file for
+captured (the views, the converter, \\fBmodbus-replay --replay\\fR).
+The file is 0600 and appends across recorder sessions \\(em the feed
+re\\-stamps its header per subscriber connect, the session boundary a
+re\\-connected recorder appends. The feed is the family's one record
+contract: the cache's trace\\-socket subscribes the same way, so the
+cache's live wire records to a file with
+\\fB--socket /tmp/modbus\\-cache\\-<listen\\-port>\\-trace.socket
+\\-\\-record trace.pvmb\\fR. \\fB--quiet\\fR drops the per\\-record
+render \\(em the recorder runs silent, the banners and the save tally
+stay."""
     signals = """.SH SIGNALS
 .TP
 .BR SIGTERM ", " SIGINT
@@ -199,11 +217,14 @@ DUMP_SOCKET) live on
 .I the trace file
 the wire dump: 0600 \\(em the binary PVMB blocks (the capture default)
 or the JSON v1 lines (\\fB--dump-type json\\fR); both shapes read the
-same.
+same. The recorded trace (\\fB--record\\fR) rides the same shapes \\(em
+binary, 0600, appended across sessions.
 .TP
 .I /tmp/modbus\\-replay\\-<listen\\-port>.socket
 the daemon's record feed (\\fB--dump-socket\\fR) \\(em bare
-\\fB--socket\\fR spells this default."""
+\\fB--socket\\fR spells this default; any family feed subscribes (the
+cache's trace\\-socket at
+/tmp/modbus\\-cache\\-<listen\\-port>\\-trace.socket included)."""
     exit_status = """.SH EXIT STATUS
 .TP
 .B 0
@@ -218,7 +239,7 @@ command-line misuse."""
     return page(
         'read, convert and follow a Modbus wire trace',
         'modbus-replay-dump', 1, DATE, VERSION, MANUAL,
-        '.B modbus-replay-dump\n.B trace\n.RI [ options ]\n.br\n.B modbus-replay-dump \\-\\-to json \\-o trace.jsonl trace.pvmb\n.br\n.B modbus-replay-dump \\-\\-socket\n.RI [ path ]',
+        '.B modbus-replay-dump\n.B trace\n.RI [ options ]\n.br\n.B modbus-replay-dump \\-\\-to json \\-o trace.jsonl trace.pvmb\n.br\n.B modbus-replay-dump \\-\\-socket\n.RI [ path ]\n.br\n.B modbus-replay-dump \\-\\-socket path \\-\\-record trace.pvmb [\\-\\-quiet]',
         description,
         options_section(parser),
         extra_sections=(signals, security, environment, files, exit_status),

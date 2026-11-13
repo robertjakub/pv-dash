@@ -229,6 +229,15 @@ r = subprocess.run([sys.executable, DUMP, 'a.pvmb', '--to', 'json', '-o', 'b.jso
 check('the dump: the live-conversion combo refused', r.returncode == 1 and 'racy' in r.stderr,
       (r.stderr.strip().splitlines() or ['-'])[-1])
 
+r = subprocess.run([sys.executable, DUMP, 'a.pvmb', '--record', 'b.pvmb'],
+                   capture_output=True, text=True)
+check('the dump: --record without a feed refused', r.returncode == 1 and 'rides --socket' in r.stderr,
+      (r.stderr.strip().splitlines() or ['-'])[-1])
+
+r = subprocess.run([sys.executable, DUMP, '--quiet'], capture_output=True, text=True)
+check('the dump: --quiet without a feed refused', r.returncode == 1 and 'rides --socket' in r.stderr,
+      (r.stderr.strip().splitlines() or ['-'])[-1])
+
 print()
 print('== the example trace renders ==')
 
@@ -729,8 +738,6 @@ check('the cap-viewed capture pipes the wide read', len(livecapw_again) > 7
 time.sleep(1.0)
 p_livecapw.send_signal(signal.SIGTERM)
 p_livecapw.wait(timeout=10)
-p_livecap.send_signal(signal.SIGTERM)
-p_livecap.wait(timeout=10)
 live_log = read_log(LOG % 'live')
 check('the live view rendered the exchange',
       'req' in live_log and '(pending)' in live_log and 'rsp' in live_log and 'ms' in live_log,
@@ -752,6 +759,100 @@ check('the live view honors --values-cap (the wide read capped at 4, +16 more)',
       '32064:  ' in livecapw_log and '(+16 more)' in livecapw_log,
       next((l for l in livecapw_log.splitlines() if '(+' in l), '-')[:120])
 
+print()
+print('== the recorder (--record on the live view) ==')
+
+# the recorder face: the feed's bytes land verbatim — a record in the
+# file is byte-identical to the one the daemon's own --capture writes
+# off the same emit, so the walk compares the two files' records one to
+# one. The daemon keeps capturing to TRACE; the recorder watches the feed.
+TRACE_REC = os.path.join(SCRATCH, 'replay-trace-rec.pvmb')
+p_rec = start([sys.executable, DUMP, '--socket', FEED_CAP, '--record', TRACE_REC],
+              log=LOG % 'rec')
+time.sleep(1.0)
+rec_again = raw_exchange(PORT_CAP, fc4_req, TXN['fc4'])
+check('the recorded capture pipes the wire', rec_again == frames['fc4'], rec_again.hex())
+time.sleep(1.0)
+p_rec.send_signal(signal.SIGTERM)
+p_rec.wait(timeout=10)
+
+check('the recorded trace exists', os.path.exists(TRACE_REC))
+check('the recorded trace is 0600',
+      os.stat(TRACE_REC).st_mode & 0o777 == 0o600, '%03o' % (os.stat(TRACE_REC).st_mode & 0o777))
+rec_headers, rec_recs = walk_pvmb(open(TRACE_REC, 'rb').read(), 'the recorded trace')
+check('the recorded trace holds one run header (the feed\'s posture)',
+      len(rec_headers) == 1 and str(PORT_FAKE) in rec_headers[0], str(rec_headers))
+check('the recorded trace holds the exchange',
+      [(r_['kind'], r_['raw']) for r_ in rec_recs]
+      == [(0, struct.pack('>HHHB', TXN['fc4'], 0, len(fc4_req) + 1, 1) + fc4_req),
+          (1, frames['fc4'])],
+      str([(r_['kind'], r_['raw'].hex()) for r_ in rec_recs]))
+_, trace_now = walk_pvmb(open(TRACE, 'rb').read(), 'the capture trace')
+check('the recorded records are byte-identical to the capture\'s',
+      [(r_['kind'], r_['raw']) for r_ in rec_recs]
+      == [(r_['kind'], r_['raw']) for r_ in trace_now[-2:]],
+      '%d recorded / %d captured' % (len(rec_recs), len(trace_now)))
+
+# the quiet recorder renders nothing per record — and the feed's close
+# (the daemon's SIGTERM) ends it by itself, exit 0, the save tally told
+TRACE_QUIET = os.path.join(SCRATCH, 'replay-trace-quiet.pvmb')
+p_quiet = start([sys.executable, DUMP, '--socket', FEED_CAP, '--record', TRACE_QUIET,
+                 '--quiet'], log=LOG % 'quiet')
+time.sleep(1.0)
+quiet_again = raw_exchange(PORT_CAP, fc3_req, TXN['fc3b'])
+check('the quiet-viewed capture pipes the wire',
+      quiet_again == struct.pack('>H', TXN['fc3b']) + frames['fc3'][2:], quiet_again.hex())
+time.sleep(1.0)
+p_livecap.send_signal(signal.SIGTERM)
+p_livecap.wait(timeout=10)
+p_quiet.wait(timeout=10)
+check('the quiet recorder ended by itself when the feed closed',
+      p_quiet.returncode == 0, str(p_quiet.returncode))
+quiet_headers, quiet_recs = walk_pvmb(open(TRACE_QUIET, 'rb').read(), 'the quiet trace')
+check('the quiet trace holds the exchange',
+      [(r_['kind'], r_['raw']) for r_ in quiet_recs]
+      == [(0, struct.pack('>HHHB', TXN['fc3b'], 0, len(fc3_req) + 1, 1) + fc3_req),
+          (1, struct.pack('>H', TXN['fc3b']) + frames['fc3'][2:])],
+      str([(r_['kind'], r_['raw'].hex()) for r_ in quiet_recs]))
+quiet_log = read_log(LOG % 'quiet')
+check('the quiet recorder rendered nothing per record',
+      'req' not in quiet_log and 'pending' not in quiet_log and 'rsp' not in quiet_log,
+      next((l for l in quiet_log.splitlines() if 'req' in l or 'rsp' in l), '-')[:100])
+check('the quiet recorder told the save tally',
+      'record(s) recorded' in quiet_log and '--- the live feed on' in quiet_log,
+      next((l for l in quiet_log.splitlines() if 'record(s) recorded' in l), '-')[:100])
+
+r = subprocess.run([sys.executable, DUMP, TRACE_REC], capture_output=True, text=True)
+check('the recorded trace renders like a captured one',
+      r.returncode == 0 and 'the answer index' in r.stdout and '0 orphan(s)' in r.stdout,
+      (r.stdout.strip().splitlines() or ['-'])[0][:140])
+
+# the re-connected recorder appends: the feed re-stamps its header per
+# subscriber connect, the second session's header the boundary the
+# reader walks (two sessions, both exchanges served)
+p_recap = daemon(['--listen', '127.0.0.1:%d' % PORT_CAP, '--upstream', '127.0.0.1:%d' % PORT_FAKE,
+                  '--capture', TRACE], LOG % 'livecap2')
+check('the append capture came up', wait_port(PORT_CAP))
+p_rec2 = start([sys.executable, DUMP, '--socket', FEED_CAP, '--record', TRACE_REC, '--quiet'],
+               log=LOG % 'rec2')
+time.sleep(1.0)
+rec2_again = raw_exchange(PORT_CAP, fc3_req, TXN['fc3'])
+check('the append capture pipes the wire', rec2_again == frames['fc3'], rec2_again.hex())
+time.sleep(1.0)
+p_rec2.send_signal(signal.SIGTERM)
+p_rec2.wait(timeout=10)
+p_recap.send_signal(signal.SIGTERM)
+p_recap.wait(timeout=10)
+
+rec2_headers, rec2_recs = walk_pvmb(open(TRACE_REC, 'rb').read(), 'the appended trace')
+check('the appended trace holds two run headers', len(rec2_headers) == 2, str(len(rec2_headers)))
+check('the appended trace holds both sessions\' exchanges', len(rec2_recs) == 4,
+      '%d record(s)' % len(rec2_recs))
+r = subprocess.run([sys.executable, DUMP, TRACE_REC], capture_output=True, text=True)
+check('the reader walks the appended trace\'s two sessions',
+      r.returncode == 0 and '2 session(s)' in r.stdout,
+      (r.stdout.strip().splitlines() or ['-'])[0][:140])
+
 r = subprocess.run([sys.executable, DUMP, EXAMPLE, '--values'],
                    capture_output=True, text=True)
 check('the dump: --values refused on the file views',
@@ -766,7 +867,7 @@ for name, proc in (('cap', p_cap), ('rep', p_rep), ('rep0', p_rep0), ('pass', p_
     check('%s: alive at the end' % name, proc.poll() is None or proc.returncode == 0,
           str(proc.returncode))
 for name in ('cap', 'rep', 'rep0', 'pass', 'fake', 'warn', 'wide', 'live', 'livev',
-             'livecapw', 'livecap'):
+             'livecapw', 'livecap', 'rec', 'quiet', 'rec2', 'livecap2'):
     log = read_log(LOG % name)
     check('%s: zero tracebacks' % name, 'Traceback' not in log)
 for name in ('cap', 'rep', 'rep0', 'pass', 'wide'):

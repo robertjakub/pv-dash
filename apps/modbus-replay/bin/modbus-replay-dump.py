@@ -22,6 +22,12 @@ is the record). One tool, three abilities:
                  --values adds the value dumps, off by default). The
                  default path derives the family's ctl way:
                  /tmp/modbus-replay-<listen-port>.socket.
+                 --record FILE saves the feed while it renders — the
+                 received PVMB blocks land in the file verbatim (0600,
+                 appended across sessions), a trace any reader takes
+                 for captured; --quiet drops the render, the recorder
+                 runs silent. Any feed subscribes — the cache's
+                 trace-socket included.
 
 The value dumps under the lines cap at 16 words a block (the
 conversations' diagram stays readable under a poller's repeats; the
@@ -265,13 +271,24 @@ def recv_exact(sock, n):
     return buf
 
 
-def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP):
+def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP, record=None,
+         quiet=False):
     """The feed: connect, the header (the same peek a file gets), then
     the records as they land — the conversations render realtime. The
     values (the address-prefixed words, the bit strings) ride only with
     --values: a busy feed stays one line a frame; the trace file has
     everything, the file views dump the values always. The value blocks
-    cap at `cap` words (--values-cap; None = the full block)."""
+    cap at `cap` words (--values-cap; None = the full block).
+
+    record = --record FILE: the feed's bytes land in the file verbatim
+    — the header block at connect (the feed re-stamps it per
+    subscriber, the session boundary a re-connected recorder appends),
+    then one length-framed crc-checked block per record, flushed per
+    record (a killed recorder leaves a readable trace). The write is
+    the wire's bytes, one copy: a record the file holds is
+    byte-identical to the one the daemon's own --capture writes. 0600
+    — the wire carries values. quiet = --quiet: the per-record lines
+    drop, the banners and the save tally stay."""
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         sock.connect(sock_path)
@@ -279,6 +296,19 @@ def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP):
         print('modbus-replay-dump: cannot reach the feed socket %s: %s'
               % (sock_path, e), file=sys.stderr)
         raise SystemExit(1)
+    out = None
+    saved = 0
+    if record is not None:
+        try:
+            out = open(record, 'ab')
+        except OSError as e:
+            print('modbus-replay-dump: cannot open the record file %s: %s'
+                  % (record, e), file=sys.stderr)
+            raise SystemExit(1)
+        try:
+            os.chmod(record, 0o600)   # the wire carries values — the secrets posture
+        except OSError:
+            pass
     print('--- the live feed on %s (^C ends it) ---' % sock_path)
     try:
         sys.stdout.reconfigure(line_buffering=True)   # a live view renders live
@@ -291,25 +321,37 @@ def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP):
             print('modbus-replay-dump: %s is not a pv-suite record feed '
                   '(the magic is %r)' % (sock_path, magic), file=sys.stderr)
             raise SystemExit(1)
-        hdr = parse_binary_header(head + recv_exact(sock, up_len + 4), 0)
+        tail = recv_exact(sock, up_len + 4)
+        hdr = parse_binary_header(head + tail, 0)
         if hdr is None:
             print('modbus-replay-dump: %s: the feed header does not parse'
                   % sock_path, file=sys.stderr)
             raise SystemExit(1)
+        if out is not None:
+            out.write(head + tail)   # the run header verbatim — the file's anchor
+            out.flush()
         session = 1
         printed = set()
         pending = {}   # conn -> (no, ts, words) — the open request
         spans = {}     # conn -> [first_ts, last_ts]
         no = 0
         while True:
-            (body_len,) = struct.unpack('>I', recv_exact(sock, 4))
+            head_len = recv_exact(sock, 4)
+            (body_len,) = struct.unpack('>I', head_len)
             body = recv_exact(sock, body_len)
-            (crc,) = struct.unpack('>I', recv_exact(sock, 4))
+            crc_bytes = recv_exact(sock, 4)
+            (crc,) = struct.unpack('>I', crc_bytes)
             if zlib.crc32(body) != crc:
                 print('modbus-replay-dump: the feed sent a corrupt record '
                       '— stopping', file=sys.stderr)
                 raise SystemExit(1)
+            if out is not None:
+                out.write(head_len + body + crc_bytes)   # the block verbatim
+                out.flush()   # a killed recorder leaves a readable trace
+                saved += 1
             rec = decode_record(body)
+            if quiet:
+                continue
             no += 1
             key = (session, rec['conn'])
             if key not in printed:
@@ -348,6 +390,10 @@ def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP):
     except ConnectionError:
         print('--- the feed closed (the daemon stopped, or the capture '
               'outpaced this viewer — the trace file has everything) ---')
+    finally:
+        if out is not None:
+            out.close()
+            print('%s: %d record(s) recorded' % (record, saved))
 
 
 def values_cap(text):
@@ -375,6 +421,12 @@ def validate(args):
     if args.socket is not None and args.to:
         problems.append('--to converts a snapshot — a live feed converts nothing '
                         '(the combo is racy by definition)')
+    if args.record is not None and args.socket is None:
+        problems.append('--record saves the live feed — it rides --socket '
+                        '(a file source is already the record)')
+    if args.quiet and args.socket is None:
+        problems.append('--quiet silences the live view — it rides --socket '
+                        '(the file views render on demand)')
     if args.values and args.socket is None:
         problems.append('--values rides the live view — the file views dump the '
                         'values always (the file is the artifact, studied at leisure)')
@@ -398,7 +450,8 @@ def main():
         description='modbus-replay-dump: the trace\'s reader face — the three '
                     'views (the summary, the answer index, the conversations), '
                     'the converter (--to json|binary -o OUT), the live view '
-                    '(--socket: the daemon\'s record feed). Both trace shapes '
+                    '(--socket: the daemon\'s record feed, --record: the feed '
+                    'saved to a trace file). Both trace shapes '
                     'read the same; the trace is 0600 at rest and belongs with '
                     'the secrets.')
     p.add_argument('trace', nargs='?', help='the trace file (the binary PVMB '
@@ -407,7 +460,18 @@ def main():
                    metavar='PATH',
                    help='the daemon\'s record feed (--dump-socket): the '
                         'conversations render live; bare --socket spells the '
-                        'derived default (/tmp/modbus-replay-<listen-port>.socket)')
+                        'derived default (/tmp/modbus-replay-<listen-port>.socket) — '
+                        'any family feed subscribes (the cache\'s trace-socket '
+                        'included)')
+    p.add_argument('--record', default=None, metavar='FILE',
+                   help='the live view saves the feed to this trace file while '
+                        'it renders — the received PVMB blocks land verbatim '
+                        '(0600, appended across sessions), a trace any reader '
+                        'takes for captured')
+    p.add_argument('--quiet', action='store_true',
+                   help='the live view renders nothing per record — the '
+                        'recorder\'s silent face (the banners and the save '
+                        'tally stay)')
     p.add_argument('--values', action='store_true',
                    help='the live view: dump the values under the completed '
                         'exchanges (the address-prefixed words, the bit '
@@ -439,7 +503,8 @@ def main():
         else (None if args.values_cap == 'all' else args.values_cap)
     try:
         if args.socket is not None:
-            live(args.socket, values=args.values, cap=cap)
+            live(args.socket, values=args.values, cap=cap,
+                 record=args.record, quiet=args.quiet)
         elif args.to:
             convert(args.trace, args.to, args.out)
         else:

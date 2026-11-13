@@ -10,6 +10,8 @@ modbus-replay-dump \- read, convert and follow a Modbus wire trace
 .br
 .B modbus-replay-dump \-\-socket
 .RI [ path ]
+.br
+.B modbus-replay-dump \-\-socket path \-\-record trace.pvmb [\-\-quiet]
 
 .SH DESCRIPTION
 \
@@ -54,6 +56,24 @@ frame (the file views dump the values always), the same
 \fB--values\-cap\fR word cap shapes them. Bare \fB--socket\fR
 spells the derived default
 (/tmp/modbus\-replay\-<listen\-port>.socket).
+.PP
+The recorder (\fB--record\fR FILE, on the live view): the feed's
+bytes land in the file verbatim while the conversations render \(em
+the header block at connect, then one length\-framed crc\-checked
+block per record, flushed per record (a killed recorder leaves a
+readable trace). The write is the wire's bytes, one copy: a record the
+file holds is byte\-identical to the one the daemon's own
+\fB--capture\fR writes, and any family reader takes the file for
+captured (the views, the converter, \fBmodbus-replay --replay\fR).
+The file is 0600 and appends across recorder sessions \(em the feed
+re\-stamps its header per subscriber connect, the session boundary a
+re\-connected recorder appends. The feed is the family's one record
+contract: the cache's trace\-socket subscribes the same way, so the
+cache's live wire records to a file with
+\fB--socket /tmp/modbus\-cache\-<listen\-port>\-trace.socket
+\-\-record trace.pvmb\fR. \fB--quiet\fR drops the per\-record
+render \(em the recorder runs silent, the banners and the save tally
+stay.
 
 .SH OPTIONS
 .TP
@@ -64,7 +84,17 @@ bytes pick the walk)
 .B \-\-socket
 the daemon's record feed (\-\-dump\-socket): the conversations render
 live; bare \-\-socket spells the derived default
-(/tmp/modbus\-replay\-<listen\-port>.socket)
+(/tmp/modbus\-replay\-<listen\-port>.socket) — any family feed
+subscribes (the cache's trace\-socket included)
+.TP
+.B \-\-record
+the live view saves the feed to this trace file while it renders — the
+received PVMB blocks land verbatim (0600, appended across sessions), a
+trace any reader takes for captured
+.TP
+.B \-\-quiet
+the live view renders nothing per record — the recorder's silent face
+(the banners and the save tally stay)
 .TP
 .B \-\-values
 the live view: dump the values under the completed exchanges (the
@@ -111,11 +141,14 @@ DUMP_SOCKET) live on
 .I the trace file
 the wire dump: 0600 \(em the binary PVMB blocks (the capture default)
 or the JSON v1 lines (\fB--dump-type json\fR); both shapes read the
-same.
+same. The recorded trace (\fB--record\fR) rides the same shapes \(em
+binary, 0600, appended across sessions.
 .TP
 .I /tmp/modbus\-replay\-<listen\-port>.socket
 the daemon's record feed (\fB--dump-socket\fR) \(em bare
-\fB--socket\fR spells this default.
+\fB--socket\fR spells this default; any family feed subscribes (the
+cache's trace\-socket at
+/tmp/modbus\-cache\-<listen\-port>\-trace.socket included).
 
 .SH EXIT STATUS
 .TP

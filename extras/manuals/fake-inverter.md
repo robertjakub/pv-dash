@@ -1,4 +1,4 @@
-# The fake-inverter manual (MANUAL.md)
+# The fake-inverter manual
 
 A dependency-free (Python stdlib only) Modbus TCP server that plays an
 inverter — the battery, the smart meter, the diagnostics — for the family to

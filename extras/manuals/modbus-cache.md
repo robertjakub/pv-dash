@@ -1,4 +1,4 @@
-# The modbus-cache manual (MANUAL.md)
+# The modbus-cache manual
 
 A dependency-free (Python stdlib only) Modbus TCP caching proxy for
 single-client devices: it polls the inverter once and serves every client

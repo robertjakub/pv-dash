@@ -1,4 +1,4 @@
-# The dashboard manual (MANUAL.md)
+# The dashboard manual
 
 A single-page dashboard for home PV monitoring, fed by Prometheus: it serves
 the page and proxies the upstream queries. Part of the pv-suite family. The

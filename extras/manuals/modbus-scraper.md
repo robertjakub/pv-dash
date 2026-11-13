@@ -1,4 +1,4 @@
-# The modbus-scraper manual (MANUAL.md)
+# The modbus-scraper manual
 
 A dependency-free (Python stdlib only) Prometheus exporter that polls a
 Modbus device and exposes the metrics at /metrics. Part of the pv-suite

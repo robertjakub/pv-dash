@@ -4,7 +4,9 @@ that sits on the wire between a pv-suite client (the cache, the scraper,
 any Modbus master) and the device. Capture mode (--upstream) pipes every
 client to the device and dumps both directions to a trace file (--capture,
 0600 — one record per frame with timestamps, the binary PVMB blocks by
-default or the JSON v1 lines per --dump-type); replay mode (--replay)
+default or the JSON v1 lines per --dump-type; --trace-max-mb rotates the
+file at a size, the .1 .. .N backups each a complete trace); replay mode
+(--replay)
 serves the trace back: every request is matched against the recorded ones
 and answered with the most recent recorded response, so the poll planning,
 the write-through and the chaos behavior debug against real hardware
@@ -63,6 +65,10 @@ def validate(args):
                         'FILE records it) or --replay FILE (serve a trace)')
     if args.capture and not capture:
         problems.append('--capture records the capture mode\'s wire — it needs --upstream, not --replay')
+    if (args.trace_max_mb or args.trace_files != 3) and not args.capture:
+        problems.append('--trace-max-mb/--trace-files shape the trace file — '
+                        'they ride --capture (the record feed rotates nothing: '
+                        'the recorder shapes its own file)')
     if capture:
         try:
             parse_upstream(args.upstream)
@@ -140,7 +146,8 @@ def main():
                             client_timeout=args.client_timeout)
     if args.capture or feed:   # the writer opens before serving (a trace file is a side effect)
         try:
-            face.writer = TraceWriter(args.capture, dump_type=args.dump_type, feed=feed)
+            face.writer = TraceWriter(args.capture, dump_type=args.dump_type, feed=feed,
+                                      max_mb=args.trace_max_mb, files=args.trace_files)
             face.writer.open_run(args.upstream if args.upstream
                                  else 'replay %s' % (args.replay or '-'))
         except OSError as e:

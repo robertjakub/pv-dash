@@ -7,7 +7,7 @@ page. The page class is 'sidecar' — the daemon ladder without the
 CONTROL section: the sidecar has no control plane."""
 from common.render.manpage import options_section, page
 
-DATE = '2026-11-13'
+DATE = '2026-11-14'
 VERSION = 'pv-suite 0.5.1'
 MANUAL = 'User Commands'
 
@@ -38,6 +38,14 @@ holds the pipe; the auth handshakes (the PVA1 proof, the Waveshare
 password, their verdicts) peel and name the same way \\(em the raw
 bytes ride verbatim. Without \\fB--capture\\fR the proxy runs
 pass-through and the decoded frames log at DEBUG only.
+A capture left running grows unbounded \\(em \\fB--trace-max-mb\\fR
+rotates the trace at that size, keeping \\fB--trace-files\\fR backups
+(0 = no size rotation, the default): at the size the backups shift
+(.1 <\\- .2 <\\- ... <\\- .N, the oldest dropped), the file
+reopens fresh and stamps a new run header \\(em the fresh capture
+keeps the plain name, every backup is a complete trace of its own
+(any reader takes each for captured), and a record never straddles
+two files.
 .PP
 Every record also fans out to the record feed (\\fB--dump-socket\\fR,
 bound by default at the derived
@@ -88,12 +96,16 @@ timestamped), a second accounting of the same wire would only drift
 from it."""
     environment = """.SH ENVIRONMENT
 .TP
-.B UPSTREAM ", " CAPTURE ", " REPLAY ", " REPLAY_SPEED ", " REPLAY_MISS ", " DUMP_TYPE ", " DUMP_SOCKET
+.B UPSTREAM ", " CAPTURE ", " REPLAY ", " REPLAY_SPEED ", " REPLAY_MISS
 the mode knobs: capture (the device endpoint + the trace out) or replay
-(the trace in) with its speed and miss policy, the trace's shape
+(the trace in) with its speed and miss policy \\(em the start reads them
+too (flag > env).
+.TP
+.B TRACE_MAX_MB ", " TRACE_FILES ", " DUMP_TYPE ", " DUMP_SOCKET
+the trace's rotation (the size trigger, the backup count), the shape
 (binary \\(em the default \\(em or the v1 JSON lines) and the record
 feed's socket (the default derives from the listen port; \\fBnone\\fR
-binds no feed) \\(em the start reads them too (flag > env)."""
+binds no feed)."""
     files = """.SH FILES
 .TP
 .I the trace (--capture / --replay)
@@ -103,7 +115,10 @@ by default (the magic
 v1 lines ("format": "pv\\-suite\\-modbus\\-trace", version 1) per
 \\fB--dump-type json\\fR \\(em the capture side appends, the replay side
 reads both shapes; a foreign file or a future version refuses
-(re\\-capture), a torn tail keeps what parsed.
+(re\\-capture), a torn tail keeps what parsed. The size rotation's
+backups ride beside it as
+.IR trace.pvmb.1 " .. " trace.pvmb.N
+(each a complete trace; the fresh capture keeps the plain name).
 .TP
 .I /tmp/modbus\\-replay\\-<listen\\-port>.socket
 the record feed (\\fB--dump-socket\\fR): the records push to the
@@ -186,7 +201,14 @@ file holds is byte\\-identical to the one the daemon's own
 captured (the views, the converter, \\fBmodbus-replay --replay\\fR).
 The file is 0600 and appends across recorder sessions \\(em the feed
 re\\-stamps its header per subscriber connect, the session boundary a
-re\\-connected recorder appends. The feed is the family's one record
+re\\-connected recorder appends. An unbounded record grows too:
+\\fB--trace\\-max\\-mb\\fR rotates it at that size, keeping
+\\fB--trace\\-files\\fR backups \\(em the backups shift
+(.1 <\\- .2 <\\- ... <\\- .N, the oldest dropped), the file
+reopens fresh and stamps a header of its own (the feed's posture, now),
+the received records keep landing verbatim and a block never straddles
+two files \\(em every backup a complete trace, any reader takes each
+for captured. The feed is the family's one record
 contract: the cache's trace\\-socket subscribes the same way, so the
 cache's live wire records to a file with
 \\fB--socket /tmp/modbus\\-cache\\-<listen\\-port>\\-trace.socket
@@ -218,7 +240,10 @@ DUMP_SOCKET) live on
 the wire dump: 0600 \\(em the binary PVMB blocks (the capture default)
 or the JSON v1 lines (\\fB--dump-type json\\fR); both shapes read the
 same. The recorded trace (\\fB--record\\fR) rides the same shapes \\(em
-binary, 0600, appended across sessions.
+binary, 0600, appended across sessions; the size rotation's backups
+ride beside it as
+.IR trace.pvmb.1 " .. " trace.pvmb.N
+(each a complete trace).
 .TP
 .I /tmp/modbus\\-replay\\-<listen\\-port>.socket
 the daemon's record feed (\\fB--dump-socket\\fR) \\(em bare

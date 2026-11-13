@@ -3,6 +3,38 @@
 The open items live in the family-wide [docs/TODO.md](../../docs/TODO.md);
 this file keeps the tool's done/history records, newest first.
 
+## 2026-11-14 — the trace rotates at a size (--trace-max-mb / --trace-files)
+
+An unbounded capture is a disk hazard — a capture proxy can sit in-line
+for days, and the 0600 trace grows without bound. The answer is the
+audit log's rotation story, and it lands format-free: at
+`--trace-max-mb` the backups shift (`.1 <- .2 <- … <- .N`, the oldest
+dropped per `--trace-files`), the file reopens fresh (still 0600) and
+stamps a new run header — the fresh capture keeps the plain name, and
+every backup is a complete trace of its own (each run stamps its
+header, so every reader takes each backup for captured; `--replay`
+serves one slice at a time, the accepted cost of a safety valve). A
+record is the rotation boundary: the size check runs before the write,
+a block never straddles two files. `0` = no size rotation, the default
+— nothing moves unless the knob is spelled; the bounds mirror the
+audit pair's (0..1048576 MB, 1..100 backups), gated at the flag layer
+from the registry rows' min/max. The knob lives in the shared writer
+(`common/modbus/trace.py` — `TraceWriter(max_mb, files)` plus the
+shared `shift_backups`), so both writers of the class ride it:
+modbus-replay's `--capture` and modbus-replay-dump's `--record` (whose
+recorder re-stamps a header of its own on the shift — the feed's
+posture, now — and keeps landing the received blocks verbatim). The
+knobs refuse without their file (the rotation shapes a trace file, the
+feed rotates nothing), and `--trace-files` without `--trace-max-mb`
+refuses too (the count alone rotates nothing). The suite gains the
+size-rotation section: a capture with a max below one record's size
+(the pathological spelling — every record rotates, the shift exercised
+hardest) pumps six exchanges and pins the four-file set (live + `.1` +
+`.2` + `.3`, keep=3, nothing beyond), each file 0600, one header + one
+record, the posture carried, the newest-first kinds and the verbatim
+requests in `.1`/`.2`; the recorder leg pins its own three-file set and
+the save tally.
+
 ## 2026-11-13 — the values cap, reshapeable (--values-cap N|all)
 
 The value dumps under the lines always capped at 16 words a block — the

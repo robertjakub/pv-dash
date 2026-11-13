@@ -15,7 +15,7 @@ from common.modbus.trace import (KIND_RAW_C2D, KIND_RAW_D2C, KIND_REQ, KIND_RSP,
                                  SINGLE_WRITE_FCS, TRACE_BINARY_VERSION, TRACE_FORMAT,
                                  TRACE_MAGIC, TRACE_VERSION, decode_frame, decode_record,
                                  describe_frame, encode_header, encode_record,
-                                 parse_binary_header, FeedSocket, TraceWriter)
+                                 parse_binary_header, shift_backups, FeedSocket, TraceWriter)
 from .statics import MAX_PDU
 
 

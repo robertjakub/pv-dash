@@ -1,4 +1,4 @@
-.TH MODBUS-REPLAY 1 "2026-11-13" "pv-suite 0.5.1" "User Commands"
+.TH MODBUS-REPLAY 1 "2026-11-14" "pv-suite 0.5.1" "User Commands"
 .SH NAME
 modbus-replay \- capture and replay a Modbus TCP wire trace
 .SH SYNOPSIS
@@ -34,6 +34,14 @@ holds the pipe; the auth handshakes (the PVA1 proof, the Waveshare
 password, their verdicts) peel and name the same way \(em the raw
 bytes ride verbatim. Without \fB--capture\fR the proxy runs
 pass-through and the decoded frames log at DEBUG only.
+A capture left running grows unbounded \(em \fB--trace-max-mb\fR
+rotates the trace at that size, keeping \fB--trace-files\fR backups
+(0 = no size rotation, the default): at the size the backups shift
+(.1 <\- .2 <\- ... <\- .N, the oldest dropped), the file
+reopens fresh and stamps a new run header \(em the fresh capture
+keeps the plain name, every backup is a complete trace of its own
+(any reader takes each for captured), and a record never straddles
+two files.
 .PP
 Every record also fans out to the record feed (\fB--dump-socket\fR,
 bound by default at the derived
@@ -86,6 +94,18 @@ encodes fans out to the connected dump tools (read\-only push, the
 binary encoding verbatim; modbus\-replay\-dump \-\-socket subscribes).
 The default derives the family's ctl way:
 /tmp/modbus\-replay\-<listen\-port>.socket; 'none' binds no feed socket
+.TP
+.BI \-\-trace\-max\-mb " trace-max-mb"
+rotate the trace file at this size in MB, keeping N backups; 0 = no size
+rotation (the default — the capture appends unbounded). At the size the
+writer shifts the backups (.1 <\- .2 <\- ... <\- .N, the oldest
+dropped), reopens fresh and stamps a new run header — the fresh capture
+keeps the plain name, every backup is a complete trace any reader takes
+for captured
+.TP
+.BI \-\-trace\-files " trace-files"
+rotated trace backups to keep (the size rotation's .1 .. .N; 1 = only
+the shift\-away previous file survives)
 .TP
 .BI \-\-replay " replay"
 the trace file to serve (one written by \-\-capture): every incoming
@@ -150,12 +170,16 @@ from it.
 
 .SH ENVIRONMENT
 .TP
-.B UPSTREAM ", " CAPTURE ", " REPLAY ", " REPLAY_SPEED ", " REPLAY_MISS ", " DUMP_TYPE ", " DUMP_SOCKET
+.B UPSTREAM ", " CAPTURE ", " REPLAY ", " REPLAY_SPEED ", " REPLAY_MISS
 the mode knobs: capture (the device endpoint + the trace out) or replay
-(the trace in) with its speed and miss policy, the trace's shape
+(the trace in) with its speed and miss policy \(em the start reads them
+too (flag > env).
+.TP
+.B TRACE_MAX_MB ", " TRACE_FILES ", " DUMP_TYPE ", " DUMP_SOCKET
+the trace's rotation (the size trigger, the backup count), the shape
 (binary \(em the default \(em or the v1 JSON lines) and the record
 feed's socket (the default derives from the listen port; \fBnone\fR
-binds no feed) \(em the start reads them too (flag > env).
+binds no feed).
 
 .SH FILES
 .TP
@@ -166,7 +190,10 @@ by default (the magic
 v1 lines ("format": "pv\-suite\-modbus\-trace", version 1) per
 \fB--dump-type json\fR \(em the capture side appends, the replay side
 reads both shapes; a foreign file or a future version refuses
-(re\-capture), a torn tail keeps what parsed.
+(re\-capture), a torn tail keeps what parsed. The size rotation's
+backups ride beside it as
+.IR trace.pvmb.1 " .. " trace.pvmb.N
+(each a complete trace; the fresh capture keeps the plain name).
 .TP
 .I /tmp/modbus\-replay\-<listen\-port>.socket
 the record feed (\fB--dump-socket\fR): the records push to the

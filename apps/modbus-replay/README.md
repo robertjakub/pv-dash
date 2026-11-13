@@ -93,6 +93,18 @@ the tear. The JSON walk reads the same story line-wise: a torn line
 skips (noted), a later header line is the boundary. A foreign file or
 a future version refuses with a clean one-liner.
 
+**A capture left running grows unbounded** — `--trace-max-mb` rotates
+the trace at that size, keeping `--trace-files` backups (`0` = no size
+rotation, the default). At the size the backups shift
+(`trace.pvmb.1 ← trace.pvmb.2 ← …`, the oldest dropped), the file
+reopens fresh and stamps a new run header: the fresh capture keeps the
+plain name, and **every backup is a complete trace of its own** — any
+reader takes each for captured (the views, the converter, `--replay`
+serve one slice at a time). A record is the rotation boundary: a block
+never straddles two files. The dump tool's `--record` carries the same
+pair and rotates the same way (the recorder re-stamps a header of its
+own — the feed's posture, now).
+
 The json spelling's records (the decoded echo is its readability sugar —
 the binary carries the frame once and re-derives on read; the converter
 never copies the echo):
@@ -198,7 +210,9 @@ renders — the received PVMB blocks land verbatim (0600, flushed and
 appended across recorder sessions, the feed's per-connect header the
 session boundary), a record in the file is byte-identical to the one
 the daemon's own `--capture` writes, and any reader takes the file for
-captured (the views, the converter, `--replay`). `--quiet` drops the
+captured (the views, the converter, `--replay`) — `--trace-max-mb`/
+`--trace-files` rotate it the capture's way (the recorder re-stamps a
+header of its own on the shift). `--quiet` drops the
 per-record render — the recorder runs silent, the banners and the save
 tally stay. The feed is the family's one record contract: the cache's
 `trace-socket` subscribes the same way, so the cache's live wire
@@ -214,6 +228,8 @@ the whole block always.
 ```bash
 # capture: the cache's polls to the real device, the wire to a trace
 python3 apps/modbus-replay/bin/modbus-replay.py --upstream inverter-lan:502 --capture sun2000-morning.pvmb
+# a capture left running: rotate the trace at 100 MB, keep 5 backups
+python3 apps/modbus-replay/bin/modbus-replay.py --upstream inverter-lan:502 --capture sun2000.pvmb --trace-max-mb 100 --trace-files 5
 # pass-through inspector (no trace): the decoded frames at DEBUG
 python3 apps/modbus-replay/bin/modbus-replay.py --upstream :502 --log-level DEBUG
 # replay: the scraper debugs against the morning's trace, hardware-free
@@ -255,6 +271,8 @@ control plane either: every knob is a startup knob). The flags:
 | `--capture` | off | the trace file the wire dumps to (0600; the binary PVMB blocks by default, the v1 JSON lines per `--dump-type`; appends across runs) — without it the proxy runs pass-through (the record feed still carries the frames) (`$CAPTURE`) |
 | `--dump-type` | `binary` | the trace's shape capture writes: `binary` (the PVMB blocks — every reader speaks both) or `json` (the v1 lines for a capture that wants `head`/`grep`/`jq`) (`$DUMP_TYPE`) |
 | `--dump-socket` | `/tmp/modbus-replay-<listen-port>.socket` | the record feed's unix socket: the records push to the connected `modbus-replay-dump --socket` viewers (read-only, best effort); `none` binds no feed (`$DUMP_SOCKET`) |
+| `--trace-max-mb` | `0` | rotate the trace file at this size in MB, keeping N backups (`0` = no size rotation — the capture appends unbounded) (`$TRACE_MAX_MB`) |
+| `--trace-files` | `3` | the size rotation's backups to keep (`.1 .. .N`, the oldest dropped; each a complete trace) (`$TRACE_FILES`) |
 | `--replay` | — | replay mode: the trace file to serve (exactly one of `--upstream`/`--replay` per run) (`$REPLAY`) |
 | `--replay-speed` | `0` | the recorded device latencies divided by N (`1` = as captured, N = N× faster; `0` = answer immediately) (`$REPLAY_SPEED`) |
 | `--replay-miss` | `exception` | what an unmatched request answers: `exception` (exception 11) or `zero` (the zero-filled shape) (`$REPLAY_MISS`) |

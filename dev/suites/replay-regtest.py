@@ -853,6 +853,110 @@ check('the reader walks the appended trace\'s two sessions',
       r.returncode == 0 and '2 session(s)' in r.stdout,
       (r.stdout.strip().splitlines() or ['-'])[0][:140])
 
+print()
+print('== the size rotation ==')
+
+# an unbounded capture is a disk hazard: --trace-max-mb rotates, the
+# backups shift (.1 <- .2 <- ... <- .N, the oldest dropped), the fresh
+# file stamps its own run header — every backup a complete trace any
+# reader takes for captured, and a record never straddles two files. A
+# max below one record's size rotates on EVERY record (the pathological
+# spelling exercises the shift hardest): after six exchanges the live
+# file holds the last record alone, .1 the one before it, .2 the third
+# back — keep=3 bounds the set, the earliest records shifted out for good.
+PORT_ROT = 15945 + BASE   # the rotation capture (PORT_CAP is still in service)
+FEED_ROT = '/tmp/modbus-replay-%d.socket' % PORT_ROT
+TRACE_ROT = os.path.join(SCRATCH, 'replay-trace-rot.pvmb')
+p_rot = daemon(['--listen', '127.0.0.1:%d' % PORT_ROT,
+                '--upstream', '127.0.0.1:%d' % PORT_FAKE,
+                '--capture', TRACE_ROT, '--trace-max-mb', '0.00001',
+                '--trace-files', '3'], LOG % 'rot')
+check('the rotation capture came up (port %d)' % PORT_ROT, wait_port(PORT_ROT))
+rot_txns = ((fc3_req, TXN['fc3']), (fc4_req, TXN['fc4']), (fc6_req, TXN['fc6']))
+for pdu_, txn_ in rot_txns * 2:
+    raw_exchange(PORT_ROT, pdu_, txn_)
+time.sleep(1.0)
+p_rot.send_signal(signal.SIGTERM)
+p_rot.wait(timeout=10)
+
+rot_files = [TRACE_ROT + suffix for suffix in ('', '.1', '.2', '.3')]
+check('the rotation kept three backups and the plain name',
+      all(os.path.exists(f_) for f_ in rot_files)
+      and not os.path.exists(TRACE_ROT + '.4'),
+      str([os.path.basename(f_) for f_ in rot_files if os.path.exists(f_)]))
+rot_kinds = []
+for name_, path_ in zip(('', '.1', '.2', '.3'), rot_files):
+    check('the rotated trace%s is 0600' % (name_ or ' (live)'),
+          os.stat(path_).st_mode & 0o777 == 0o600,
+          '%03o' % (os.stat(path_).st_mode & 0o777))
+    headers_, recs_ = walk_pvmb(open(path_, 'rb').read(),
+                                'the rotated trace%s' % (name_ or ' (live)'))
+    check('the rotated trace%s: one header + one record (a complete trace)'
+          % (name_ or ' (live)'),
+          len(headers_) == 1 and len(recs_) == 1,
+          '%d header(s) %d record(s)' % (len(headers_), len(recs_)))
+    check('the rotated trace%s carries the posture' % (name_ or ' (live)'),
+          str(PORT_FAKE) in headers_[0], headers_[0][:80])
+    rot_kinds.append(recs_[0]['kind'])
+check('the rotation shifted newest-first (rsp, req, rsp, req out)',
+      rot_kinds == [1, 0, 1, 0], str(rot_kinds))
+check('the shifted .1 holds the last exchange\'s request verbatim',
+      walk_pvmb(open(TRACE_ROT + '.1', 'rb').read(), '.1')[1][0]['raw']
+      == struct.pack('>HHHB', TXN['fc6'], 0, len(fc6_req) + 1, 1) + fc6_req)
+check('the shifted .2 holds the fifth exchange\'s response verbatim',
+      walk_pvmb(open(TRACE_ROT + '.2', 'rb').read(), '.2')[1][0]['raw']
+      == frames['fc4'])
+check('the shifted .3 holds the fifth exchange\'s request verbatim',
+      walk_pvmb(open(TRACE_ROT + '.3', 'rb').read(), '.3')[1][0]['raw']
+      == struct.pack('>HHHB', TXN['fc4'], 0, len(fc4_req) + 1, 1) + fc4_req)
+
+# the recorder rotates the same way (--trace-max-mb/--trace-files on
+# --record): the shift lands, the recorder stamps a header of its own
+# (the feed's posture, now) and the received blocks keep landing
+# verbatim, never straddling two files. A pass-through proxy feeds —
+# the recorder shapes its own file.
+p_rot2 = daemon(['--listen', '127.0.0.1:%d' % PORT_ROT,
+                 '--upstream', '127.0.0.1:%d' % PORT_FAKE], LOG % 'rot2')
+check('the rotation feed came up (port %d)' % PORT_ROT, wait_port(PORT_ROT))
+TRACE_ROTREC = os.path.join(SCRATCH, 'replay-trace-rotrec.pvmb')
+p_rotrec = start([sys.executable, DUMP, '--socket', FEED_ROT, '--record', TRACE_ROTREC,
+                  '--trace-max-mb', '0.00001', '--trace-files', '2'],
+                 log=LOG % 'rotrec')
+time.sleep(1.0)
+raw_exchange(PORT_ROT, fc3_req, TXN['fc3b'])
+raw_exchange(PORT_ROT, fc3_req, TXN['fc3'])
+time.sleep(1.0)
+p_rot2.send_signal(signal.SIGTERM)
+p_rot2.wait(timeout=10)
+p_rotrec.wait(timeout=10)   # the feed's close ends the recorder by itself
+check('the recorder ended by itself when the feed closed',
+      p_rotrec.returncode == 0, str(p_rotrec.returncode))
+
+rotrec_files = [TRACE_ROTREC + suffix for suffix in ('', '.1', '.2')]
+check('the recorder kept two backups and the plain name',
+      all(os.path.exists(f_) for f_ in rotrec_files)
+      and not os.path.exists(TRACE_ROTREC + '.3'),
+      str([os.path.basename(f_) for f_ in rotrec_files if os.path.exists(f_)]))
+rotrec_kinds = []
+for name_, path_ in zip((' (live)', ' .1', ' .2'), rotrec_files):
+    check('the recorded trace%s is 0600' % name_,
+          os.stat(path_).st_mode & 0o777 == 0o600,
+          '%03o' % (os.stat(path_).st_mode & 0o777))
+    headers_, recs_ = walk_pvmb(open(path_, 'rb').read(),
+                                'the recorded trace%s' % name_)
+    check('the recorded trace%s: one header + one record (the re-stamp)'
+          % name_, len(headers_) == 1 and len(recs_) == 1,
+          '%d header(s) %d record(s)' % (len(headers_), len(recs_)))
+    check('the recorded trace%s carries the feed\'s posture' % name_,
+          str(PORT_FAKE) in headers_[0], headers_[0][:80])
+    rotrec_kinds.append(recs_[0]['kind'])
+check('the recorder\'s shift landed (rsp, req, rsp out)',
+      rotrec_kinds == [1, 0, 1], str(rotrec_kinds))
+check('the recorder told the save tally',
+      '4 record(s) recorded' in read_log(LOG % 'rotrec'),
+      next((l for l in read_log(LOG % 'rotrec').splitlines()
+            if 'record(s) recorded' in l), '-')[:100])
+
 r = subprocess.run([sys.executable, DUMP, EXAMPLE, '--values'],
                    capture_output=True, text=True)
 check('the dump: --values refused on the file views',
@@ -867,13 +971,14 @@ for name, proc in (('cap', p_cap), ('rep', p_rep), ('rep0', p_rep0), ('pass', p_
     check('%s: alive at the end' % name, proc.poll() is None or proc.returncode == 0,
           str(proc.returncode))
 for name in ('cap', 'rep', 'rep0', 'pass', 'fake', 'warn', 'wide', 'live', 'livev',
-             'livecapw', 'livecap', 'rec', 'quiet', 'rec2', 'livecap2'):
+             'livecapw', 'livecap', 'rec', 'quiet', 'rec2', 'livecap2', 'rot', 'rotrec',
+             'rot2'):
     log = read_log(LOG % name)
     check('%s: zero tracebacks' % name, 'Traceback' not in log)
 for name in ('cap', 'rep', 'rep0', 'pass', 'wide'):
     check('%s: the loopback bind stayed silent' % name,
           'NOT loopback' not in read_log(LOG % name))
-for name in ('cap', 'rep', 'wide'):
+for name in ('cap', 'rep', 'wide', 'rot'):
     check('%s: the record feed logged' % name, 'the record feed on' in read_log(LOG % name))
 rep_log = read_log(LOG % 'rep')
 check('the miss logged with the request spelled out',

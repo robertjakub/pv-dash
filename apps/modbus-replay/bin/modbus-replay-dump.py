@@ -22,12 +22,13 @@ is the record). One tool, three abilities:
                  --values adds the value dumps, off by default). The
                  default path derives the family's ctl way:
                  /tmp/modbus-replay-<listen-port>.socket.
-                 --record FILE saves the feed while it renders — the
+                  --record FILE saves the feed while it renders — the
                  received PVMB blocks land in the file verbatim (0600,
-                 appended across sessions), a trace any reader takes
-                 for captured; --quiet drops the render, the recorder
-                 runs silent. Any feed subscribes — the cache's
-                 trace-socket included.
+                 appended across sessions; --trace-max-mb/--trace-files
+                 rotate the file at a size, the backups .1 .. .N each a
+                 complete trace), a trace any reader takes for captured;
+                 --quiet drops the render, the recorder runs silent. Any
+                 feed subscribes — the cache's trace-socket included.
 
 The value dumps under the lines cap at 16 words a block (the
 conversations' diagram stays readable under a poller's repeats; the
@@ -55,8 +56,8 @@ from lib.man import dump_page
 from lib.statics import DEFAULT_LISTEN_PORT
 from lib.trace import (HDR_HEAD, KIND_RAW_C2D, KIND_RAW_D2C, KIND_REQ,
                        KIND_RSP, TRACE_MAGIC, TraceIndex, TraceWriter,
-                       decode_record, describe_frame,
-                       parse_binary_header)
+                       decode_record, describe_frame, encode_header,
+                       parse_binary_header, shift_backups)
 
 DEFAULT_FEED = '/tmp/modbus-replay-%d.socket' % DEFAULT_LISTEN_PORT
 DEFAULT_VALUES_CAP = 16   # the capped dumps' word cap — --values-cap N|all reshapes it
@@ -272,7 +273,7 @@ def recv_exact(sock, n):
 
 
 def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP, record=None,
-         quiet=False):
+         quiet=False, max_mb=0.0, files=3):
     """The feed: connect, the header (the same peek a file gets), then
     the records as they land — the conversations render realtime. The
     values (the address-prefixed words, the bit strings) ride only with
@@ -288,7 +289,12 @@ def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP, record=None,
     the wire's bytes, one copy: a record the file holds is
     byte-identical to the one the daemon's own --capture writes. 0600
     — the wire carries values. quiet = --quiet: the per-record lines
-    drop, the banners and the save tally stay."""
+    drop, the banners and the save tally stay. max_mb/files = the
+    size rotation (--trace-max-mb/--trace-files): at max_mb the
+    recorder shifts the backups (.1 <- .2 <- ... <- .N, the oldest
+    dropped), reopens fresh and stamps a header of its own (the feed's
+    posture, now) — the received records keep landing verbatim, the
+    blocks never straddle two files, every backup a complete trace."""
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         sock.connect(sock_path)
@@ -298,6 +304,7 @@ def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP, record=None,
         raise SystemExit(1)
     out = None
     saved = 0
+    max_bytes = int(max_mb * 1024 * 1024) if max_mb and max_mb > 0 else 0
     if record is not None:
         try:
             out = open(record, 'ab')
@@ -309,6 +316,21 @@ def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP, record=None,
             os.chmod(record, 0o600)   # the wire carries values — the secrets posture
         except OSError:
             pass
+
+    def rotate_recorder():
+        """The recorder's size rotation: the backups shift, the file
+        reopens fresh (0600) and stamps a header of its own — the
+        feed's posture, now — so the backup is a complete trace."""
+        nonlocal out
+        out.close()
+        shift_backups(record, files)
+        out = open(record, 'ab')
+        try:
+            os.chmod(record, 0o600)
+        except OSError:
+            pass
+        out.write(encode_header(hdr[0]['upstream'], int(time.time())))
+        out.flush()
     print('--- the live feed on %s (^C ends it) ---' % sock_path)
     try:
         sys.stdout.reconfigure(line_buffering=True)   # a live view renders live
@@ -346,6 +368,8 @@ def live(sock_path, values=False, cap=DEFAULT_VALUES_CAP, record=None,
                       '— stopping', file=sys.stderr)
                 raise SystemExit(1)
             if out is not None:
+                if max_bytes and out.tell() >= max_bytes:
+                    rotate_recorder()
                 out.write(head_len + body + crc_bytes)   # the block verbatim
                 out.flush()   # a killed recorder leaves a readable trace
                 saved += 1
@@ -424,6 +448,17 @@ def validate(args):
     if args.record is not None and args.socket is None:
         problems.append('--record saves the live feed — it rides --socket '
                         '(a file source is already the record)')
+    if (args.trace_max_mb or args.trace_files != 3) and args.record is None:
+        problems.append('--trace-max-mb/--trace-files shape the recorded trace — '
+                        'they ride --record (a file source and the bare render '
+                        'write nothing)')
+    if args.trace_files != 3 and not args.trace_max_mb:
+        problems.append('--trace-files counts the size rotation\'s backups — '
+                        'it rides --trace-max-mb (the count alone rotates nothing)')
+    if not (0 <= args.trace_max_mb <= 1048576):
+        problems.append('--trace-max-mb must be 0..1048576 MB')
+    if not (1 <= args.trace_files <= 100):
+        problems.append('--trace-files must be 1..100')
     if args.quiet and args.socket is None:
         problems.append('--quiet silences the live view — it rides --socket '
                         '(the file views render on demand)')
@@ -468,6 +503,18 @@ def main():
                         'it renders — the received PVMB blocks land verbatim '
                         '(0600, appended across sessions), a trace any reader '
                         'takes for captured')
+    p.add_argument('--trace-max-mb', type=float, default=0.0, metavar='MB',
+                   help='rotate the recorded trace at this size in MB, keeping N '
+                        'backups; 0 = no size rotation (the default — the recorder '
+                        'appends unbounded). At the size the backups shift '
+                        '(.1 <- .2 <- ... <- .N, the oldest dropped), the file '
+                        'reopens fresh and stamps a new header — the fresh record '
+                        'keeps the plain name, every backup a complete trace '
+                        '(rides --record)')
+    p.add_argument('--trace-files', type=int, default=3, metavar='N',
+                   help='rotated trace backups to keep (the size rotation\'s '
+                        '.1 .. .N; 1 = only the shift-away previous file survives) '
+                        '(rides --record)')
     p.add_argument('--quiet', action='store_true',
                    help='the live view renders nothing per record — the '
                         'recorder\'s silent face (the banners and the save '
@@ -504,7 +551,8 @@ def main():
     try:
         if args.socket is not None:
             live(args.socket, values=args.values, cap=cap,
-                 record=args.record, quiet=args.quiet)
+                 record=args.record, quiet=args.quiet,
+                 max_mb=args.trace_max_mb, files=args.trace_files)
         elif args.to:
             convert(args.trace, args.to, args.out)
         else:

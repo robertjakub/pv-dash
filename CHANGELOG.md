@@ -12,6 +12,22 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **modbus-replay: the trace rotates at a size (`--trace-max-mb` /
+  `--trace-files`)** — an unbounded capture is a disk hazard (a capture
+  proxy can sit in-line for days), so the writer now answers the audit
+  log's rotation story: at `--trace-max-mb` the backups shift
+  (`.1 <- .2 <- … <- .N`, the oldest dropped per `--trace-files`), the
+  file reopens fresh (still 0600) and stamps a new run header — the
+  fresh capture keeps the plain name, every backup is a complete trace
+  of its own (any reader takes each for captured), and a record is the
+  rotation boundary (a block never straddles two files). `0` = no size
+  rotation, the default — nothing moves unless the knob is spelled.
+  The dump tool's `--record` carries the same pair and rotates the same
+  way (the recorder re-stamps a header of its own — the feed's posture,
+  now); the knobs refuse without their file (`--capture` / `--record`),
+  the bounds mirror the audit pair's (0..1048576 MB, 1..100 backups),
+  and the rotation is format-free — no version bump, the shared writer
+  (`common/modbus/trace.py`) grew the knob, both tools ride it.
 - **The cache's record feed (`--trace-socket` / `--trace-sources`) — the
   wire trace live** — the cache emits every Modbus record it serves and
   exchanges to a unix feed socket in the same PVMB protocol

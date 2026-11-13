@@ -1,4 +1,4 @@
-.TH MODBUS-REPLAY-DUMP 1 "2026-11-13" "pv-suite 0.5.1" "User Commands"
+.TH MODBUS-REPLAY-DUMP 1 "2026-11-14" "pv-suite 0.5.1" "User Commands"
 .SH NAME
 modbus-replay-dump \- read, convert and follow a Modbus wire trace
 .SH SYNOPSIS
@@ -67,7 +67,14 @@ file holds is byte\-identical to the one the daemon's own
 captured (the views, the converter, \fBmodbus-replay --replay\fR).
 The file is 0600 and appends across recorder sessions \(em the feed
 re\-stamps its header per subscriber connect, the session boundary a
-re\-connected recorder appends. The feed is the family's one record
+re\-connected recorder appends. An unbounded record grows too:
+\fB--trace\-max\-mb\fR rotates it at that size, keeping
+\fB--trace\-files\fR backups \(em the backups shift
+(.1 <\- .2 <\- ... <\- .N, the oldest dropped), the file
+reopens fresh and stamps a header of its own (the feed's posture, now),
+the received records keep landing verbatim and a block never straddles
+two files \(em every backup a complete trace, any reader takes each
+for captured. The feed is the family's one record
 contract: the cache's trace\-socket subscribes the same way, so the
 cache's live wire records to a file with
 \fB--socket /tmp/modbus\-cache\-<listen\-port>\-trace.socket
@@ -91,6 +98,17 @@ subscribes (the cache's trace\-socket included)
 the live view saves the feed to this trace file while it renders — the
 received PVMB blocks land verbatim (0600, appended across sessions), a
 trace any reader takes for captured
+.TP
+.BI \-\-trace\-max\-mb " MB"
+rotate the recorded trace at this size in MB, keeping N backups; 0 = no
+size rotation (the default — the recorder appends unbounded). At the
+size the backups shift (.1 <\- .2 <\- ... <\- .N, the oldest dropped),
+the file reopens fresh and stamps a new header — the fresh record keeps
+the plain name, every backup a complete trace (rides \-\-record)
+.TP
+.BI \-\-trace\-files " N"
+rotated trace backups to keep (the size rotation's .1 .. .N; 1 = only
+the shift\-away previous file survives) (rides \-\-record)
 .TP
 .B \-\-quiet
 the live view renders nothing per record — the recorder's silent face
@@ -142,7 +160,10 @@ DUMP_SOCKET) live on
 the wire dump: 0600 \(em the binary PVMB blocks (the capture default)
 or the JSON v1 lines (\fB--dump-type json\fR); both shapes read the
 same. The recorded trace (\fB--record\fR) rides the same shapes \(em
-binary, 0600, appended across sessions.
+binary, 0600, appended across sessions; the size rotation's backups
+ride beside it as
+.IR trace.pvmb.1 " .. " trace.pvmb.N
+(each a complete trace).
 .TP
 .I /tmp/modbus\-replay\-<listen\-port>.socket
 the daemon's record feed (\fB--dump-socket\fR) \(em bare

@@ -7,10 +7,10 @@
 
 A dependency-free (Python stdlib only) Prometheus exporter that polls a
 Modbus TCP inverter and exposes the `huawei_*_watts` metrics (the
-`--metrics-prefix` default) the [dashboard](../apps/dashboard/README.md)
+`--metrics-prefix` default) the [dashboard](../dashboard/README.md)
 expects, plus health gauges. The bundled profiles cover the Huawei
 SUN2000 and the Deye hybrids. It can poll the inverter directly or
-through the [modbus-cache](../apps/cache/README.md) proxy (which it detects
+through the [modbus-cache](../cache/README.md) proxy (which it detects
 automatically).
 Modbus TCP must be enabled on the inverter / SDongle / EMMA (via
 FusionSolar or the local setup), reachable at the inverter's LAN IP on TCP
@@ -58,7 +58,7 @@ Settings are resolved in this order (first hit wins), mirroring
    `CONFIG`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`, `MODBUS_TIMEOUT`,
    `MODBUS_INTERVAL`, `LISTEN`, `MODBUS_PROFILE`, `LOG_LEVEL`, `AUTH_TOKEN`, … —
    the full twin set is the generated
-   [`docker/env/scraper.env.example`](../docker/env/scraper.env.example)
+   [`docker/env/scraper.env.example`](../../docker/env/scraper.env.example)
 3. Config file — the set-grammar script (`set <name> <value>` lines) —
    `--config` picks the file (default: `$CONFIG`, then `modbus-scraper.conf` next
    to the script, then the subproject root's sample; missing file is fine)
@@ -90,7 +90,7 @@ set system log-level INFO
 |---|---|---|
 | `--upstream` | `127.0.0.1:5502` | the inverter's Modbus TCP endpoint `HOST:PORT` (`:5502` = `127.0.0.1:5502`) |
 | `--modbus-unit` / `--modbus-offset` | `1` / `0` | Modbus unit id / added to register addresses (`-1` for gateways that need 0-based addressing) |
-| `--modbus-auth` / `--modbus-auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/common/MODBUS.md](../docs/common/MODBUS.md) |
+| `--modbus-auth` / `--modbus-auth-key` | `none` | the inverter's Modbus auth scheme (`suite` = the crypt handshake; `none` = no auth) + the shared key (**min 16 characters**, `file:<path>` welcome) — the peer's key must match; see [docs/specs/MODBUS.md](../../docs/specs/MODBUS.md) |
 | `--modbus-profile` | the bundled `sun2000` profile | device profile JSON (a bare name resolves in `shared/profiles/`); live-swappable with `set modbus profile` |
 | `--metrics-spec` | the bundled `metrics.json` | metrics spec JSON, sectioned `{inputs?, metrics, scraper?}` — merged in memory over the built-in `lib/metrics.json`; the JSON Schema ships as `schema/metrics.schema.json` |
 | `--metrics-prefix` | `huawei` | the prefix on the **profile- and compute-fed** metric names; the bundled `scraper_*` names are fixed |
@@ -101,7 +101,7 @@ set system log-level INFO
 | `--modbus-timeout` / `--modbus-interval` | `3` / `10` | Modbus timeout, seconds / seconds between Modbus polls |
 | `--listen` | `127.0.0.1:9350` | exporter bind address `HOST:PORT` (loopback by default; beyond loopback `--auth-token` is mandatory, F13) |
 | `--auth-token` | disabled | require `Authorization: Bearer <token>` on every request (`401` + `WWW-Authenticate` otherwise; compared timing-safe); the value may be `file:<path>` — **re-read on every SIGHUP**: rotate by rewriting the file and reloading |
-| `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none`, comma-separated IPs/prefixes, `file:<path>` (the ip-prefix acl file — the grammar lives in [docs/common/ACL.md](../docs/common/ACL.md)); checked at accept; live-settable |
+| `--metrics-acl` | `any` | the clients allowed to **connect** to /metrics: `any`, `none`, comma-separated IPs/prefixes, `file:<path>` (the ip-prefix acl file — the grammar lives in [docs/specs/ACL.md](../../docs/specs/ACL.md)); checked at accept; live-settable |
 | `--control-port` | `/tmp/modbus-scraper-<listen-port>.socket` | the JSON-lines control server target (unix socket path or TCP port), `0` = off |
 | `--control-token` / `--control-ops-token` | off | the control tokens (a TCP control port refuses to start without the admin token, F5); `file:<path>` welcome |
 | `--control-ops-verbs` | `show` | the read-only ops role's RBAC policy (`flush` is not a verb here — there is nothing to flush) |
@@ -162,8 +162,8 @@ refuses to start).
 
 The wire (the signed frames, the peer-cred trusted peers, the read-only
 ops role, the F5 token rule) is the family's — one paragraph per piece in
-[docs/common/ACL.md](../docs/common/ACL.md) (the control-plane row) and
-[docs/SECURITY.md](../docs/SECURITY.md); a token value never renders back
+[docs/specs/ACL.md](../../docs/specs/ACL.md) (the control-plane row) and
+[docs/SECURITY.md](../../docs/SECURITY.md); a token value never renders back
 (`show <secret>` refuses). Every command and knob the wire answers —
 command, settable (`set`/`clear`) or show-only — is tabled in
 [MANUAL.md](MANUAL.md) (generated from the registry). The commands:
@@ -215,8 +215,8 @@ Sign conventions and sanity caps:
 ## Alerting
 
 The family's **alert rules pack** lives at
-[`alerts/`](../extras/alerts/README.md) — one rule file per watched exporter;
-this exporter's half is [`alerts/scraper.yml`](../extras/alerts/scraper.yml),
+[`alerts/`](../../extras/alerts/README.md) — one rule file per watched exporter;
+this exporter's half is [`alerts/scraper.yml`](../../extras/alerts/scraper.yml),
 the cache's half (`alerts/cache.yml`) ships with the cache package. The
 pack is the audit vocabulary's detection half (docs/SECURITY.md F16): every
 alert names the audit events and the log lines it correlates with, so a
@@ -242,17 +242,17 @@ this pack.
 Wire-in: the demo image bakes the pack (`docker/prometheus.yml` sets
 `rule_files:`); a NixOS Prometheus points `services.prometheus.ruleFiles`
 at the packaged copy (`share/modbus-scraper/alerts.yml`, see
-[nixos/README.md](../nixos/README.md)); an external collector copies the file and
+[nixos/README.md](../../nixos/README.md)); an external collector copies the file and
 lists it under its own `rule_files:`. Thresholds assume the default 10 s
 poll interval — tune them to yours.
 
 ## Device profile
 
 *Where* the primary values live comes from a **device profile** — the same
-shared schema the [fake inverter](../apps/inverter/README.md) serves and the
-[cache](../apps/cache/README.md) polls; the shipped profiles live in the suite's
-[`shared/profiles/`](../shared/profiles/) data dir (`sun2000.json` by default); the
-format is documented in [shared/profiles/README.md](../shared/profiles/README.md).
+shared schema the [fake inverter](../inverter/README.md) serves and the
+[cache](../cache/README.md) polls; the shipped profiles live in the suite's
+[`shared/profiles/`](../../shared/profiles/) data dir (`sun2000.json` by default); the
+format is documented in [shared/profiles/README.md](../../shared/profiles/README.md).
 Resolution: `--modbus-profile` flag, env `MODBUS_PROFILE`, config `set modbus profile`,
 then the bundled copy; re-read on `SIGHUP`. The live control surface swaps
 it at runtime: `set modbus profile <file-or-name>` loads the new map,
@@ -280,7 +280,7 @@ always fetched. Every profile-bound metric beyond them is read once per
 poll, softly: a rejected read keeps its metric absent instead of failing
 the poll. Metric names, help texts and types are loaded at startup from the
 packaged `metrics.json` (the lib dir's default; a checkout resolves the
-`scraper/metrics.json` → `examples/` dev symlink) — point
+`apps/scraper/metrics.json` → `examples/` dev symlink) — point
 `--metrics-spec` elsewhere (or `set metrics spec`) to rename metrics or
 reword `# HELP` lines without touching the code; a missing or corrupt
 spec fails cleanly at startup (one-line error, exit 1).
@@ -351,7 +351,7 @@ line and CEF carry no hostname) — the chain groups by the
 ## Test inverter
 
 The fake inverter lives in its own subproject:
-[inverter/](../apps/inverter/README.md) — a Modbus TCP server with day/static
+[inverter/](../inverter/README.md) — a Modbus TCP server with day/static
 demo values, battery + meter simulation, a runtime control server and
 chaos injection. Both regression suites start it automatically.
 
@@ -361,11 +361,11 @@ The endpoint exposes **production values, not telemetry** — a week of it
 is a home-occupancy profile (the privacy note, F15): the bearer token
 mandatory beyond loopback (F13), the localhost bind by default, the
 endpoint internal. The full story is
-[docs/SECURITY.md](../docs/SECURITY.md).
+[docs/SECURITY.md](../../docs/SECURITY.md).
 
 ## Testing
 
-Two standalone suites live in the suite-root [`tests/`](../tests/) —
+Two standalone suites live in the suite-root [`tests/`](../../tests/) —
 stdlib only, each starts its own fake inverter + exporters on scratch
 ports and cleans up after itself:
 
@@ -381,7 +381,7 @@ Every scenario must end with the exporter serving correct metrics and
 ## Source layout
 
 ```
-scraper/
+apps/scraper/
 ├── bin/
 │   ├── modbus-scraper.py  # CLI, logging setup, signal handling, the control wiring
 │   └── modbus-scraper-cli.py     # console-style control session
@@ -397,13 +397,13 @@ scraper/
     ├── protocol.py        # Modbus TCP client (hardened framing)
     ├── config.py          # settings resolution + validation
     ├── metrics.py         # metrics.json loader
+    ├── expr.py            # the compute expressions' evaluator (the derived metrics)
     ├── poller.py          # poll loop + sanity checks + cache diagnostics
     ├── server.py          # Prometheus exposition endpoint (auth, limits)
     ├── control.py         # JSON-lines control server (the cache's shape, mirrored)
     ├── options.json       # the knob registry
     ├── options.py         # its loader: the Option rows, the control-grammar vocabulary
-    ├── man.py             # the generated man pages' prose (common/render/manpage.py renders)
-    └── version.py         # the suite version
+    └── man.py             # the generated man pages' prose (common/render/manpage.py renders)
 ```
 
 ## License

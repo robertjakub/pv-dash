@@ -1,6 +1,6 @@
 # TODO (scraper — the Done/history records)
 
-The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
+The open items live in the family-wide [TODO](../../docs/TODO.md) (tagged
 `[scraper]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
@@ -238,7 +238,7 @@ registers keeps them absent), the `when: battery` gates and the
 
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (587 → ~330 lines) — the Nix/NixOS section moved to
-[docs/NIXOS.md (now nixos/README.md)](../nixos/README.md) (the README's option list still carried
+[docs/NIXOS.md (now nixos/README.md)](../../nixos/README.md) (the README's option list still carried
 the RETIRED register/scale options — `pvRegister`, `gridRegister`,
 `scale`, `gridScale`, `batteryRegister`, `batterySocRegister` — and the
 stale "config INI" claim; both died with the move, the list is rebuilt

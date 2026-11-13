@@ -113,7 +113,7 @@ class CaptureProxy:
                 # that stops answering surfaces through the client's own modbus
                 # timeout, and --client-timeout kicks the silent client leg
             except OSError as e:
-                logger.info('upstream %s:%d refused the pair (%s) — closing %s:%d',
+                logger.info('upstream %s:%d dial failed (%s) — closing %s:%d',
                             self.upstream_host, self.upstream_port, e, *addr[:2])
                 client.close()
                 continue

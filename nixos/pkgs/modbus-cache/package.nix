@@ -49,7 +49,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../../../extras/examples}/modbus-cache-filter.json ${../../../extras/examples}/acl-write-registers.json ${../../../extras/examples}/acl-ip-prefix.json $out/share/examples/
     install -dm755 $out/share/shared/schema
     install -m644 ${../../../shared}/schema/acl-write-registers.schema.json ${../../../shared}/schema/acl-ip-prefix.schema.json ${../../../shared}/schema/modbus-cache-filter.schema.json $out/share/shared/schema/
-    install -Dm644 ${../../../extras/alerts}/cache.yml $out/share/alerts/cache.yml
+    install -Dm644 ${../../../extras/alerts}/cache.yml $out/share/alerts.yml
     install -dm755 $out/share/profiles
     install -m644 ${../../../shared/profiles}/*.json $out/share/profiles/
     install -dm755 $out/share/man/man1

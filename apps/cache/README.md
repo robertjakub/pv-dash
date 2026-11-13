@@ -425,7 +425,7 @@ error's age) and every poll block
 The alert rules pack ([`alerts/cache.yml`](../../extras/alerts/cache.yml), the F16
 closure) watches this endpoint's poll down, the age spikes and the
 write-refusal bursts — the cache-only install ships its half
-(`share/alerts/cache.yml`); see [the scraper's alerting
+(`share/alerts.yml`); see [the scraper's alerting
 section](../scraper/README.md#alerting).
 
 ## Audit logging

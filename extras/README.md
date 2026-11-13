@@ -14,7 +14,7 @@ grammar).
   definitions.
 - [alerts/](alerts/) — the Prometheus rule pack, one file per watched
   exporter (`scraper.yml`, `cache.yml`); the watched exporters'
-  packages ship their half (`share/<daemon>/alerts.yml`), the docker
+  packages ship their half (each as `share/alerts.yml`), the docker
   prometheus image bakes both.
 - [examples/](examples/) — the suite-wide sample files, one copy each
   (the standalone acl pairs); every `package.nix` installs its packaged

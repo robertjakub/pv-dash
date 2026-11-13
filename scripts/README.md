@@ -121,8 +121,12 @@ prose gates apart from the runners:
   spellings — the token check skips `docs/history/` and the per-tool
   TODOs; the links check runs everywhere). Bare run reports,
   `--check` is the gate spelling — and a battery suite itself:
-  [tests/link-check.py](../tests/suites/link-check.py) rides every
-  profile beside check-options.
+  [tests/links-check.py](../tests/suites/links-check.py) rides every
+  profile beside check-options. The family's other rc-1 gates ride the
+  `lint-gates` suite the same way (one check() row each): the
+  acl/options/readmes/texts/profile lints, the manual/examples/sbom
+  `--check`s and the drift doc's `--check` —
+  [tests/lint-gates.py](../tests/suites/lint-gates.py).
 - **`audit_verify.py`** — the audit trail's chained-hash verifier
   (the F10 chain: every line carries its hash right after the event
   name).

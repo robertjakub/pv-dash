@@ -6,7 +6,7 @@ every repo-rooted path token in a current doc names something that exists
 findings list re-emits through the harness check() so the tally reads it
 like any suite's.
 
-  python3 tests/link-check.py
+  python3 tests/links-check.py
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """

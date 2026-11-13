@@ -18,7 +18,8 @@ jobs:
       matrix:
         suite:
           - check-options.py
-          - link-check.py
+          - links-check.py
+          - lint-gates.py
           - cache-regtest.py
           - scrape-regtest.py
           - cache-stress.py

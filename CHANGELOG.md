@@ -12,6 +12,34 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **The docs' links gate** — `scripts/lint/links.py` walks the
+  hand-written docs (the generated layer excluded — the MANUALs, the
+  drift doc and the SBOM speak their generators' constants) and checks
+  three rot classes: every relative markdown link resolves (the
+  history records included), every mdbook `{{#include}}` target
+  exists, and every repo-rooted path-shaped inline-code token in a
+  current doc names something that exists (the history records and the
+  per-tool TODO Done records keep their landed spellings; fenced code
+  blocks are skipped). It went red on the tree at birth — 60 findings,
+  the apps/ move's one-level-short relative links chief among them —
+  the class no gate saw (`check_options` gates flag presence in the
+  READMEs, `lint/readmes.py` pins the heading canon; neither resolves
+  a path). The battery twin rides the check-options pattern:
+  `tests/suites/link-check.py` + the runpy wrapper, `links-check`
+  leading beside check-options in every profile, the release matrix
+  leg with it. The family's remaining rc-1 gates ride beside it as the
+  `lint-gates` suite (one check() row each): the acl/options/readmes/
+  texts/profile lints, the manual/examples/sbom `--check`s and the
+  drift doc's `--check` — every rc-1-on-red check the battery had no
+  leg for.
+
+- **The book's Manuals page** — the four generated `<tool>/MANUAL.md`
+  pages gather on one book page by `{{#include}}` beside a SUMMARY row
+  (the manuals-home ruling: the pages stay per-tool beside their
+  registries — the `extras/manuals/` move declined, the operator-pack
+  contract holds), and the book's changelog page stops including the
+  1671-line archive (the root CHANGELOG only + a link).
+
 - **The scripts/lint/ split** — the four linters move from `scripts/` to
   `scripts/lint/` (`lint_acl.py`, `lint_options.py`, `lint_readmes.py`,
   `lint_texts.py` — the package docstring carries the rule; `lint` was an
@@ -154,6 +182,33 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   owned by the account, the ctl speaking through it).
 
 ### Changed
+
+- **The docs redo flies** — the full audit's work order
+  (docs/history/docs-redo.md): `docs/common/` becomes `docs/specs/`
+  (the dir name collided with the `common/` package it documents; the
+  three mechanism specs + their README move as one git-mv home, every
+  current pointer re-points, the CHANGELOG's released halves keep
+  their landed spellings), the two landed alignment contracts
+  (`options-align.md`, `show-commands-align.md`) join
+  `docs/history/` (the docs root keeps only current-truth files), and
+  every hand-written surface's stale facts fix: the four tool READMEs'
+  ~45 relative links re-depth (the apps/ move's uncaught ripple) plus
+  their dead source-layout rows and the wrong defaults (the
+  dashboard's `--metrics-max-clients` speaks the canon 64, the
+  fake's SIGHUP layer spells `MODBUS_PROFILE`), the MANUAL generator
+  speaks the one-client truth (the retired `-ctl` bin names drop from
+  the four intros), nixos/README's option tables spell
+  `modbusAuthKeyFile`, SECURITY's module row spells the subpackaged
+  homes and the demo stack counts five services, TODO's landed items
+  close out and its dead cites re-point, MODBUS's fake unit row spells
+  `--unit` and the profile inventory gains `sun2000_full`, ACL's
+  example/schema paths resolve, the SBOM generator's constants and the
+  four Dockerfile build headers gain the apps/ depth, the CHANGELOG
+  boundary says 0.4.2 and older in both halves, history/AUDIT's title
+  runs to rev. 31 — and the examples generator's `--check` drops its
+  latent `', '.join(bool)` crash. Verified: `lint/links.py --check`
+  green (every link, include and rooted path resolves), all ten gates
+  green, the battery ALL PASS.
 
 - **The device profiles fold into `shared/`** — `profiles/profiles/` +
   the README move to `shared/profiles/` and the root `profiles/` dir

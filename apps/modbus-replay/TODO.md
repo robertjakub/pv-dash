@@ -3,6 +3,36 @@
 The open items live in the family-wide [docs/TODO.md](../../docs/TODO.md);
 this file keeps the tool's done/history records, newest first.
 
+## 2026-11-13 — the capture face never times a leg (the flapping-scraper bugfix)
+
+The capture proxy armed BOTH pump legs with the modbus-timeout as a
+recv timeout — the client leg took it whenever `--client-timeout`
+stayed unset (the else-branch), the upstream leg carried it always —
+so either pump's recv timeout ended the pair modbus-timeout (3s) into
+the client's first silence. A scraper polling every 10s lost its pair
+between every poll: the next read hit EOF (`connection closed by
+peer` — one `reachable`, one `unreachable`, the transition-only
+logging hides the flapping), re-dialed, and the capture's conn #
+climbed one per poll with each pair serving exactly one cycle. The
+face's own contract ("only --client-timeout kicks the silent") and the
+shared ladder's order (common/modbus/server.py sets a timeout only
+when client_timeout is truthy) both said the code was wrong. Now: the
+client leg takes a timeout ONLY from `--client-timeout` (300s default,
+0 = never), the upstream leg runs untimed (`settimeout(None)`) — the
+pipe never times a leg; a device that stops answering surfaces through
+the CLIENT's own modbus timeout (the scraper's read raises, the
+scraper hangs up, the pair ends), a device that dies mid-answer still
+EOFs the d2c pump. Found against a live rig (scraper → capture → a
+second proxy → real hardware) and reproduced locally at exact
++3.000s; the diagnosis trap: the piped bytes were identical to the
+direct run's and the direct connection lived — the kick lived in the
+capture's legs, not the path. The suite gained the poll-gap section
+(the regression both ways): the pair survives a 2.5s idle past a 1s
+`--modbus-timeout` on one connection (the reply asserted minus the txn
+echo — the pipe echoes the client's txn per exchange) and
+`--client-timeout 1` ends a silent pair (a request in flight would
+race the kick — the check stays silent on purpose).
+
 ## 2026-11-13 — the trace goes binary (`TRACE-BINARY.md`'s wave, twelve rulings)
 
 The binary-trace wave: the trace gains a binary shape BESIDE the JSON

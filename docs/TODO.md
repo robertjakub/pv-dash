@@ -674,10 +674,6 @@ re-open — is the history half:
   single-register writes through the cache's allow-list (the write-through
   lands the value in the charts instantly): the ops poke, audited with the
   writer's identity.
-- **a Modbus capture/replay tool** `[common]` `[inverter]` — a `pv-suite`
-  sidecar that sits on a TCP connection and dumps the wire to a file (and
-  replays it): debugging the poll planning, the write-through and the
-  chaos behavior against real hardware traces without the hardware.
 - **the hardware verification** `[cache]` `[scraper]` — everything is
   verified against the fake inverter, fuzzing and stress only; a real
   SUN2000/SDongle week (poll pacing, the dongle's single-client

@@ -282,9 +282,16 @@ Synthetic data only — nothing served is measured from a real device; there
 is no PII and no production telemetry to protect.
 
 **modbus-replay** — the sidecar records the wire, so its data story is
-the trace file's: 0600 at rest, values and names included, and a
-Waveshare capture carries the gateway's connection password raw — treat
-a trace as a secret (it is a slice of the device's truth). The listen
+the trace file's: 0600 at rest, values and names included — the binary
+PVMB blocks by default (`--dump-type json` keeps the v1 JSON lines), a
+Waveshare capture carries the gateway's connection password raw, a
+suite-auth capture the PVA1 proof (a leaked trace can replay it at any
+server holding the key) — treat
+a trace as a secret (it is a slice of the device's truth). The record
+feed (`--dump-socket`, bound by default on a unix socket at the derived
+`/tmp/modbus-replay-<port>.socket`) is read-only push — no verbs, no
+tokens, nothing a command could ride; a slow subscriber is dropped.
+The listen
 binds 127.0.0.1 by default; there is no control plane to authenticate,
 no audit trail (the trace IS the record) and no connection gating — no
 connect ACL, no client caps, only `--client-timeout` kicks the silent:

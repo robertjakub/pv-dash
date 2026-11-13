@@ -15,25 +15,47 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 - **`apps/modbus-replay`, the capture/replay sidecar** — a Modbus TCP
   debug instrument that sits on the wire between a pv-suite client and
   the device: capture mode pipes every client upstream and dumps both
-  directions to a JSON-lines trace (0600, one record per frame with
-  timestamps, the raw bytes and the decoded fields — appends across
-  runs, flushes per frame), replay mode serves the trace back (every
+  directions to a trace file (0600, one record per frame — the binary
+  PVMB blocks by default: one magic+version+posture header block per
+  run, then length-framed CRC-checked records, big-endian, the raw
+  frame bytes verbatim; `--dump-type json` keeps the v1 JSON lines
+  with the decoded fields riding beside the raw hex; every reader
+  speaks both, the trace appends across runs, flushes per record, and
+  a torn tail costs one record — the reader resyncs at the next run
+  header instead of refusing), replay mode serves the trace back (every
   request matched on unit + function code + PDU bytes, the most recent
   recorded response under the client's own transaction id, the recorded
   device latencies replayable at `--replay-speed`, the misses loud —
   exception 11 — or zero-shaped per `--replay-miss`), so the poll
   planning, the write-through and the chaos behavior debug against real
-  hardware traces without the hardware. The sidecar deliberately stands
+  hardware traces without the hardware. The auth handshakes (the PVA1
+  proof, the Waveshare password, the verdicts) ride the trace verbatim
+  as named raw records (the tap peels them before the first clean
+  frame — the handshake renders whole, the device's first frame
+  survives the verdict glue); the record feed (`--dump-socket`, bound
+  by default at the derived `/tmp/modbus-replay-<port>.socket`) pushes
+  every record to the connected dump tools live — capture the real
+  wire, replay the session it serves — read-only, best effort. The
+  reader face is its own bin, `bin/modbus-replay-dump.py` (its own man
+  page): the summary, the answer index (per unique query: the recorded
+  reply, the latency, the ask count), the conversations (the
+  per-connection query→answer diagram), the converter
+  (`--to json|binary -o OUT` — the raw bytes the one truth, a
+  binary→json→binary round trip byte-identical) and the live view
+  (`--socket`). The sidecar deliberately stands
   outside the family's deployment and gate shapes: no control plane (no
   ctl/cli pair, no tokens — the man ladder grew the `sidecar` page
-  class), no docker image, no Nix package, no service module, no audit
+  class; the feed is read-only push, not a listener that answers), no
+  docker image, no Nix package, no service module, no audit
   trail — the trace IS the record — no connection gating (no connect
   ACL, no client caps — only `--client-timeout` kicks the silent) and
   no config file (the knobs are the flags and their bare env twins,
   flag > env > default). The registry
   (lib/options.json) still drives the parser and the man page the
-  family's way; the suite is `dev/suites/replay-regtest.py` (the
-  battery's new `replay` profile; it rides `commit`/`quick`/`full` too).
+  family's way; the example trace ships at
+  extras/examples/modbus-replay-trace.pvmb (generated, `--check`
+  gated); the suite is `dev/suites/replay-regtest.py` (the
+  battery's `replay` profile; it rides `commit`/`quick`/`full` too).
 
 ### Docs
 

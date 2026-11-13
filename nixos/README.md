@@ -123,7 +123,7 @@ services.modbus-scraper = {
 
 | Option | Meaning |
 |---|---|
-| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, MODBUS_PROFILE, METRICS_SPEC, METRICS_PREFIX, MAX_KWP, DUMP_PATH, CTL, AUDIT_LOG, LOG_LEVEL, ...; `docker/env/scraper.env.example` is the key list) |
+| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, MODBUS_PROFILE, METRICS_SPEC, METRICS_PREFIX, MAX_KWP, DUMP_PATH, CTL, AUDIT_LOG, LOG_LEVEL, ...; `docker/env/modbus-scraper.env.example` is the key list) |
 | `user` / `group` | run as a static account instead of the `DynamicUser` (the module creates it; `pvsuite` is the family's shared identity) |
 | `modbusAuthKeyFile` / `authTokenFile` | the suite-handshake key / the `/metrics` bearer token, from a file outside the store (LoadCredential) |
 | `controlTokenFile` / `controlOpsTokenFile` | the control plane's admin / read-only ops tokens, from a file |
@@ -171,7 +171,7 @@ services.modbus-scraper = {
 
 | Option | Meaning |
 |---|---|
-| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, MODBUS_UNIT, TIMEOUT, INTERVAL, READ_DELAY, MERGE_GAP, CACHE_TTL, ALLOW_WRITE, WRITE_REGISTERS, CONNECT_ACL, WRITE_ACL, MODBUS_PROFILE, SELECTION, METRICS_SERVER, METRICS_LISTEN, METRICS_ACL, MAX_CLIENTS, CTL, DUMP_PATH, DUMP_WITH_CACHE, DUMP_INTERVAL, RESTORE_ON_START, AUDIT_REQUESTS, AUDIT_LOG, AUDIT_FORWARD, AUDIT_INSTANCE, LOG_LEVEL, ...; `docker/env/cache.env.example` is the key list) |
+| `settings` | the daemon's environment, verbatim `NAME=value` — every knob's env twin (UPSTREAM, LISTEN, MODBUS_AUTH, MODBUS_UNIT, TIMEOUT, INTERVAL, READ_DELAY, MERGE_GAP, CACHE_TTL, ALLOW_WRITE, WRITE_REGISTERS, CONNECT_ACL, WRITE_ACL, MODBUS_PROFILE, SELECTION, METRICS_SERVER, METRICS_LISTEN, METRICS_ACL, MAX_CLIENTS, CTL, DUMP_PATH, DUMP_WITH_CACHE, DUMP_INTERVAL, RESTORE_ON_START, AUDIT_REQUESTS, AUDIT_LOG, AUDIT_FORWARD, AUDIT_INSTANCE, LOG_LEVEL, ...; `docker/env/modbus-cache.env.example` is the key list) |
 | `user` / `group` | run as a static account instead of the `DynamicUser` (the module creates it; `pvsuite` is the family's shared identity) |
 | `modbusAuthKeyFile` / `authUpstreamKeyFile` | the key the cache's **own clients** prove (needs `MODBUS_AUTH = "suite"`) / the key **toward the inverter** (`suite` or `waveshare`), from a file outside the store (LoadCredential) |
 | `controlTokenFile` / `controlOpsTokenFile` | the control plane's admin / read-only ops tokens, from a file |

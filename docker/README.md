@@ -65,17 +65,18 @@ your Prometheus is external and pulls the exporter's `/metrics`:
 
 ```bash
 cd docker/prod
-cp ../env/cache.env.example ../env/cache-production.env
-$EDITOR ../env/cache-production.env                  # UPSTREAM=192.168.1.100:5502 — the device
+cp ../env/modbus-cache.env.example ../env/modbus-cache-production.env
+$EDITOR ../env/modbus-cache-production.env           # UPSTREAM=192.168.1.100:5502 — the device
 docker compose up -d                                # cache + scraper + dashboard
 ```
 
 Three operator decisions, each called out in the compose file's comments:
 
-- **the device address** — `env/cache-production.env` is **required**
-  here (no `required: false`): the stack refuses to start without it,
-  because the image's default `UPSTREAM` (`modbus-fake-inverter:5502`) only
-  ever resolves in the demo. Set `UPSTREAM=HOST:PORT` to the device.
+- **the device address** — `env/modbus-cache-production.env` is
+  **required** here (no `required: false`): the stack refuses to start
+  without it, because the image's default `UPSTREAM`
+  (`modbus-fake-inverter:5502`) only ever resolves in the demo. Set
+  `UPSTREAM=HOST:PORT` to the device.
 - **the device's auth** (optional) — if the device or its gateway speaks
   an auth scheme, set `MODBUS_UPSTREAM_AUTH=suite|waveshare` and
   `MODBUS_UPSTREAM_AUTH_KEY` in the same env file: the upstream credential is
@@ -103,10 +104,10 @@ blockquote, usage and topology diagram:
 ## The env files (one per tool)
 
 Each image has its own env file, shipped as an example:
-`env/cache.env.example`, `env/scraper.env.example`,
-`env/modbus-fake-inverter.env.example`,
-`env/dashboard.env.example`, `env/prometheus.env.example` — `cp
-env/<tool>.env.example env/<tool>.env` and edit. The compose stacks
+`env/modbus-cache.env.example`, `env/modbus-scraper.env.example`,
+`env/modbus-fake-inverter.env.example`, `env/dashboard.env.example`,
+`env/prometheus.env.example` — `cp env/<tool>.env.example
+env/<tool>.env` and edit. The compose stacks
 copy-name the files per stack: the demo reads `env/<tool>.env`, prod reads
 `env/<tool>-production.env` (the cache's and the scraper's — the cache's
 required there), so one checkout runs both stacks without the copies
@@ -130,14 +131,14 @@ The same file is consumed two ways:
 
 ```bash
 cd docker
-cp env/cache.env.example env/cache.env
-$EDITOR env/cache.env                            # UPSTREAM=192.168.1.100:5502
+cp env/modbus-cache.env.example env/modbus-cache.env
+$EDITOR env/modbus-cache.env                     # UPSTREAM=192.168.1.100:5502
 
 docker run --rm -p 127.0.0.1:15502:15502 \
-    --env-file env/cache.env modbus-cache        # plain docker: --env-file
+    --env-file env/modbus-cache.env modbus-cache  # plain docker: --env-file
 
 cd demo && docker compose up -d modbus-cache     # the demo stack: env_file: (required: false)
-cd ../prod && docker compose up -d modbus-cache  # the prod stack: env_file: (cache-production.env, required)
+cd ../prod && docker compose up -d modbus-cache  # the prod stack: env_file: (modbus-cache-production.env, required)
 ```
 
 Compose reads the service's file via `env_file:` relative to the stack's
@@ -205,8 +206,9 @@ default):
   (server), the cache proves it upstream and demands it from its own
   clients; in prod the cache demands it (server) and the scraper proves
   it — the upstream side stays the device's credential (the operator's
-  `MODBUS_UPSTREAM_AUTH*` in `env/cache-production.env`, or none for a device
-  without auth). The `environment:` blocks pin scheme + `file:` reference;
+  `MODBUS_UPSTREAM_AUTH*` in `env/modbus-cache-production.env`, or none
+  for a device without auth). The `environment:` blocks pin scheme +
+  `file:` reference;
   opening a hop is a compose edit (an explicit operator act, the F7
   shape). Standalone runs stay auth-less — pass `-e MODBUS_AUTH=suite -e
   MODBUS_AUTH_KEY=file:/config/modbus-auth.token` on a shared named volume to
@@ -276,7 +278,7 @@ The caching proxy multiplexing the inverter's single Modbus client — see the
 (`/pv-suite/cache/modbus-cache.conf`, the default `--config` target) loads
 from the image; the volume carries `/config/selection.json` (`SELECTION`)
 — edit it there, it survives recreation; override the conf's knobs with
-`env/cache.env` (or flags):
+`env/modbus-cache.env` (or flags):
 
 ```bash
 cd docker
@@ -288,7 +290,7 @@ docker run --rm -it modbus-cache bash          # poke around as pvsuite
 docker run --rm -p 127.0.0.1:15502:15502 modbus-cache \
     modbus-cache --upstream 192.168.1.100:5502          # any flags via the CMD override
 docker run --rm -p 127.0.0.1:15502:15502 \
-    --env-file env/cache.env modbus-cache       # the peer via the env file (a --upstream flag beats it)
+    --env-file env/modbus-cache.env modbus-cache  # the peer via the env file (a --upstream flag beats it)
 ```
 
 Without `-v` the volume is anonymous (thrown away with `--rm`); name it to
@@ -302,7 +304,7 @@ bundled conf (`/pv-suite/scraper/modbus-scraper.conf`, the default `--config`
 target) loads from the image; the volume carries `/config/metrics.json`
 (`METRICS_SPEC`) and the generated `/config/metrics.token` — edit the spec
 there, it survives recreation; override the conf's knobs with
-`env/scraper.env` (or flags):
+`env/modbus-scraper.env` (or flags):
 
 ```bash
 cd docker
@@ -314,7 +316,7 @@ docker run --rm -it modbus-scraper bash        # poke around as pvsuite
 docker run --rm -p 127.0.0.1:9350:9350 modbus-scraper \
     modbus-scraper --upstream 192.168.1.100:502        # any flags via the CMD override
 docker run --rm -p 127.0.0.1:9350:9350 \
-    --env-file env/scraper.env modbus-scraper   # the peer via the env file (a --upstream flag beats it)
+    --env-file env/modbus-scraper.env modbus-scraper  # the peer via the env file (a --upstream flag beats it)
 ```
 
 Standalone runs stay token-less and auth-less by default — the compose

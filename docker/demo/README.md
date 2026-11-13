@@ -4,7 +4,7 @@
 > the fake inverter end to end on one internal network — a self-contained
 > demo, not a production recipe. Before running it against real hardware,
 > adapt it: point the cache's `UPSTREAM` at the device
-> (`env/cache.env`), publish only the ports your clients actually need
+> (`env/modbus-cache.env`), publish only the ports your clients actually need
 > (loopback first — see the F7 notes below), and size the collector's
 > retention (`env/prometheus.env`). The production shape is the sibling
 > [prod/](../prod/compose.yaml) stack — see

@@ -9,8 +9,9 @@ let
   cfg = config.services.modbus-scraper;
 
   # the service contract: `settings` carries the daemon's env twins verbatim
-  # (the bare upper-snake names — the generated docker/env/scraper.env.example
-  # documents the key list); the module inspects three of them for the
+  # (the bare upper-snake names — the generated
+  # docker/env/modbus-scraper.env.example documents the key list); the module
+  # inspects three of them for the
   # sandbox's write paths and the control socket, everything else renders
   # untouched
   listen = cfg.settings.LISTEN or "127.0.0.1:9350";
@@ -133,7 +134,7 @@ in
         `NAME=value` into the service's systemd EnvironmentFile. The keys
         are the bare env twins the daemon resolves (UPSTREAM, LISTEN,
         INTERVAL, DUMP_PATH, ... — the generated
-        docker/env/scraper.env.example documents the key list), the values
+        docker/env/modbus-scraper.env.example documents the key list), the values
         are strings the daemon's own conv parses ("true"/"false", "10.0");
         an absent key leaves the daemon default. Nothing is mapped,
         converted or validated against the knob registry — except the

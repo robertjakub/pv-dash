@@ -58,7 +58,7 @@ Settings are resolved in this order (first hit wins), mirroring
    `CONFIG`, `UPSTREAM`, `MODBUS_UNIT`, `MODBUS_OFFSET`, `MODBUS_TIMEOUT`,
    `MODBUS_INTERVAL`, `LISTEN`, `MODBUS_PROFILE`, `LOG_LEVEL`, `AUTH_TOKEN`, … —
    the full twin set is the generated
-   [`docker/env/scraper.env.example`](../../docker/env/scraper.env.example)
+   [`docker/env/modbus-scraper.env.example`](../../docker/env/modbus-scraper.env.example)
 3. Config file — the set-grammar script (`set <name> <value>` lines) —
    `--config` picks the file (default: `$CONFIG`, then `modbus-scraper.conf` next
    to the script, then the subproject root's sample; missing file is fine)

@@ -92,7 +92,7 @@ services:
       MODBUS_AUTH: suite
       MODBUS_AUTH_KEY: file:/config/modbus-auth.token
     env_file:
-      - path: ../env/cache.env
+      - path: ../env/modbus-cache.env
         required: false
     volumes:
       - config:/config
@@ -118,11 +118,12 @@ services:
       MODBUS_AUTH_KEY: file:/config/modbus-auth.token
       # the token the entrypoint generated into the volume (0600, pvsuite):
       # the demo exporter never serves unauthenticated (the audit's F13) —
-      # environment beats env_file, so scraper.env cannot override this;
-      # the value is a file: reference (the first line of the 0600 file)
+      # environment beats env_file, so modbus-scraper.env cannot override
+      # this; the value is a file: reference (the first line of the 0600
+      # file)
       AUTH_TOKEN: file:/config/metrics.token
     env_file:
-      - path: ../env/scraper.env
+      - path: ../env/modbus-scraper.env
         required: false
     networks:
       - modbus

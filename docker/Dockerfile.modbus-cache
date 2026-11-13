@@ -24,10 +24,10 @@
 # stay) — for the cache that is /config/selection.json (SELECTION): edit it
 # there, it survives recreation. The bundled conf is NOT in the volume —
 # the tool loads the image's /pv-suite/cache/modbus-cache.conf (the default
-# --config target) and the per-tool env file (env/cache.env — the demo and
-# plain-docker spelling; the prod copy carries -production) overrides its
-# knobs (see ../docker/README.md); a flag beats the env: `docker run ...
-# modbus-cache --upstream 10.0.0.9:5502` on top.
+# --config target) and the per-tool env file (env/modbus-cache.env —
+# the demo and plain-docker spelling; the prod copy carries -production)
+# overrides its knobs (see ../docker/README.md); a flag beats the env:
+# `docker run ... modbus-cache --upstream 10.0.0.9:5502` on top.
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \

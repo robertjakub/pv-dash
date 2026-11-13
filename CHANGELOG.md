@@ -9,6 +9,22 @@ before the repo restructured into one suite.
 This file keeps **Unreleased and the current release** only — the release
 history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
 
+## Unreleased
+### Changed
+
+- **The docker env examples carry the full tool names** —
+  `docker/env/cache.env.example` → `docker/env/modbus-cache.env.example`,
+  `docker/env/scraper.env.example` → `docker/env/modbus-scraper.env.example`:
+  every file now spells `<tool>.env.example` exactly (the generator's
+  "the env-file stem IS the daemon name" comment finally true for all
+  four). The cp hints, the compose `env_file:` paths and the prod
+  `-production` copies follow (`env/modbus-cache.env`,
+  `env/modbus-scraper.env`, `env/modbus-cache-production.env`,
+  `env/modbus-scraper-production.env`) — an operator's copied env files
+  need the same rename (`required: false` keeps a stale demo copy
+  silently unread; the prod stack refuses to start without its
+  renamed file).
+
 ## 0.5.0 — 2026-11-13
 ### Added
 

@@ -15,10 +15,11 @@ demo stack runs; only the wiring differs:
   dashboard's `/prom` proxy points at it
 - **the network is not `internal: true`** — the cache dials the device
   on the LAN (the demo's closed network would cut the route out)
-- **`env/cache-production.env` is required** — the demo's env files are
-  optional (`required: false`, the image defaults stand); here the cache's
-  file must exist. The `-production` name keeps the prod copies apart from
-  the demo stack's (`env/cache.env`), so one checkout can run both stacks
+- **`env/modbus-cache-production.env` is required** — the demo's env
+  files are optional (`required: false`, the image defaults stand); here
+  the cache's file must exist. The `-production` name keeps the prod
+  copies apart from the demo stack's (`env/modbus-cache.env`), so one
+  checkout can run both stacks
 
 The secrets ship decided — the stack is authenticated out of the box
 ([the secrets story](../README.md#the-secrets-story)): the Modbus hops
@@ -27,8 +28,8 @@ with the generated bearer token, the dashboard's page is token'd (F21).
 
 ```bash
 cd docker/prod
-cp ../env/cache.env.example ../env/cache-production.env
-$EDITOR ../env/cache-production.env                  # UPSTREAM=192.168.1.100:5502 — the device
+cp ../env/modbus-cache.env.example ../env/modbus-cache-production.env
+$EDITOR ../env/modbus-cache-production.env           # UPSTREAM=192.168.1.100:5502 — the device
 docker compose up -d                                # cache + scraper + dashboard
 docker compose exec --user pvsuite modbus-cache modbus-cache-cli   # a console session
 docker compose down                                 # keeps the volume; down -v wipes it
@@ -38,8 +39,8 @@ docker compose down                                 # keeps the volume; down -v 
 
 Each is called out in the compose file's comments:
 
-- **the device address** — `env/cache-production.env` is **required**
-  (no `required: false`): the image's default `UPSTREAM`
+- **the device address** — `env/modbus-cache-production.env` is
+  **required** (no `required: false`): the image's default `UPSTREAM`
   (`modbus-fake-inverter:5502`) only ever resolves in the demo. Set
   `UPSTREAM=HOST:PORT` to the device.
 - **the device's own auth** (optional) — if the device or its gateway
@@ -81,8 +82,8 @@ collector's pull are the two routes through:
 
           the device: real hardware -    ┌──────────────┐
           UPSTREAM=HOST:PORT lives in    │  inverter    │
-          env/cache-production.env       └──────┬───────┘
-          (the required file); its own          │
+          modbus-cache-production.env    └──────┬───────┘
+          (the required file, env/); its        │
           auth, if any, rides                   │
           MODBUS_UPSTREAM_AUTH there                   │
                                                 │
@@ -130,7 +131,7 @@ collector's pull are the two routes through:
 
 - **the device** — real hardware, outside the network; its address (and
   its auth scheme, if any) live in the operator's
-  `env/cache-production.env`.
+  `env/modbus-cache-production.env`.
 - **modbus-cache** — the proxy: polls the device every 10 s (proving
   the suite key upstream when `MODBUS_UPSTREAM_AUTH` says so), owns the single
   client slot, serves reads from memory, demands the same key from its

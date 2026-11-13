@@ -72,9 +72,10 @@ SUITE_KEY_DEMO = ("the demo stack pins this to the stack's suite key "
 # the prod stack's copy stems: the prod compose reads env/<prod>.env (the
 # cache's REQUIRED, the scraper's optional) while the demo keeps
 # env/<stem>.env — one generated example, two copy targets
-PROD = {'cache': 'cache-production', 'scraper': 'scraper-production'}
+PROD = {'modbus-cache': 'modbus-cache-production',
+        'modbus-scraper': 'modbus-scraper-production'}
 ENV_TOOLS = (
-    ('cache', 'modbus-cache', 'cache',
+    ('cache', 'modbus-cache', 'modbus-cache',
      ('Both compose stacks read the file (env_file: — the demo copy '
       'optional, the prod copy REQUIRED: UPSTREAM is the operator\'s '
       'decision there); where a stack\'s environment block pins a knob '
@@ -97,7 +98,7 @@ ENV_TOOLS = (
                             'is the device\'s — this file is its edit '
                             'surface')},
      ),
-    ('scraper', 'modbus-scraper', 'scraper',
+    ('scraper', 'modbus-scraper', 'modbus-scraper',
      ('Both compose stacks read the file (env_file:, required: false — '
       'no file = the image defaults); the stacks\' environment block '
       'pins the auth knobs the notes below mark.',),

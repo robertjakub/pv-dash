@@ -346,7 +346,7 @@ else:
 # the daemon port extraction: only the flag-anchored numbers (--listen
 # 127.0.0.1:16591, --control-port 16592) count as ports — the paths and
 # the pids carry digits too and must not read as one.
-FAMILY_PGREP = '[m]odbus-cache.py|[m]odbus-scraper.py|[m]odbus-fake-inverter.py|bin/[d]ashboard.py|[m]odbus-replay.py'
+FAMILY_PGREP = '[m]odbus-cache.py|[m]odbus-scraper.py|[m]odbus-fake-inverter.py|bin/[d]ashboard.py|[m]odbus-replay.py|[m]odbus-replay-dump.py'
 
 
 def family_daemons():
@@ -429,7 +429,7 @@ def kill_daemons():
         return
     for pat in ('[m]odbus-cache.py', '[m]odbus-scraper.py',
                 '[m]odbus-fake-inverter.py', 'bin/[d]ashboard.py',
-                '[m]odbus-replay.py'):
+                '[m]odbus-replay.py', '[m]odbus-replay-dump.py'):
         subprocess.run(['pkill', '-9', '-f', pat], capture_output=True)
 
 

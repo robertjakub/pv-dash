@@ -11,6 +11,7 @@ per gate:
   lint/profile.py --check      the shared device profiles
   generators/manual.py --check   the four MANUAL pages
   generators/examples.py --check the env + conf examples
+  generators/trace_example.py --check  the example trace
   generators/sbom.py --check     the SBOM pair
   family_drift.py --check      the generated drift doc
 
@@ -35,6 +36,7 @@ GATES = (
     ('lint/profile --check', ('dev/gates/profile.py', '--check')),
     ('generators/manual --check', ('dev/generators/manual.py', '--check')),
     ('generators/examples --check', ('dev/generators/examples.py', '--check')),
+    ('generators/trace_example --check', ('dev/generators/trace_example.py', '--check')),
     ('generators/sbom --check', ('dev/generators/sbom.py', '--check')),
     ('family_drift --check', ('dev/family_drift.py', '--check')),
 )

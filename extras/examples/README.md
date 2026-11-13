@@ -39,6 +39,21 @@ samples, and every `package.nix` installs its packaged copy into
   [shared/schema/modbus-cache-filter.schema.json](../../shared/schema/modbus-cache-filter.schema.json)
   is the schema.
 
+- **`modbus-replay-trace.pvmb`** — the modbus-replay example trace: a
+  small, deterministic binary capture wearing everything the format
+  can carry — two sessions (two runs' headers), the suite-auth
+  handshake peeled and named (the PVA1 proof the family's own
+  `auth_mac` computes — a demo key, a fixed nonce — and the OK
+  verdict), one Waveshare session (the raw-ASCII password), the polls
+  with their recorded latencies (the shapes cycle, the FC3 repeat
+  climbs the ask count), a refused write riding its exception, one
+  framing-lost record. The content is SYNTHETIC (the keys, the
+  passwords, the values are filler) — an example, not a secret, so it
+  ships 0644. `modbus-replay-dump extras/examples/modbus-replay-trace.pvmb`
+  renders the three views;
+  [apps/modbus-replay/README.md](../../apps/modbus-replay/README.md)
+  documents the byte layout.
+
 ## Keeping it honest
 
 ```bash
@@ -46,6 +61,7 @@ python3 dev/gates/acl.py --check                       # lints the acl files (ba
 python3 dev/editor/editor.py acl extras/examples/acl-ip-prefix.json  # the terminal editor
 python3 dev/gates/validate_json.py shared/schema/modbus-cache-filter.schema.json \
     extras/examples/modbus-cache-filter.json              # the selection example vs its schema
+python3 dev/generators/trace_example.py --check        # the example trace vs its generator
 ```
 
 The loader (`common/settings/config.py`'s `_write_gate_object` — one gate

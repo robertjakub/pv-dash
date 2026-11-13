@@ -23,6 +23,7 @@ TOOLS = (
     ('dashboard',            'apps/dashboard/bin/dashboard.py',    'apps/dashboard/man/dashboard.1'),
     ('dashboard-cli',        'apps/dashboard/bin/dashboard-cli.py', 'apps/dashboard/man/dashboard-cli.1'),
     ('modbus-replay',        'apps/modbus-replay/bin/modbus-replay.py', 'apps/modbus-replay/man/modbus-replay.1'),
+    ('modbus-replay-dump',   'apps/modbus-replay/bin/modbus-replay-dump.py', 'apps/modbus-replay/man/modbus-replay-dump.1'),
 )
 
 

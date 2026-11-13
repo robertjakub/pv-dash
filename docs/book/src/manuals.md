@@ -3,20 +3,21 @@
 The four tools' generated command/knob references — each rendered from
 its registry by `dev/generators/manual.py` (`--check`-gated; edit
 `apps/<tool>/lib/options.json` and re-run, never the markdown). The
-pages live beside their registries; the book gathers them for reading.
+pages live in `extras/manuals/`, named for their daemons; the book
+gathers them for reading.
 
 ## modbus-cache
 
-{{#include ../../../apps/cache/MANUAL.md}}
+{{#include ../../../extras/manuals/modbus-cache.md}}
 
 ## modbus-scraper
 
-{{#include ../../../apps/scraper/MANUAL.md}}
+{{#include ../../../extras/manuals/modbus-scraper.md}}
 
 ## modbus-fake-inverter
 
-{{#include ../../../apps/inverter/MANUAL.md}}
+{{#include ../../../extras/manuals/fake-inverter.md}}
 
 ## the dashboard
 
-{{#include ../../../apps/dashboard/MANUAL.md}}
+{{#include ../../../extras/manuals/dashboard.md}}

@@ -235,7 +235,7 @@ they name the wire.
   long on cache/scraper, short on inverter/dashboard; the inverter's
   `connect-acl` help says "the cache's connect-acl, mirrored" — a
   cross-tool reference in a user row (`apps/inverter/lib/options.json:139`,
-  it reached `apps/inverter/lib/man.py:117` and `apps/inverter/MANUAL.md:119`).
+  it reached `apps/inverter/lib/man.py:117` and `extras/manuals/fake-inverter.md:119`).
   Outcome: one line per verb, per-tool brackets only.
 - **the knob descriptions, four voices** `[all]` — `control-port`
   alone has three dialects ("control server target..." /
@@ -258,7 +258,7 @@ they name the wire.
   `startup-only — pass it by flag/env/config (set/clear refuse)`
   (show knobs + help config via `control_command()`,
   `common/settings/options.py:390-408`),
-  `*(restart)*` / `startup-only (secret)` (MANUAL.md,
+  `*(restart)*` / `startup-only (secret)` (the manual pages,
   `dev/generators/manual.py:143-146`), `restart: true` + the wire phrase
   (only the cache's man carries the trio now, `apps/cache/lib/man.py:98-107`),
   and "restart to apply" (apps/inverter/README.md:204). Outcome: a
@@ -645,14 +645,15 @@ re-open — is the history half:
   mdBook form: the READMEs/audit/TODO/changelog included via
   `{{#include}}`); what remains is the publishing: build + deploy the
   book on GH Pages in the CI item's workflow.
-- *(landed — the docs redo, the manuals-home ruling)*: the four
-  `<tool>/MANUAL.md` pages stay per-tool beside their registries —
-  `shared/manuals/` ruled out (the pages are loaded by no tool; the
-  alerts precedent) and `extras/manuals/` declined (the operator-pack
-  contract holds: manuals are product docs, not operator packs). The
-  browsing home is the book: the Manuals page includes all four by
-  `{{#include}}` beside a SUMMARY row; the pages' relative
-  the `MANUAL.md` links in the per-tool READMEs stay
+- *(landed — the manuals-home move, reversing the docs redo's per-tool
+  ruling)*: the four pages live in `extras/manuals/` under their daemon
+  names — `modbus-cache.md`, `modbus-scraper.md`, `fake-inverter.md`,
+  `dashboard.md`: the tool dirs hold the code and the registries, the
+  operator packs hold the reading (the earlier `extras/manuals/`
+  decline is overturned — the pages are loaded by no tool either way,
+  and the daemon-named pack reads as one). The browsing home is still
+  the book: the Manuals page includes all four by `{{#include}}` beside
+  a SUMMARY row; the per-tool READMEs' links re-point and stay
   disk-true (the book page is the reader's route).
 
 ### CROSS-TOOL

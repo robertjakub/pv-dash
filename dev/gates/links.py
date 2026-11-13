@@ -18,7 +18,7 @@ The two checks have different homes:
   the scripts split).
 
 The generated layer is excluded from both — docs/family-drift.md, the
-four <tool>/MANUAL.md pages and docs/sbom/SBOM.md speak their
+four extras/manuals/<daemon>.md pages and docs/sbom/SBOM.md speak their
 generators' constants (`dev/generators/{manual,sbom}.py --check`
 are their gates). Fenced code blocks are skipped (the tree diagrams and
 the build snippets cite nothing). Run after any docs rewrite, beside
@@ -36,7 +36,9 @@ INCLUDE = re.compile(r'\{\{#include\s+([^}]+?)\}\}')
 SPAN = re.compile(r'`([^`\n]+)`')
 ROOTED = re.compile(r'^(apps|docs|shared|common|extras|docker|nixos|scripts|tests)/'
                     r'[A-Za-z0-9][A-Za-z0-9_./-]*$')
-GENERATED = ('/MANUAL.md', 'docs/family-drift.md', 'docs/sbom/SBOM.md')
+GENERATED = ('extras/manuals/modbus-cache.md', 'extras/manuals/modbus-scraper.md',
+             'extras/manuals/fake-inverter.md', 'extras/manuals/dashboard.md',
+             'docs/family-drift.md', 'docs/sbom/SBOM.md')
 RECORDS = ('CHANGELOG.md',)
 TOKEN_SKIP = ('docs/history/', )
 TOKEN_SKIP_FILES = ('CHANGELOG.md', 'docs/docs-redo.md')

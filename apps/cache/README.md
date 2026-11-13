@@ -171,7 +171,7 @@ A JSON-lines control server runs **by default on the unix socket
 CLI tool resolve the target the same way: flag > the **`CTL`** environment
 variable > the default socket. Every command and knob the wire answers —
 command, settable (`set`/`clear`) or show-only — is tabled in
-[MANUAL.md](MANUAL.md) (generated from the registry).
+[manual](../../extras/manuals/modbus-cache.md) (generated from the registry).
 
 One command per line, one reply per line: `{"cmd": …}` →
 `{"status": "ok|fail|note|bye", "text": …}`. With `--control-token` set,

@@ -5,6 +5,13 @@ The open items live in the family-wide [TODO](../../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The manual moved to the operator packs: `apps/scraper/MANUAL.md` is
+`extras/manuals/modbus-scraper.md` now (the daemon-named page;
+`dev/generators/manual.py` renders it there, `--check` gates it — the
+docs redo's per-tool manuals-home ruling reversed). The README's link
+and the book's include re-pointed; the content is unchanged but the
+h1's `(MANUAL.md)` tail dropped.
+
 pvsuite-cli: the tool's cli bin (`modbus-scraper-cli.py`) became a symlink to
 the family dispatcher `apps/pvsuite-cli.py` — the tool's SPEC half
 (the pools, the labels, the defaults, the labels)

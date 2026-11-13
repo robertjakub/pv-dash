@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render <tool>/MANUAL.md — one page per daemon: every command, knob and
+"""Render extras/manuals/<daemon>.md — one page per daemon: every command, knob and
 show report its control wire answers, the kind of each (command, settable
 — set/clear — or show-only), the flag and the env twin, the value shape
 and the description — from the per-tool registries (lib/options.json via
@@ -288,7 +288,7 @@ def render(tool, daemon, daemon_bin, blurb, cli, sock, port, example,
         r['name'] for r in meta.get('commands') or [])))
     out = []
     w = out.append
-    w('# The %s manual (MANUAL.md)' % daemon)
+    w('# The %s manual' % daemon)
     w('')
     w(wrap('%s Part of the pv-suite family. The daemon\'s own `--help` and '
            'the man page (`%s --man`) carry the startup surface; this page '
@@ -397,7 +397,7 @@ def main(argv):
         page = render(tool, daemon, daemon_bin, blurb, cli, sock, port,
                       example, token_mandatory, conf, rows, shows, meta)
         raw_angle_guard(page, daemon)
-        path = os.path.join(REPO, 'apps', tool, 'MANUAL.md')
+        path = os.path.join(REPO, 'extras', 'manuals', daemon + '.md')
         drift = emit(path, page, check, 'manual',
                      rerun='python3 dev/generators/manual.py') or drift
     if check:

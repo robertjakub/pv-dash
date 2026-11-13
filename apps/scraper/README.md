@@ -168,7 +168,7 @@ ops role, the F5 token rule) is the family's — one paragraph per piece in
 [docs/SECURITY.md](../../docs/SECURITY.md); a token value never renders back
 (`show <secret>` refuses). Every command and knob the wire answers —
 command, settable (`set`/`clear`) or show-only — is tabled in
-[MANUAL.md](MANUAL.md) (generated from the registry). The commands:
+[manual](../../extras/manuals/modbus-scraper.md) (generated from the registry). The commands:
 
 | Command | Effect |
 |---|---|

@@ -9,6 +9,17 @@ before the repo restructured into one suite.
 This file keeps **Unreleased and the current release** only — the release
 history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
 
+## Unreleased
+### Docs
+
+- **The four manuals move to `extras/manuals/<daemon>.md`** — the
+  per-tool `MANUAL.md` pages become the daemon-named `modbus-cache.md`,
+  `modbus-scraper.md`, `fake-inverter.md` and `dashboard.md` under the
+  operator packs (the docs redo's per-tool ruling reversed):
+  `dev/generators/manual.py` renders them there (`--check` gates
+  them), the book's Manuals page and the root + per-tool READMEs'
+  links re-point, the links gate's generated-layer exclusion follows.
+
 ## 0.5.1 — 2026-11-13
 ### Changed
 

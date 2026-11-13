@@ -169,8 +169,8 @@ default socket. The target also **rebinds live** — `set control port` —
 and on the fake a **tokenless TCP rebind succeeds** (the F11 test-tool
 posture; every other tool in the family refuses it — F5). Every command
 and knob the wire answers — command, settable (`set`/`clear`) or
-show-only — is tabled in [MANUAL.md](MANUAL.md) (generated from the
-registry).
+show-only — is tabled in [the manual](../../extras/manuals/fake-inverter.md)
+(generated from the registry).
 
 The wire is the family's JSON lines (one request object per line, one
 reply per line: `{"cmd": …}` → `{"status": "ok|fail|note|bye", "text": …}`;

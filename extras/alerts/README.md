@@ -26,8 +26,8 @@ watches the poll and the gates.
 
 | surface | where |
 |---|---|
-| nix — `modbus-scraper` | `share/modbus-scraper/alerts.yml` (this pack's `scraper.yml`) |
-| nix — `modbus-cache` | `share/modbus-cache/alerts.yml` (this pack's `cache.yml`) — the cache-only install carries its half |
+| nix — `modbus-scraper` | `share/alerts/scraper.yml` (this pack's `scraper.yml`) |
+| nix — `modbus-cache` | `share/alerts/cache.yml` (this pack's `cache.yml`) — the cache-only install carries its half |
 | docker — the demo image | both files baked to `/etc/prometheus/alerts/` ([Dockerfile.prometheus](../../docker/Dockerfile.prometheus), the `alerts` build context) |
 | production | your own collector — list the packaged copy(es) under its `rule_files:` |
 

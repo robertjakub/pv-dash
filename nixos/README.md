@@ -29,8 +29,11 @@ nix build .#modbus-scraper       # or any other package
 
 Each package installs the daemon, its `*-cli` client, the
 generated man pages under `share/man/man1/` and — where the tool has them —
-the bundled profile, the `examples/` samples and the JSON Schemas (the
-shared one from `shared/schema/`, the tool-local ones from `schema/`).
+the bundled profile, the `examples/` samples and the JSON Schemas, all
+flat under `share/` (the tree is the app root: the daemon, the `lib/`,
+`common/` and `shared/` packages beside it — the shared Schemas at
+`share/shared/schema/`, the repo's `shared/schema/`; the tool-local ones
+at `share/schema/`).
 
 ## How the service modules work
 
@@ -133,14 +136,15 @@ services.modbus-scraper = {
 The packages also ship the **alert rules pack** (`extras/alerts/` in the repo —
 the F16 closure, the audit vocabulary's detection half, one file per
 watched exporter): the scraper's copy sits at
-`share/modbus-scraper/alerts.yml`, the cache's at
-`share/modbus-cache/alerts.yml`. A Prometheus on the same host points its
-`ruleFiles` at the packaged copies and the poll story alerts itself:
+`share/alerts/scraper.yml`, the cache's at
+`share/alerts/cache.yml` — the repo's own names. A Prometheus on the same
+host points its `ruleFiles` at the packaged copies and the poll story
+alerts itself:
 
 ```nix
 services.prometheus.ruleFiles =
-  [ "${inputs.pv-dash.packages.${pkgs.system}.modbus-scraper}/share/modbus-scraper/alerts.yml"
-    "${inputs.pv-dash.packages.${pkgs.system}.modbus-cache}/share/modbus-cache/alerts.yml" ];
+  [ "${inputs.pv-dash.packages.${pkgs.system}.modbus-scraper}/share/alerts/scraper.yml"
+    "${inputs.pv-dash.packages.${pkgs.system}.modbus-cache}/share/alerts/cache.yml" ];
 ```
 
 List only the copies of the tools you run — a cache-only install still

@@ -13,7 +13,7 @@
 # Wire-in: `rule_files: [/etc/prometheus/alerts/*.yml]` — the demo image
 # bakes it (docker/Dockerfile.prometheus); a NixOS Prometheus points
 # services.prometheus.ruleFiles at the packaged copy
-# (share/modbus-cache/alerts.yml — nixos/README.md). Thresholds assume the
+# (share/alerts/cache.yml — nixos/README.md). Thresholds assume the
 # default 10 s poll interval — tune them to yours.
 groups:
   - name: pv-suite-cache

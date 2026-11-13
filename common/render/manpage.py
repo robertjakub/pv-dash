@@ -84,13 +84,18 @@ def wrap(text, width=72):
 
 
 def _flag_str(action):
-    """'.BI \\-\\-flag " TYPE"' / '.B \\-\\-flag' / the positional form."""
+    """'.BI \\-\\-flag " TYPE"' / '.B \\-\\-flag' / the positional form —
+    a typed flag's explicit metavar spells the shape when the type's
+    name cannot (`N|all`); the untyped rows stay bare (the metavar is
+    the usage hint, not the shape)."""
     opts = [o.replace('-', '\\-') for o in action.option_strings]
     if not opts:
         return '.B %s' % action.dest
     flag = opts[0] if len(opts) == 1 else ', '.join(opts)
     if action.nargs == 0 or action.type is None:
         return '.B %s' % flag
+    if action.metavar is not None:
+        return '.BI %s " %s"' % (flag, action.metavar)
     shape = getattr(action.type, '__name__', 'VAL')
     if shape in ('int', 'float'):
         shape = 'N'

@@ -148,7 +148,7 @@ sit. Pass each one on every start — by flag, by env, or as `file:<path>`
 lands in `ps` — the file form is the shipped way (the audit's F9/F12).
 
 `examples/modbus-cache.conf` is a sample in the set grammar — GENERATED
-(`scripts/generators/examples.py`) from `lib/options.json`, every knob the
+(`dev/generators/examples.py`) from `lib/options.json`, every knob the
 registry declares, every line commented at its default; `show config`
 regenerates the script from the running daemon (secrets hidden) and `help
 config` maps every knob to its control command.
@@ -490,7 +490,7 @@ carry no host — pooled there, name them apart. The chain groups by the
 
 The 12-hex token after the event name is the entry's **chained hash** (the
 audit's F10): any edit, deletion or reordering shows up as a chain break in
-`scripts/gates/audit_verify.py` (run it on this file, the family's XDG trails, or
+`dev/gates/audit_verify.py` (run it on this file, the family's XDG trails, or
 a journald dump on stdin). **Every wire command is audited once, by the
 server** (with the client peer, the role, and the frame's mac when the wire
 is signed); the per-client **request accounting** rides the same trail (one
@@ -514,14 +514,15 @@ is [docs/SECURITY.md](../../docs/SECURITY.md).
 
 ## Testing
 
-Four standalone suites live in the suite-root [`tests/`](../../tests/) —
+Four standalone suites live in the suite root
+[`dev/suites/`](../../dev/suites/) —
 stdlib only, each starts its own fake inverter + proxy on scratch ports and
 cleans up after itself:
 
 ```bash
-tests/battery/battery.py cache              # the cache profile: the regtest, the two fuzzes,
+dev/battery/battery.py cache              # the cache profile: the regtest, the two fuzzes,
                                     # the audit chain (the stress suite rides quick/full)
-tests/battery/battery.py cache-regtest      # one suite — every run needs the runner (the suites
+dev/battery/battery.py cache-regtest      # one suite — every run needs the runner (the suites
                                     # refuse without the runner's PV_RUN_DIR)
 ```
 
@@ -538,7 +539,7 @@ apps/cache/
 │   └── modbus-cache-cli.py     # console-style interactive control session (a symlink to the family dispatcher, ../../pvsuite-cli.py)
 ├── examples/
 │   └── modbus-cache.conf    # sample config in the set grammar
-├── man/                     # the generated man pages (scripts/generators/man.py)
+├── man/                     # the generated man pages (dev/generators/man.py)
 └── lib/
     ├── defaults.json     # the static constants: diagnostics block, log levels (the protocol
     ├── statics.py       #   limits live in shared/suite/protocol.json)

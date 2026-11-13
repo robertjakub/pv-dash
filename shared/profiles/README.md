@@ -7,16 +7,16 @@ against the JSON files in `shared/profiles/` first, then its own packaged
 copy. Every fact lives in the JSON — no hardcoded tables anywhere in the
 suite; a profile is addressed by bare name (this directory) or by path.
 
-One tool keeps the profiles in shape — `scripts/gates/profile.py`, the
-lint/ home's member (stdlib only, run as `python3 scripts/gates/profile.py`
+One tool keeps the profiles in shape — `dev/gates/profile.py`, the
+lint/ home's member (stdlib only, run as `python3 dev/gates/profile.py`
 from the repo root):
 
 ```bash
-python3 scripts/gates/profile.py                          # lint all shipped profiles
-python3 scripts/gates/profile.py my-device.json           # lint one file
-python3 scripts/gates/profile.py format shared/profiles/deye-sg03lp1.json
-python3 scripts/gates/profile.py format --check           # the layout drift only, rc 1 = off-form
-python3 scripts/gates/profile.py format --diff            # the unified diff, no write
+python3 dev/gates/profile.py                          # lint all shipped profiles
+python3 dev/gates/profile.py my-device.json           # lint one file
+python3 dev/gates/profile.py format shared/profiles/deye-sg03lp1.json
+python3 dev/gates/profile.py format --check           # the layout drift only, rc 1 = off-form
+python3 dev/gates/profile.py format --diff            # the unified diff, no write
 ```
 
 - **lint** (the default verb) — the schema and style checks: valid JSON,

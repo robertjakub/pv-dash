@@ -30,7 +30,7 @@ jobs:
           - scrape-fuzz.py 300
     steps:
       - uses: actions/checkout@v4
-      - run: python3 tests/suites/${{ matrix.suite }}
+      - run: python3 dev/suites/${{ matrix.suite }}
         env:
           PV_RUN_DIR: /tmp/pvbattery-ci
 
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/generators/sbom.py --check
+      - run: python3 dev/generators/sbom.py --check
 
   release:
     name: the GitHub release

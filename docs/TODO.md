@@ -259,7 +259,7 @@ they name the wire.
   (show knobs + help config via `control_command()`,
   `common/settings/options.py:390-408`),
   `*(restart)*` / `startup-only (secret)` (MANUAL.md,
-  `scripts/generators/manual.py:143-146`), `restart: true` + the wire phrase
+  `dev/generators/manual.py:143-146`), `restart: true` + the wire phrase
   (only the cache's man carries the trio now, `apps/cache/lib/man.py:98-107`),
   and "restart to apply" (apps/inverter/README.md:204). Outcome: a
   two-phrase lexicon in `shared/suite/texts.json`, every surface renders it,
@@ -339,7 +339,7 @@ they name the wire.
 - **the ctl exits 0 on a refused command** — a `fail` reply prints
   `% error: ...` and exits 0 (`common/wire/cli.py` the reply ladder; the only
   nonzero exits are mac/auth/transport), pinned by the suite
-  (`tests/suites/cache-regtest.py`; the man page's EXIT STATUS even
+  (`dev/suites/cache-regtest.py`; the man page's EXIT STATUS even
   promises "every command answered ok" (`common/render/manpage.py:46`).
   Outcome: decide (rc 1 when any reply is `fail`), reword EXIT STATUS.
 - **the 401 bodies, three spellings** — `unauthorized\n` (scraper
@@ -394,7 +394,7 @@ they name the wire.
   flanked by the unit-range and audit-bounds rows, and the sweep's
   field table reads the rows (`default`/`min`/`max`/`live`).
 - the env examples are **GENERATED from the registries**
-  (`scripts/generators/examples.py --check`): the full registry env-twin set per
+  (`dev/generators/examples.py --check`): the full registry env-twin set per
   tool (50/39/34/38), grouped by the knob's namespace node, the image's
   own CMD/ENV values as the sample lines with the pin notes (the
   compose's environment pins marked per knob), the secrets' lines
@@ -506,7 +506,7 @@ re-open — is the history half:
   clear text. The Modbus side stays F1 (accepted, protocol-inherent).
 ## The pipeline (CI, releases, supply chain)
 
-- **schema every family JSON** `[common]` — `scripts/gates/validate_json.py`
+- **schema every family JSON** `[common]` — `dev/gates/validate_json.py`
   speaks the draft-2020-12 core but only the shipped spec pairs meet it
   today (the drift sweep's schema/example pass). Give the family's
   remaining JSON artifacts schemas and one gate: `shared/suite/texts.json`,
@@ -524,14 +524,14 @@ re-open — is the history half:
   (`cache-fuzz 10000`, `scrape-fuzz 10000`, `control-fuzz`, the stress
   suite) plus `docker compose up` (the Prometheus answers, no tracebacks
   in the logs).
-- **the SBOM / supply-chain note** `[common]` — **done**: `scripts/generators/sbom.py`
+- **the SBOM / supply-chain note** `[common]` — **done**: `dev/generators/sbom.py`
   generates both [sbom/SBOM.md](sbom/SBOM.md) + `sbom/sbom.cdx.json` from
   the tree (the import scan gates the render — a foreign dependency fails
   the generation; the vendored ECharts version and its bundled zrender are
   read out of the shipped bundle itself), and the release workflow's `sbom`
   job runs `sbom.py --check` (regenerate + diff), so the pair cannot go
   stale silently.
-- **the release discipline** `[common]` — **done**: `scripts/release.py`
+- **the release discipline** `[common]` — **done**: `dev/release.py`
   (the orchestrator: the version sweep, the changelog rename, the
   flake.lock refresh, the verification, the commit, the annotated tag —
   signed when a key exists — and the push) plus the tag-triggered
@@ -759,7 +759,7 @@ re-open — is the history half:
   samples and the NixOS modules render the set grammar, and the
   **one-knob-one-source** registry (`lib/options.json` + its loader
   `lib/options.py` per tool on `common/settings/options.py`) +
-  `scripts/gates/check_options.py` gate the four
+  `dev/gates/check_options.py` gate the four
   surfaces against drift. Also closed in the wave: the RBAC verb policy
   (`--control-ops-verbs`), the dashboard's own /metrics endpoint, the
   metrics.json sections + `--metric-prefix` + the `scraper_*` renames
@@ -782,10 +782,10 @@ re-open — is the history half:
   cache's endpoints live-togglable (`metrics-server` + `--metrics-listen`),
   the scraper refusing a non-loopback listen without a token (F13 closed).
 - **the integrity wave** — the audit trails carry chained per-writer
-  hashes verified by `scripts/gates/audit_verify.py` (F10); the state dump is
+  hashes verified by `dev/gates/audit_verify.py` (F10); the state dump is
   0600 + integrity-hashed with a fail-closed restore (F18); the dump
   splits by content (settings by default, with-cache on request).
-- **the release tooling** — `scripts/release.py` + the tag-triggered
+- **the release tooling** — `dev/release.py` + the tag-triggered
   release workflow (the pipeline item above is the operational follow-up).
 - **the systemd unit hardening** — the three NixOS modules sandbox every
   service (`ProtectSystem=strict`, `PrivateDevices`, `ProtectHome`,
@@ -808,7 +808,7 @@ re-open — is the history half:
   `PATH`), the shared external `config` volume seeded by `entrypoint.sh`
   (bundled defaults copied in, existing files kept), the profiles +
   `common/` riding in as named build contexts.
-- **the profile tool** — `scripts/gates/profile.py` (lint + format, one
+- **the profile tool** — `dev/gates/profile.py` (lint + format, one
   script, the lint/ home's member): lint = the required keys and their
   family order, the register bounds, the type width, the fc, the
   per-entry ttl, the mappings vs a register word, the duplicate names,

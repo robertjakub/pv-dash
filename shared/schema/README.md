@@ -21,9 +21,9 @@ feedback while editing.
 ## Validate
 
 ```bash
-python3 scripts/gates/validate_json.py shared/schema/acl-ip-prefix.schema.json extras/examples/acl-ip-prefix.json
-python3 scripts/gates/validate_json.py shared/schema/acl-write-registers.schema.json extras/examples/acl-write-registers.json
-python3 scripts/gates/validate_json.py shared/schema/modbus-cache-filter.schema.json extras/examples/modbus-cache-filter.json
+python3 dev/gates/validate_json.py shared/schema/acl-ip-prefix.schema.json extras/examples/acl-ip-prefix.json
+python3 dev/gates/validate_json.py shared/schema/acl-write-registers.schema.json extras/examples/acl-write-registers.json
+python3 dev/gates/validate_json.py shared/schema/modbus-cache-filter.schema.json extras/examples/modbus-cache-filter.json
 ```
 
 The repo's own stdlib-only checker speaks the draft-2020-12 core the

@@ -31,8 +31,8 @@ and as a full pass whenever a wave landed doc ripples across tools.
 | the mechanism specs (the shared core) | [specs/MODBUS.md](specs/MODBUS.md) (the protocol, the profiles, the auth), [specs/ACL.md](specs/ACL.md) (the gates), [specs/static-defaults.md](specs/static-defaults.md) (the defaults ladder + the gate) |
 | the security ledger | [SECURITY.md](SECURITY.md) — the open findings, the posture, the NIS2/DORA map; the closed half in [history/AUDIT.md](history/AUDIT.md) (the closed findings with fix + verification, the per-revision walk) |
 | the ledgers (open vs history) | [TODO.md](TODO.md) — the open items (the one-product sweep rides as its section) + the per-tool `TODO.md` Done records; [history/family-unify.md](history/family-unify.md) — the sweep's verified-aligned ledger (do not re-open); the alignment waves' contracts ([history/options-align.md](history/options-align.md), [history/show-commands-align.md](history/show-commands-align.md) — landed, do not re-fly); the generated [family-drift.md](family-drift.md) (the census + the open findings) + [history/family-drift.md](history/family-drift.md) (the landed legs) |
-| the release history | the root [CHANGELOG](../CHANGELOG.md) (Unreleased + the current release), [history/CHANGELOG.md](history/CHANGELOG.md) (the archive — `scripts/release.py` maintains the split) |
-| the maintenance | this page's redo (below), [scripts/README.md](../scripts/README.md) (the gates + the editors) |
+| the release history | the root [CHANGELOG](../CHANGELOG.md) (Unreleased + the current release), [history/CHANGELOG.md](history/CHANGELOG.md) (the archive — `dev/release.py` maintains the split) |
+| the maintenance | this page's redo (below), [dev/README.md](../dev/README.md) (the gates + the editors) |
 | the deployment | [docker/README.md](../docker/README.md) (the stacks, the env files, the secrets), [nixos/README.md](../nixos/README.md) (the one Nix reference) |
 | the supply chain | [sbom/SBOM.md](sbom/SBOM.md) |
 | the operator packs | [extras/](../extras/README.md) — the [alert rules](../extras/alerts/README.md) (one file per watched exporter), the [shared sample files](../extras/examples/README.md) the `file:` acl gates point at, the [graylog pack](../extras/graylog/README.md) |
@@ -56,7 +56,7 @@ answers "what is true now", the history half "how did we get here"):
 The generated pages — the drift doc + the seed ledger, the four
 MANUALs, the four env examples, the man pages, the SBOM pair —
 are inventoried with their generators and gates in the generators
-section of [scripts/README.md](../scripts/README.md). An editorial
+section of [dev/README.md](../dev/README.md). An editorial
 change to a generated doc lands in the GENERATOR's constants (the
 drift verdicts live in `family_drift.py`'s
 `*_FINDINGS`/`*_VERBS`/`*_CENSUS` blocks), then regenerates — a hand
@@ -72,15 +72,15 @@ release.
    judgement):
 
    ```bash
-   python3 scripts/family_drift.py --check
-   python3 scripts/gates/check_options.py
-   python3 scripts/gates/links.py --check
-   python3 scripts/gates/options.py --check
-   python3 scripts/gates/texts.py
-   python3 scripts/generators/manual.py --check
-   python3 scripts/generators/examples.py --check
-   python3 scripts/generators/sbom.py --check
-   python3 scripts/generators/man.py && mandoc -Tlint apps/<tool>/man/*.1
+   python3 dev/family_drift.py --check
+   python3 dev/gates/check_options.py
+   python3 dev/gates/links.py --check
+   python3 dev/gates/options.py --check
+   python3 dev/gates/texts.py
+   python3 dev/generators/manual.py --check
+   python3 dev/generators/examples.py --check
+   python3 dev/generators/sbom.py --check
+   python3 dev/generators/man.py && mandoc -Tlint apps/<tool>/man/*.1
    ```
 
    A red gate means the generated layer is stale — regenerate (and fix
@@ -129,4 +129,4 @@ release.
 Prose lines ≤ 80 characters (the tables and code blocks are exempt);
 the man pages wrap at 72; strict cmark-gfm shape (the lint and the
 book build watch it); the texts the code renders ride
-shared/suite/texts.json (`scripts/gates/texts.py`), not the docs.
+shared/suite/texts.json (`dev/gates/texts.py`), not the docs.

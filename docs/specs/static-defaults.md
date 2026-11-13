@@ -1,7 +1,7 @@
 # The defaults
 
 Every value knob's default lives in its registry row — the `default`
-field of `lib/options.json`, editable with `scripts/editor/editor.py options`
+field of `lib/options.json`, editable with `dev/editor/editor.py options`
 (conv-typed: int/float/bool/str, the empty input clears to the None
 ladder-end). The resolver ladder's last rung reads it: each tool's
 `lib/statics.py` builds `DEFAULTS` off the loaded `OPTIONS` rows (the
@@ -60,7 +60,7 @@ live in common/runtime/audit.py and the rows repeat them.
 
 ## The gate
 
-`scripts/gates/check_options.py` runs four rows per tool:
+`dev/gates/check_options.py` runs four rows per tool:
 
 - **every non-secret flag knob's row carries its default** (or a
   `NO_ROW_DEFAULT` reason) — the static rung is explicit, never a

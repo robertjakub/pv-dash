@@ -31,7 +31,7 @@ the registry's hierarchy nodes file the listings, the non-value reply lines
 ride the `% ` prefix). Every knob lives in its registry
 (`apps/<tool>/lib/options.json`); the per-tool [MANUAL.md](apps/cache/MANUAL.md)
 tables render it (generated, `--check`-gated), and
-`python3 scripts/list_options.py` is the cross-tool census on demand.
+`python3 dev/list_options.py` is the cross-tool census on demand.
 
 ## The flake
 
@@ -63,15 +63,16 @@ pv-suite/
 │                 #   modules (modules/<tool>.nix) and the [Nix reference](nixos/README.md)
 ├── shared/       # the family's shared data: profiles/, schema/, suite/ ([docs](shared/README.md))
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
-├── tests/        # the battery runner (tests/battery/ behind the
-│                 #   tests/battery/battery.py runner) + the suites, one or more per Modbus tool
-├── scripts/      # the tooling, filed by role: editor/ (the registry
-│                 #   editor + its curses primitives), family_drift.py,
-│                 #   release.py, list_options.py, options_compare.py
-│                 #   (the three compare lenses)
+├── dev/          # the tooling + the verification, filed by role:
+│                 #   family_drift.py, release.py, list_options.py,
+│                 #   options_compare.py (the three compare lenses)
 │   ├── gates/    # everything rc-1-on-red: the lints (acl/options/readmes/
 │   │             #   texts/links/profile) + check_options/validate_json/audit_verify
-│   ├── lib/      # the scripts' common lib (the loaders, the registry, the tree-walk, emit)
+│   ├── suites/   # the verification suites, one or more per Modbus tool
+│   ├── battery/  # the battery runner — the suites always run through it
+│   ├── harness/  # the suites' shared harness
+│   ├── editor/   # the registry editor + its curses primitives
+│   ├── lib/      # the dev lib (the loaders, the registry, the tree-walk, emit)
 │   └── generators/  # the four generators: man/manual/examples/sbom
 ├── docker/       # one alpine image per tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
@@ -93,7 +94,7 @@ pv-suite/
 
 ## Testing
 
-The suites always run through the battery — `tests/battery/battery.py` owns the
+The suites always run through the battery — `dev/battery/battery.py` owns the
 run dir (the suites' /tmp scratch rewrites into it), the port-space slot
 (concurrent batteries take disjoint port spaces), the daemon reaping
 between suites and the tally; a suite run outside it refuses (the marker
@@ -102,11 +103,11 @@ across sessions). The release verification and the CI matrix set the same
 marker for their legs.
 
 ```bash
-tests/battery/battery.py                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
-tests/battery/battery.py quick              # all ten, the fuzz budgets at 300 (~3 min) — the pre-push loop
-tests/battery/battery.py full               # all ten, the suite defaults — the nightly
-tests/battery/battery.py cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
-tests/battery/battery.py control-fuzz       # named suite(s) — e.g. the one you are iterating on
+dev/battery/battery.py                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
+dev/battery/battery.py quick              # all ten, the fuzz budgets at 300 (~3 min) — the pre-push loop
+dev/battery/battery.py full               # all ten, the suite defaults — the nightly
+dev/battery/battery.py cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
+dev/battery/battery.py control-fuzz       # named suite(s) — e.g. the one you are iterating on
 ```
 
 The ten suites (stdlib only, scratch ports, self-cleaning; each prints
@@ -115,7 +116,7 @@ ALL PASS or a FAILURES list):
 - `cache-regtest` — the cache: the full functional battery
 - `inverter-regtest` — the fake: the F11/F13 surface (client caps, timeouts, per-IP, the count gate)
 - `scrape-regtest` — the scraper + the fake's machines
-- `audit-chain` — the audit trails' hash chains + `scripts/gates/audit_verify.py`
+- `audit-chain` — the audit trails' hash chains + `dev/gates/audit_verify.py`
 - `cache-stress` — the cache: 100 clients / 15 s load
 - `cache-fuzz` [n] / `scrape-fuzz` [n] — n hostile client / HTTP frames
 - `cache-control-fuzz` / `control-fuzz` / `dashboard-control-fuzz` — hostile JSON on the control servers

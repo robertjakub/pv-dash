@@ -42,9 +42,9 @@ samples, and every `package.nix` installs its packaged copy into
 ## Keeping it honest
 
 ```bash
-python3 scripts/gates/acl.py --check                       # lints the acl files (bare run)
-python3 scripts/editor/editor.py acl extras/examples/acl-ip-prefix.json  # the terminal editor
-python3 scripts/gates/validate_json.py shared/schema/modbus-cache-filter.schema.json \
+python3 dev/gates/acl.py --check                       # lints the acl files (bare run)
+python3 dev/editor/editor.py acl extras/examples/acl-ip-prefix.json  # the terminal editor
+python3 dev/gates/validate_json.py shared/schema/modbus-cache-filter.schema.json \
     extras/examples/modbus-cache-filter.json              # the selection example vs its schema
 ```
 

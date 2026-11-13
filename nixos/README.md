@@ -102,7 +102,7 @@ All three modules behave the same way:
   default port when unset); with a loopback bind the module warns that the
   hole is unreachable.
 
-`scripts/gates/check_options.py` (the one-knob-one-source gate) keeps the modules
+`dev/gates/check_options.py` (the one-knob-one-source gate) keeps the modules
 structural: exactly `enable`/`package`/`user`/`group`/`openFirewall`/`settings`,
 every registry secret row's `*File` credential option (the dashboard adds
 `solarConfig`/`staticDir`), and nothing else — a knob option declared by

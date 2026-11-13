@@ -15,7 +15,7 @@ resolved-config
 key renames and the set-grammar rendering of the effective values. The
 config script (the ini's replacement), `show config`, the knob ->
 control-command mapper, the argparse parser (--help, built from these rows —
-common/settings/options.py build_parser) and scripts/gates/check_options.py all read this
+common/settings/options.py build_parser) and dev/gates/check_options.py all read this
 table."""
 import os
 
@@ -34,7 +34,7 @@ def _load_options():
     resolver never falls through a truthy flag value) — they ladder
     flag > env > config > static in lib/config.py like every other knob.
     defaults.json is read directly so the module also imports flat
-    (scripts/gates/check_options.py walks lib/ on sys.path)."""
+    (dev/gates/check_options.py walks lib/ on sys.path)."""
     return load_options_module(globals(), os.path.dirname(os.path.realpath(__file__)),
                                socket_timeout=True)
 

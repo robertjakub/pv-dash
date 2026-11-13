@@ -23,7 +23,7 @@ default. From this one row the surfaces are built or checked:
   CONSOLE spellings: the cli completes and accepts them and translates to
   the flat name before it sends; a flagless row is a control-only setting
   — the fake's pins and machines);
-- `scripts/gates/check_options.py` — the CI gate that the four surfaces (the
+- `dev/gates/check_options.py` — the CI gate that the four surfaces (the
   flags, the env names, the bundled config, the NixOS module and the README
   tables) agree with the registry.
 
@@ -629,7 +629,7 @@ def load_registry(here, choices=None):
     its globals). Every section's rows fold their canon block first
     (load_canon/canon_fold — the row's inline field wins). Returns (rows,
     sections, options); the module imports flat (the loaders walk lib/ on
-    sys.path — scripts/gates/check_options.py)."""
+    sys.path — dev/gates/check_options.py)."""
     with open(os.path.join(here, 'options.json'), encoding='utf-8') as f:
         meta = json.load(f)
     canon = load_canon()

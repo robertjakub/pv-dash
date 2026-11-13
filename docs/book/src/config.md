@@ -10,7 +10,7 @@ parser refuses the placeholder). The knobs are
 filed under the hierarchy nodes the wire spells as words (`modbus`,
 `metrics`, `caps`, `control`, `audit`, `dump` — the `?` walk and
 `show <node>` describe each namespace) and
-`scripts/gates/check_options.py` gates the four surfaces (the flags, the env
+`dev/gates/check_options.py` gates the four surfaces (the flags, the env
 twins, the NixOS modules, the README tables) against the registry.
 
 {{#include ../../../apps/cache/examples/modbus-cache.conf}}

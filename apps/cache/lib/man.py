@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The cache proxy's man pages, generated (common/render/manpage.py): the OPTIONS
 sections render from the tools' argparse parsers, the prose sections live
-here as roff (ported from the original hand-written pages). scripts/generators/man.py
+here as roff (ported from the original hand-written pages). dev/generators/man.py
 writes the shipped man/*.1 from these; `modbus-cache --man` (and the
 ctl/cli's --man) prints the same page."""
 from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_DAEMON, options_section, page

@@ -42,7 +42,7 @@ artifacts. The pattern:
   Prometheus image probes `/-/ready` with busybox wget
 - the shared [`profiles/`](../shared/profiles/README.md) JSON files copied
   flat to `/pv-suite/profiles/` (pure data, home `shared/profiles/`; the
-  linter/formatter lives in `scripts/gates/profile.py`) — the profile
+  linter/formatter lives in `dev/gates/profile.py`) — the profile
   resolution finds them relative to the checkout layout
 - the **config volume** (`/config`, `VOLUME` + `ENTRYPOINT
   pv-entrypoint`): the entrypoint seeds it with the **required file
@@ -122,7 +122,7 @@ so no namespacing is needed (the Prometheus file is the exception: its
 `PROM_*` knobs belong to `entrypoint-prometheus.sh`, not a pv-suite
 tool). Every line starts commented; the defaults live in the image.
 
-The four tool files are **GENERATED** (`scripts/generators/examples.py --check`
+The four tool files are **GENERATED** (`dev/generators/examples.py --check`
 gates the drift) from the per-tool registries (`lib/options.json`): the
 registry's full env-twin set, grouped by the knob's namespace node, the
 sample value the image itself runs (the CMD flag or an ENV where one

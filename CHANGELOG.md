@@ -12,6 +12,25 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **The tooling and the verification consolidate under one `dev/` root**
+  — `scripts/` is `dev/` and the tests tree folds in beside it
+  (`tests/battery/` → `dev/battery/`, `tests/suites/` → `dev/suites/`,
+  `tests/harness/` → `dev/harness/`): one root, filed by role — the
+  gates, the generators, the editor, the dev lib, the suites, the
+  battery and the harness — with one README and one TODO section. The
+  subdir depths are unchanged, so every `__file__` repo-walk keeps
+  working; the wave is spellings. The sweeps: the CI legs
+  (`python3 dev/suites/${{ matrix.suite }}`, the sbom gate), the
+  battery's profile strings, the lint-gates' GATES table, the drift
+  sweep's coverage greps, the suites' docstring self-paths, the current
+  docs' rooted-path tokens (the history records, the per-tool TODOs'
+  wave-record lines and the CHANGELOG keep their landed spellings — the
+  house rule), the family-drift report and the SBOM pair regenerate.
+  The battery's live view returns as the dev-root hand-off:
+  `python3 dev/battery_status.py` (the execv wrapper — the argv, the
+  exit codes and the signals ride; the real view at
+  `dev/battery/battery_status.py` is the only implementation).
+
 - **The tests tree files the harness under its own name** — `tests/lib/`
   is `tests/harness/` (the module was always `harness` — the suites seed
   the dir onto sys.path and `from harness import *`, so the dir name

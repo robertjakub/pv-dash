@@ -9,7 +9,7 @@ stay separate and are linked where they answer a security question —
 hardening and the option map).
 
 Scope: the `apps/cache/`, `apps/scraper/`, `apps/inverter/` and `apps/dashboard/` subprojects plus
-the shared `common/` package, `shared/`, `docker/` and `scripts/`. Method:
+the shared `common/` package, `shared/`, `docker/` and `dev/`. Method:
 manual code review of every module (wire handling, control servers, CLIs,
 config/token/dump loading, audit trail, metrics endpoints, Nix/Docker
 deployment) against the NIS2 (EU 2022/2555, art. 21.2) and DORA
@@ -61,11 +61,11 @@ format, and at least yearly otherwise (§ 11).
 | `/inverter` | the fake: the daemon + the cli client, the simulator/machines/control/metrics libs, man/ | a test instrument on a trusted LAN: the Modbus surface capped (`max-clients`/`client-timeout`/`max-conn-per-ip`, live-settable) and connect-ACL'd (inline grammar only), the read-count gate, `/metrics` optional on the family stack; the family control listener (tokenless TCP by posture — F11); deliberately not security-first, documented as such | F11 closed; F1 accepted |
 | `/profiles` | the device profiles (JSON data: sun2000 + sun2000_full + demo-fc4 + three Deye variants), home `shared/profiles/` in the tree | data, not code: the loader validates every entry (type/width/scale, bounds), the search path is closed, the linter checks schema/overlaps/bounds — treat a profile file like config | none |
 | `/scraper` | the exporter: the daemon + the cli client, the server/scraper/poller/control/config libs, man/, the sample conf (the alert rules pack lives in `extras/alerts/`) | the read-only consumer: one HTTP GET route set (bearer-gated, capped, `metrics/acl`, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family control server; the SIGHUP reload re-validates everything | F13, F16, F20 closed; F14 open |
-| `/scripts` | `release.py` (the release orchestrator) + `audit_verify.py` (the F10 chain verifier) | maintainer-local trust: the dirty-tree and main-only guards, the full-suite verify, then commit/tag/push; the GH release is the workflow's job; the tag is the trust root, signed when a key exists | F19 closed |
+| `/dev` | `release.py` (the release orchestrator) + `gates/audit_verify.py` (the F10 chain verifier) | maintainer-local trust: the dirty-tree and main-only guards, the full-suite verify, then commit/tag/push; the GH release is the workflow's job; the tag is the trust root, signed when a key exists | F19 closed |
 
-`flake.nix` (the packaging, the NixOS modules) and `tests/` (the
-verification suites cited in §4) are part of the story but hold no runtime
-trust of their own.
+`flake.nix` (the packaging, the NixOS modules) and `dev/` (the
+tooling and the verification suites cited in §4) are part of the story but
+hold no runtime trust of their own.
 
 | Surface | apps/cache/ | apps/scraper/ | apps/inverter/ | apps/dashboard/ | Auth |
 |---|---|---|---|---|---|
@@ -75,7 +75,7 @@ trust of their own.
 | state dump | `--dump-path`: the setting overrides (plus the cached words on `with-cache`) as one atomic JSON | n/a | n/a | n/a | created `0600` explicitly + a sha256 integrity hash, fail-closed restore (F18); sealed under `dump/key` when set |
 | token files | every secret knob takes `file:<path>` | same | same | same | owner-only (0600) enforced at the shared loader (F12); the bare `-file` siblings are gone — `file:` is the one spelling |
 | upstream connection | outbound to the inverter/SDongle | outbound poll (the device or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent) |
-| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/gates/audit_verify.py` (F10); the opt-in forward mirrors every line to the local syslog or the off-box collector (the `udp://`/`tcp://` grammar, the RFC5424/CEF envelopes, the remote-only mode) |
+| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `dev/gates/audit_verify.py` (F10); the opt-in forward mirrors every line to the local syslog or the off-box collector (the `udp://`/`tcp://` grammar, the RFC5424/CEF envelopes, the remote-only mode) |
 | compose demo stack | five services on one `internal: true` network, **nothing published on the host**, one shared `config` volume, the generated 0600 `metrics.token` | | | | the internal network is the boundary; the exporter bearer-gated in the demo (F7) |
 
 Deployment (docker/): all three Modbus images run the tool as the
@@ -187,7 +187,7 @@ the intended demo feature, gated by control-server access only.
   | `restore` | `file`, `words`, `settings` (the cache's state dump) |
   | `acl-file` | `warn` (the file's permission posture, single-quoted) |
 - **Audit forwarding** — the trail's defense is three tiers: the local
-  chain (the file of record, per-writer hashes, `scripts/gates/audit_verify.py`),
+  chain (the file of record, per-writer hashes, `dev/gates/audit_verify.py`),
   the local journald mirror and **the off-box copy** — `--audit-forward`
   spells one target: `none`, `syslog` (the local socket auto-scan),
   `syslog:/path` (an explicit socket, must exist at bind), `udp://host[:514]`
@@ -337,7 +337,7 @@ verification and the per-revision walk (rev. 1–31):
 ## 9. Verification
 
 All ten suites print ALL PASS on the revised tree; `nix flake check`,
-`scripts/gates/check_options.py` + `scripts/gates/options.py --check` clean; the
+`dev/gates/check_options.py` + `dev/gates/options.py --check` clean; the
 man pages regenerate (`mandoc -Tlint` clean). The per-finding verification
 and the per-revision walk-throughs: [history/AUDIT.md](history/AUDIT.md).
 
@@ -369,7 +369,7 @@ stateless, restart-clean; Prometheus holds the history).
 
 Dashboard deltas (rows where the dashboard matches are omitted): incident
 handling — the DSH trail (chained) + the wire macs; effectiveness —
-`tests/suites/dashboard-control-fuzz.py`, the release workflow's matrix legs;
+`dev/suites/dashboard-control-fuzz.py`, the release workflow's matrix legs;
 crypto/hygiene — the
 constant-time compares (control + page/metrics bearers), the signed wire,
 no TLS (F14); access control — the family-hardened control plane + the

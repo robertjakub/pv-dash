@@ -70,7 +70,7 @@ instead of failing later at runtime. The only soft spot is `timeout >
 interval`: that logs a warning (polls run back-to-back) instead of failing.
 
 `examples/modbus-scraper.conf` is a sample in the set grammar — GENERATED
-(`scripts/generators/examples.py`) from `lib/options.json`, every knob the
+(`dev/generators/examples.py`) from `lib/options.json`, every knob the
 registry declares, every line commented at its default; `show config`
 regenerates the script from the running scraper (secrets hidden):
 
@@ -330,7 +330,7 @@ timestamp — journald adds one.
 
 The control commands (with their wire macs), the auth failures, the
 reloads and the shutdowns land in the **SCR audit trail** (`--audit-log`,
-the XDG state home by default — `scripts/gates/audit_verify.py` walks it like
+the XDG state home by default — `dev/gates/audit_verify.py` walks it like
 the others). `--audit-forward` mirrors every line — the per-writer
 hash chain included — onward: `syslog` (the local socket auto-scan),
 `syslog:/path` (an explicit socket), `udp://host[:514]` (RFC5426,
@@ -367,12 +367,13 @@ endpoint internal. The full story is
 
 ## Testing
 
-Two standalone suites live in the suite-root [`tests/`](../../tests/) —
+Two standalone suites live in the suite root
+[`dev/suites/`](../../dev/suites/) —
 stdlib only, each starts its own fake inverter + exporters on scratch
 ports and cleans up after itself:
 
 ```bash
-tests/battery/battery.py scraper        # the scraper profile: the regtest, the fuzz, the
+dev/battery/battery.py scraper        # the scraper profile: the regtest, the fuzz, the
                                 #   audit chain (the suites refuse without the
                                 #   runner's PV_RUN_DIR)
 ```

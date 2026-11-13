@@ -1,7 +1,7 @@
 # The manuals
 
 The four tools' generated command/knob references — each rendered from
-its registry by `scripts/generators/manual.py` (`--check`-gated; edit
+its registry by `dev/generators/manual.py` (`--check`-gated; edit
 `apps/<tool>/lib/options.json` and re-run, never the markdown). The
 pages live beside their registries; the book gathers them for reading.
 

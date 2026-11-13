@@ -4,7 +4,7 @@ The wave record: the sweep types over the four surfaces (cache,
 scraper, inverter, dashboard) — what each sweeps, what it found,
 and the verdicts. **Ships in the repo, kept current by the
 workflow**: the open findings wait in place, and `--check` fails
-a stale page. Regenerate with `python3 scripts/family_drift.py`;
+a stale page. Regenerate with `python3 dev/family_drift.py`;
 the verdict prose lives in this script (`*_FINDINGS`/`*_VERBS`/
 `*_CENSUS`) so a re-run updates the facts and keeps the
 judgement. This doc carries the CURRENT findings only — the
@@ -212,7 +212,7 @@ The findings:
   (the page's auth namespace), the other three's is the modbus auth
   enum (`suite|none`). One spelling, two meanings in the family's
   set-grammar space — legal (the registries are per-tool), but the
-  merged-knob view (scripts/list_options.py) and any future family-wide
+  merged-knob view (dev/list_options.py) and any future family-wide
   grammar should note it.
 - **`KNOWN_VERBS` derives from the rows** (the landed leg): the
   loaders build the RBAC vocabulary from the registry's command rows
@@ -239,7 +239,7 @@ texts the rows ref; the drift and must-ref gates live in
 | commands | 16 | 16 | 16 | 13 | 13 |
 
 The exempt (intentionally per-tool) names: **39** —
-each with its reason in `scripts/gates/options.py`.
+each with its reason in `dev/gates/options.py`.
 
 ## The wire-text sweep — the log/audit canon
 
@@ -370,7 +370,7 @@ READMEs' `##` skeletons.
 - inverter: How it works -> Usage -> Configuration -> Runtime control -> Served registers (the default profile) -> Internal registers (not in the profile) -> Chaos injection (`--chaos`) -> Audit trail -> Security -> Testing -> Source layout -> License
 - dashboard: How it works -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Security -> Testing -> Source layout -> License
 
-The skeleton verdict (`scripts/gates/readmes.py --check` gates it):
+The skeleton verdict (`dev/gates/readmes.py --check` gates it):
 
 - cache: OK
 - scraper: OK
@@ -386,7 +386,7 @@ The findings:
 - **The README skeleton** is the one-skeleton wave's shape (how it
   works -> usage -> configuration -> runtime control -> the features
   -> security -> testing -> nix -> source layout -> license) and
-  `scripts/gates/readmes.py --check` pins it: the canon H2s in order,
+  `dev/gates/readmes.py --check` pins it: the canon H2s in order,
   the tool's own sections only in the slot between runtime control
   and security, and a `### Signals` block leading the Runtime-control
   H3s — this sweep prints the gate's verdict beside the ladders.
@@ -490,7 +490,7 @@ The findings:
 ## The suite-coverage sweep — the promises x the tests
 
 Every live knob name, command word and canon log phrase grepped
-against `tests/suites/*.py` (word-bounded). Word-match honesty: the suites
+against `dev/suites/*.py` (word-bounded). Word-match honesty: the suites
 are prose too — a name inside another word counts as covered; the
 list is the TODO seed, not a verdict.
 

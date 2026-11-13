@@ -4,7 +4,7 @@
   "rev": 3,
   "name": "pv-suite audit trail",
   "summary": "The pv-suite family audit trail: the syslog input, the audit_* parse, the streams and the event definitions.",
-  "description": "Operator content for pointing Graylog at the pv-suite audit trail (--audit-forward udp://<graylog>:1514 with the default rfc5424 format). Creates one syslog UDP input on 1514, three pipeline rules that parse the KV line into audit_* fields, one pipeline wired to the Audit - all stream, five streams and four event definitions (no notifications attached - attach your own). The chain verification stays off-box: scripts/gates/audit_verify.py over the collected file.",
+  "description": "Operator content for pointing Graylog at the pv-suite audit trail (--audit-forward udp://<graylog>:1514 with the default rfc5424 format). Creates one syslog UDP input on 1514, three pipeline rules that parse the KV line into audit_* fields, one pipeline wired to the Audit - all stream, five streams and four event definitions (no notifications attached - attach your own). The chain verification stays off-box: dev/gates/audit_verify.py over the collected file.",
   "vendor": "pv-suite",
   "url": "https://github.com/wework5119/opencode",
   "parameters": [],

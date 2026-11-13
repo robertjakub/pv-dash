@@ -289,7 +289,7 @@ authenticating reverse proxy. The full story is
 ## Testing
 
 ```bash
-tests/battery/battery.py dashboard             # the dashboard profile: the control fuzz +
+dev/battery/battery.py dashboard             # the dashboard profile: the control fuzz +
                                        #   the audit chain (the suites refuse without
                                        #   the runner's PV_RUN_DIR)
 ```
@@ -314,7 +314,7 @@ and **zero tracebacks** in the logs.
 | `lib/control.py` | the JSON-lines control server (the signed wire, the peer-cred shortcut) |
 | `lib/defaults.json` / `lib/statics.py` | the non-knob statics (log levels, the proxy timeout) / its loader — the knobs' defaults ride the registry rows |
 | `examples/config.js` | the user-settings example (`SOLAR_CONFIG`), served at `/config.js` |
-| `man/*.1` | the man pages — **generated** (`--man`, `scripts/generators/man.py`) |
+| `man/*.1` | the man pages — **generated** (`--man`, `dev/generators/man.py`) |
 
 ## License
 

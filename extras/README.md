@@ -26,5 +26,5 @@ grammar).
   `profiles/`, the texts/schema/tags under `suite/`, the schemas).
 - **docker/** — build machinery: the Dockerfiles, the SBOM embeds
   their paths, the compose contexts reach into the sibling dirs.
-- **tests/, scripts/, docs/** — the gates, the generators, the
+- **dev/, docs/** — the gates, the generators, the suites, the
   references.

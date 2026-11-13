@@ -154,7 +154,7 @@ family does now).
 
 The alert rules pack: the cache contributes its side to the family's
 pack ([`../../extras/alerts/cache.yml`](../../extras/alerts/cache.yml), the F16
-closure — installed with this package as `share/modbus-cache/alerts.yml`)
+closure — installed with this package as `share/alerts/cache.yml`)
 — and the missing metric landed first:
 `modbus_cache_write_refused_total` on the cache's own /metrics counts the
 gate refusals (allow-write off, the write ACL, the register allow-list, a

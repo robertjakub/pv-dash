@@ -13,14 +13,14 @@ from lib import REPO
 # per-tool surfaces the gates check the registry against (the tool dir
 # IS the key; the fake answers no NixOS module)
 SURFACES = {
-    'cache': ('cache/bin/modbus-cache.py', 'nixos/modules/modbus-cache.nix',
-              'cache/README.md', 'cache/examples/modbus-cache.conf'),
-    'scraper': ('scraper/bin/modbus-scraper.py', 'nixos/modules/modbus-scraper.nix',
-                'scraper/README.md', 'scraper/examples/modbus-scraper.conf'),
-    'inverter': ('inverter/bin/modbus-fake-inverter.py', None,
-                 'inverter/README.md', 'inverter/examples/modbus-fake-inverter.conf'),
-    'dashboard': ('dashboard/bin/dashboard.py', 'nixos/modules/dashboard.nix',
-                  'dashboard/README.md', 'dashboard/examples/dashboard.conf'),
+    'cache': ('apps/cache/bin/modbus-cache.py', 'nixos/modules/modbus-cache.nix',
+              'apps/cache/README.md', 'apps/cache/examples/modbus-cache.conf'),
+    'scraper': ('apps/scraper/bin/modbus-scraper.py', 'nixos/modules/modbus-scraper.nix',
+                'apps/scraper/README.md', 'apps/scraper/examples/modbus-scraper.conf'),
+    'inverter': ('apps/inverter/bin/modbus-fake-inverter.py', None,
+                 'apps/inverter/README.md', 'apps/inverter/examples/modbus-fake-inverter.conf'),
+    'dashboard': ('apps/dashboard/bin/dashboard.py', 'nixos/modules/dashboard.nix',
+                  'apps/dashboard/README.md', 'apps/dashboard/examples/dashboard.conf'),
 }
 
 
@@ -28,7 +28,7 @@ def raw(tool_dir):
     """The raw lib/options.json rows — the sections' row order and the raw
     marks (the loaders key by live word and drop the node rows; some
     surfaces want both)."""
-    with open(os.path.join(REPO, tool_dir, 'lib', 'options.json'), encoding='utf-8') as f:
+    with open(os.path.join(REPO, 'apps', tool_dir, 'lib', 'options.json'), encoding='utf-8') as f:
         return json.load(f)
 
 
@@ -37,7 +37,7 @@ def wired(tool_dir):
     at a time — returns (OPTIONS, KNOWN_VERBS, SHOW_OPTIONS, mod); the
     module rides for the surfaces beyond the trio (the SHOW_WORDS
     vocabulary)."""
-    sys.path.insert(0, os.path.join(REPO, tool_dir, 'lib'))
+    sys.path.insert(0, os.path.join(REPO, 'apps', tool_dir, 'lib'))
     sys.modules.pop('options', None)
     mod = __import__('options')
     sys.path.pop(0)

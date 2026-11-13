@@ -16,10 +16,10 @@ import time
 
 from harness import *   # the boot: the gate, SCRATCH, BASE, the NOTE stamp — the shared check accumulator (PROFILE rebinds below: the fuzz argv leads with the budget)
 
-CACHE_DIR = os.path.join(REPO, 'cache')
+CACHE_DIR = os.path.join(REPO, 'apps', 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
 PORT, CACHE_PORT = 15591 + BASE, 15592 + BASE
 ITERATIONS = int(sys.argv[1]) if len(sys.argv) > 1 else 300
 PROFILE = sys.argv[2] if len(sys.argv) > 2 else os.environ.get('PV_SUITE_PROFILE', 'quick')

@@ -15,7 +15,7 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(ROOT, 'cache'))
+sys.path.insert(0, os.path.join(ROOT, 'apps', 'cache'))
 
 from lib.statics import MAX_REGISTERS, REGISTER_TYPES   # noqa: E402
 

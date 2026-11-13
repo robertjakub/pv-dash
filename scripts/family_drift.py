@@ -340,8 +340,8 @@ def rendered():
     """The man pages' .SH ladders + --help's section headers + the
     README skeletons, per tool."""
     mans, helps, readmes = {}, {}, {}
-    bins = {'cache': 'cache/bin/modbus-cache.py', 'scraper': 'scraper/bin/modbus-scraper.py',
-            'inverter': 'inverter/bin/modbus-fake-inverter.py', 'dashboard': 'dashboard/bin/dashboard.py'}
+    bins = {'cache': 'apps/cache/bin/modbus-cache.py', 'scraper': 'apps/scraper/bin/modbus-scraper.py',
+            'inverter': 'apps/inverter/bin/modbus-fake-inverter.py', 'dashboard': 'apps/dashboard/bin/dashboard.py'}
     for t, b in bins.items():
         try:
             man = subprocess.run([sys.executable, os.path.join(REPO, b), '--man'],
@@ -358,7 +358,7 @@ def rendered():
         except (OSError, subprocess.TimeoutExpired):
             helps[t] = None
     for t in TOOLS:
-        p = os.path.join(REPO, t, 'README.md')
+        p = os.path.join(REPO, 'apps', t, 'README.md')
         if os.path.exists(p):
             readmes[t] = [l[3:].strip() for l in open(p, encoding='utf-8') if l.startswith('## ')]
     return mans, helps, readmes
@@ -517,7 +517,7 @@ def statics():
     fields)."""
     maps = {}
     for t in TOOLS:
-        with open(os.path.join(REPO, t, 'lib', 'defaults.json'), encoding='utf-8') as f:
+        with open(os.path.join(REPO, 'apps', t, 'lib', 'defaults.json'), encoding='utf-8') as f:
             flat = {}
             def walk(obj, prefix):
                 if isinstance(obj, dict):
@@ -538,7 +538,7 @@ def schemas(rows):
     the enum/bounds honest-check). The tool-local schema/ dirs plus the
     shared shared/schema/ home."""
     out = {}
-    for t, base in [(t, os.path.join(REPO, t, 'schema')) for t in TOOLS] + [
+    for t, base in [(t, os.path.join(REPO, 'apps', t, 'schema')) for t in TOOLS] + [
             ('shared', os.path.join(REPO, 'shared', 'schema'))]:
         per = {}
         if os.path.isdir(base):
@@ -556,7 +556,7 @@ def examples(rows):
     tool-local examples/ dirs plus the shared extras/examples/ home."""
     out = []
     sys.path.insert(0, REPO)
-    dirs = [(t, f'{t}/examples', os.path.join(REPO, t, 'examples')) for t in TOOLS]
+    dirs = [(t, f'apps/{t}/examples', os.path.join(REPO, 'apps', t, 'examples')) for t in TOOLS]
     dirs.append((None, 'extras/examples', os.path.join(REPO, 'extras', 'examples')))
     for t, label, ed in dirs:
         if not os.path.isdir(ed):
@@ -614,8 +614,8 @@ def secrets(rows):
 
 CONSOLE_SESSION_FILES = (
     'common/wire/cli.py',
-    'cache/bin/modbus-cache-cli.py', 'scraper/bin/modbus-scraper-cli.py',
-    'inverter/bin/modbus-fake-cli.py', 'dashboard/bin/dashboard-cli.py',
+    'apps/cache/bin/modbus-cache-cli.py', 'apps/scraper/bin/modbus-scraper-cli.py',
+    'apps/inverter/bin/modbus-fake-cli.py', 'apps/dashboard/bin/dashboard-cli.py',
 )
 
 
@@ -1307,7 +1307,7 @@ def emit():
     ap('The skeleton verdict (`scripts/lint/readmes.py --check` gates it):')
     ap('')
     for t in TOOLS:
-        rel = f'{t}/README.md'
+        rel = f'apps/{t}/README.md'
         findings = readme_lint.readme_findings(rel)
         ap(f'- {t}: ' + ('OK' if not findings else '; '.join(findings)))
     ap('')

@@ -9,7 +9,7 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "dashboard";
   version = "0.4.3";
 
-  src = lib.cleanSource ../../../dashboard;
+  src = lib.cleanSource ../../../apps/dashboard;
 
   nativeBuildInputs = [ makeWrapper ];
 

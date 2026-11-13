@@ -20,7 +20,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
-P = os.path.join(REPO, 'dashboard', 'bin', 'dashboard.py')
+P = os.path.join(REPO, 'apps', 'dashboard', 'bin', 'dashboard.py')
 TOKEN = 'sekrit'
 PROM_PORT = 15970 + BASE     # the stub Prometheus
 HTTP_PORT = 15971 + BASE     # the dashboard's page/proxy surface
@@ -86,7 +86,7 @@ def main():
     try:
         procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (HTTP_PORT),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
-                                       '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js'),
+                                       '--config-js', os.path.join(REPO, 'apps', 'dashboard', 'examples', 'config.js'),
                                        '--metrics-server', '--metrics-listen', '127.0.0.1:%d' % METRICS_PORT,
                                        '--control-port', str(CTRL_PORT), '--control-token', TOKEN,
                                        '--audit-log', '-'],
@@ -226,7 +226,7 @@ def main():
         # 6b. the token as a file: reference on the env: honored like the flag
         open(os.path.join(SCRATCH, 'dash_ctl_fuzz_token'), 'w').write(TOKEN + '\n')
         os.chmod(os.path.join(SCRATCH, 'dash_ctl_fuzz_token'), 0o600)
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-cli.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'dashboard', 'bin', 'dashboard-cli.py'),
                             '--control-port', str(CTRL_PORT), 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
                            env={**os.environ, 'CONTROL_TOKEN': 'file:' + os.path.join(SCRATCH, 'dash_ctl_fuzz_token')})
@@ -309,12 +309,12 @@ def main():
         check('log-queries: off sinks the line to debug', lines and 'DEBUG' in lines[-1],
               repr(lines[-1] if lines else 'no GET line in the daemon log'))
 
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-cli.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'dashboard', 'bin', 'dashboard-cli.py'),
                             '--control-port', str(OPS_CTRL_PORT), '--control-token', OPS_TOKEN,
                             'show', 'version'], capture_output=True, text=True, timeout=15)
         check('ops: dashboard_ctl reads with the ops token', r.returncode == 0
               and 'ok dashboard' in r.stdout, repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-cli.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'dashboard', 'bin', 'dashboard-cli.py'),
                             '--control-port', str(OPS_CTRL_PORT), '--control-token', OPS_TOKEN,
                             'shutdown'], capture_output=True, text=True, timeout=15)
         check('ops: dashboard_ctl cannot steer with the ops token', 'forbidden' in r.stdout
@@ -407,7 +407,7 @@ def main():
         procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (PAGES_PORT),
                                        '--auth-token', 'ptok',
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
-                                       '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js'),
+                                       '--config-js', os.path.join(REPO, 'apps', 'dashboard', 'examples', 'config.js'),
                                        '--control-port', str(PAGES_CTL), '--control-token', TOKEN,
                                        '--audit-log', '-'],
                                       stdout=open(os.path.join(SCRATCH, 'dash_ctl_fuzz_pages.log'), 'w'), stderr=subprocess.STDOUT))
@@ -437,7 +437,7 @@ def main():
         # the tokenless loopback page serves (the bind is the auth — the F21 shape)
         procs.append(subprocess.Popen([sys.executable, P, '--listen', '127.0.0.1:%d' % (15980 + BASE),
                                        '--upstream', 'http://127.0.0.1:%d' % PROM_PORT,
-                                       '--config-js', os.path.join(REPO, 'dashboard', 'examples', 'config.js')],
+                                       '--config-js', os.path.join(REPO, 'apps', 'dashboard', 'examples', 'config.js')],
                                       stdout=open(os.path.join(SCRATCH, 'dash_ctl_fuzz_tokless.log'), 'w'), stderr=subprocess.STDOUT))
         if not wait_port(15980 + BASE):
             check('page auth: the tokenless page came up (page port %d)' % (15980 + BASE), False,
@@ -479,7 +479,7 @@ def main():
                   'the port never opened — see ' + os.path.join(SCRATCH, 'dash_ctl_fuzz_rebind.log'))
 
         def rctl(*cmds, port=None, token=None):
-            r = subprocess.run([sys.executable, os.path.join(REPO, 'dashboard', 'bin', 'dashboard-cli.py'),
+            r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'dashboard', 'bin', 'dashboard-cli.py'),
                                 '--control-port', port if port is not None else reb_sock]
                                + (['--control-token', token] if token else []) + list(cmds),
                                capture_output=True, text=True, timeout=15)

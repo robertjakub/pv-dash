@@ -61,25 +61,25 @@ design); the top non-man pairs:
 
 | ratio | pair |
 |---|---|
-| 0.96 | `cache/lib/options.py:23` `_load_options` <-> `scraper/lib/options.py:25` `_load_options` |
-| 0.93 | `scraper/bin/modbus-scraper.py:46` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
-| 0.93 | `cache/lib/options.py:23` `_load_options` <-> `dashboard/lib/options.py:24` `_load_options` |
-| 0.93 | `scraper/lib/options.py:25` `_load_options` <-> `dashboard/lib/options.py:24` `_load_options` |
-| 0.90 | `scraper/bin/modbus-scraper.py:241` `graceful_stop` <-> `dashboard/bin/dashboard.py:474` `graceful_stop` |
-| 0.86 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `scraper/bin/modbus-scraper.py:46` `parse_args` |
-| 0.85 | `cache/lib/options.py:23` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
-| 0.85 | `scraper/lib/options.py:25` `_load_options` <-> `inverter/lib/options.py:27` `_load_options` |
-| 0.85 | `inverter/lib/options.py:27` `_load_options` <-> `dashboard/lib/options.py:24` `_load_options` |
-| 0.85 | `cache/bin/modbus-cache.py:48` `parse_args` <-> `dashboard/bin/dashboard.py:277` `parse_args` |
-| 0.83 | `inverter/lib/control.py:96` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
-| 0.82 | `cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
-| 0.78 | `cache/lib/control.py:798` `uplink_report` <-> `scraper/lib/control.py:474` `uplink_report` |
-| 0.78 | `cache/lib/upstream.py:16` `read` <-> `scraper/lib/protocol.py:63` `_read` |
-| 0.78 | `inverter/lib/control.py:466` `acl_table_report` <-> `dashboard/lib/control.py:296` `acl_table_report` |
-| 0.76 | `scraper/lib/control.py:119` `__init__` <-> `inverter/lib/control.py:96` `__init__` |
-| 0.76 | `scraper/lib/server.py:89` `relay` <-> `dashboard/bin/dashboard.py:175` `relay` |
-| 0.75 | `scraper/lib/control.py:119` `__init__` <-> `dashboard/lib/control.py:73` `__init__` |
-| 0.74 | `cache/lib/config.py:127` `load_profile_write_gate` <-> `common/settings/config.py:444` `load_write_gate_file` |
+| 0.96 | `apps/cache/lib/options.py:23` `_load_options` <-> `apps/scraper/lib/options.py:25` `_load_options` |
+| 0.93 | `apps/scraper/bin/modbus-scraper.py:46` `parse_args` <-> `apps/dashboard/bin/dashboard.py:277` `parse_args` |
+| 0.93 | `apps/cache/lib/options.py:23` `_load_options` <-> `apps/dashboard/lib/options.py:24` `_load_options` |
+| 0.93 | `apps/scraper/lib/options.py:25` `_load_options` <-> `apps/dashboard/lib/options.py:24` `_load_options` |
+| 0.90 | `apps/scraper/bin/modbus-scraper.py:241` `graceful_stop` <-> `apps/dashboard/bin/dashboard.py:474` `graceful_stop` |
+| 0.86 | `apps/cache/bin/modbus-cache.py:48` `parse_args` <-> `apps/scraper/bin/modbus-scraper.py:46` `parse_args` |
+| 0.85 | `apps/cache/lib/options.py:23` `_load_options` <-> `apps/inverter/lib/options.py:27` `_load_options` |
+| 0.85 | `apps/scraper/lib/options.py:25` `_load_options` <-> `apps/inverter/lib/options.py:27` `_load_options` |
+| 0.85 | `apps/inverter/lib/options.py:27` `_load_options` <-> `apps/dashboard/lib/options.py:24` `_load_options` |
+| 0.85 | `apps/cache/bin/modbus-cache.py:48` `parse_args` <-> `apps/dashboard/bin/dashboard.py:277` `parse_args` |
+| 0.83 | `apps/inverter/lib/control.py:96` `__init__` <-> `apps/dashboard/lib/control.py:73` `__init__` |
+| 0.82 | `apps/cache/bin/modbus-cache.py:344` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
+| 0.78 | `apps/cache/lib/control.py:798` `uplink_report` <-> `apps/scraper/lib/control.py:474` `uplink_report` |
+| 0.78 | `apps/cache/lib/upstream.py:16` `read` <-> `apps/scraper/lib/protocol.py:63` `_read` |
+| 0.78 | `apps/inverter/lib/control.py:466` `acl_table_report` <-> `apps/dashboard/lib/control.py:296` `acl_table_report` |
+| 0.76 | `apps/scraper/lib/control.py:119` `__init__` <-> `apps/inverter/lib/control.py:96` `__init__` |
+| 0.76 | `apps/scraper/lib/server.py:89` `relay` <-> `apps/dashboard/bin/dashboard.py:175` `relay` |
+| 0.75 | `apps/scraper/lib/control.py:119` `__init__` <-> `apps/dashboard/lib/control.py:73` `__init__` |
+| 0.74 | `apps/cache/lib/config.py:127` `load_profile_write_gate` <-> `common/settings/config.py:444` `load_write_gate_file` |
 | 0.72 | `common/settings/config.py:14` `resolve_target` <-> `common/runtime/daemon.py:44` `default_config_path` |
 
 ## The surface sweep — the listeners, the wire and the loops
@@ -537,7 +537,7 @@ files cite it — the promise ledger against the code.
 | F | title | cited by |
 |---|---|---|
 | F1 | Modbus TCP carries no authentication and no encryption | — |
-| F14 | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics trave | dashboard |
+| F14 | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics trave | apps |
 | F15 | The metrics expose production values (generation, consumption, battery SoC) | — |
 | F17 | The `/config` volume holds live config in plaintext; the entrypoint seeds copies | — |
 
@@ -585,11 +585,11 @@ shipped example re-parsed through the tool's own set-grammar reader
 
 | example | the read |
 |---|---|
-| `cache/examples/modbus-cache.conf` | ok (0 setting line(s)) |
-| `scraper/examples/metrics.json` | json ok |
-| `scraper/examples/modbus-scraper.conf` | ok (0 setting line(s)) |
-| `inverter/examples/modbus-fake-inverter.conf` | ok (0 setting line(s)) |
-| `dashboard/examples/dashboard.conf` | ok (0 setting line(s)) |
+| `apps/cache/examples/modbus-cache.conf` | parse failed: No module named 'cache' |
+| `apps/scraper/examples/metrics.json` | json ok |
+| `apps/scraper/examples/modbus-scraper.conf` | parse failed: No module named 'scraper' |
+| `apps/inverter/examples/modbus-fake-inverter.conf` | parse failed: No module named 'inverter' |
+| `apps/dashboard/examples/dashboard.conf` | parse failed: No module named 'dashboard' |
 | `extras/examples/acl-ip-prefix.json` | json ok |
 | `extras/examples/acl-write-registers.json` | json ok |
 | `extras/examples/modbus-cache-filter.json` | json ok |
@@ -635,10 +635,10 @@ the dumps placeholder, the examples and configs reference):
 
 | tool | parse_secret | SECRET_REMOVED | file: |
 |---|---|---|---|
-| cache | yes | **MISSING** | yes |
-| scraper | yes | **MISSING** | yes |
-| inverter | yes | yes | yes |
-| dashboard | yes | **MISSING** | yes |
+| cache | **MISSING** | **MISSING** | **MISSING** |
+| scraper | **MISSING** | **MISSING** | **MISSING** |
+| inverter | **MISSING** | **MISSING** | **MISSING** |
+| dashboard | **MISSING** | **MISSING** | **MISSING** |
 
 The findings:
 

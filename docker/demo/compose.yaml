@@ -2,7 +2,7 @@
 # inverter wired end to end on one internal network. The build contexts are
 # ../../inverter, ../../cache, ../../scraper and ../../dashboard; the
 # Dockerfiles are the parent directory's Dockerfile.<daemon> files
-# (dockerfile: ../docker/... from the subproject context — the subproject
+# (dockerfile: ../../docker/... from the subproject context — the subproject
 # contexts carry no Dockerfile of their own; compose resolves the
 # dockerfile relative to the context); the shared profiles/ directory, the entrypoint
 # and the common/ package + shared/ ride in as named contexts. The production shape
@@ -53,8 +53,8 @@
 services:
   modbus-fake-inverter:
     build:
-      context: ../../inverter
-      dockerfile: ../docker/Dockerfile.modbus-fake-inverter
+      context: ../../apps/inverter
+      dockerfile: ../../docker/Dockerfile.modbus-fake-inverter
       additional_contexts:
         profiles: ../../profiles
         scripts: ..
@@ -77,8 +77,8 @@ services:
 
   modbus-cache:
     build:
-      context: ../../cache
-      dockerfile: ../docker/Dockerfile.modbus-cache
+      context: ../../apps/cache
+      dockerfile: ../../docker/Dockerfile.modbus-cache
       additional_contexts:
         profiles: ../../profiles
         scripts: ..
@@ -106,8 +106,8 @@ services:
 
   modbus-scraper:
     build:
-      context: ../../scraper
-      dockerfile: ../docker/Dockerfile.modbus-scraper
+      context: ../../apps/scraper
+      dockerfile: ../../docker/Dockerfile.modbus-scraper
       additional_contexts:
         profiles: ../../profiles
         scripts: ..
@@ -154,8 +154,8 @@ services:
 
   dashboard:
     build:
-      context: ../../dashboard
-      dockerfile: ../docker/Dockerfile.dashboard
+      context: ../../apps/dashboard
+      dockerfile: ../../docker/Dockerfile.dashboard
       additional_contexts:
         scripts: ..
         common: ../../common

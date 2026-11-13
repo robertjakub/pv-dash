@@ -9,7 +9,7 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-cache";
   version = "0.4.3";
 
-  src = lib.cleanSource ../../../cache;
+  src = lib.cleanSource ../../../apps/cache;
 
   nativeBuildInputs = [ makeWrapper ];
 

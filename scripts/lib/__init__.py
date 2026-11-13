@@ -4,7 +4,7 @@ the emit-and-check doc writer (emit.py) — one home for the plumbing the
 scripts re-carried. Stdlib only.
 
 The NAME: the family's per-tool lib/ directories are regular packages
-(cache/inverter/scraper carry an __init__.py) and own `lib` wherever a
+(apps/cache, apps/inverter, apps/scraper carry an __init__.py) and own `lib` wherever a
 tool root precedes scripts/ on sys.path — editor.py imports the cache's
 lib.config beside the scripts' helpers and opens the house's
 one-module-named-`lib`-at-a-time dance around its imports. Everywhere

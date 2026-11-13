@@ -15,9 +15,9 @@ import urllib.request
 
 from harness import *   # the boot: the gate, SCRATCH, BASE, the NOTE stamp — the shared check accumulator (PROFILE rebinds below: the fuzz argv leads with the rounds)
 
-SCRAPER_DIR = os.path.join(REPO, 'scraper')
+SCRAPER_DIR = os.path.join(REPO, 'apps', 'scraper')
 P = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
 # the suite's spec — via the env; examples/ is never a loader default
 os.environ['METRICS_SPEC'] = os.path.join(SCRAPER_DIR, 'examples', 'metrics.json')
 INV_PORT, PORT = 15545 + BASE, 19455 + BASE

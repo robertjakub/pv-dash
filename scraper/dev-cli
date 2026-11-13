@@ -1,7 +1,0 @@
-#!/bin/sh
-# the dev console: the cli straight from the checkout against the dev
-# daemon (scraper/dev — the example conf's listen, the default unix socket).
-# $CTL overrides. Extra flags pass through: scraper/dev-cli --help
-DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
-exec python3 "$DIR/bin/modbus-scraper-cli.py" \
-    --control-port "${CTL:-/tmp/modbus-scraper-9350.socket}" "$@"

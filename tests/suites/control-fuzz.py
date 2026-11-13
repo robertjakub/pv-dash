@@ -19,7 +19,7 @@ import time
 
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
-F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
 wiremac = wire_mac          # the suite's two-arg spelling of the shared frame mac
 roundtrip = control_roundtrip   # the raw form: this suite's ports carry no handshake
 
@@ -171,19 +171,19 @@ def main():
             c.close()
         except (OSError, ValueError) as e:
             check('fuzz: the file: token authenticates', False, str(e))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py'),
                             '--control-port', '%d' % (15964 + BASE), '--control-token', 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_token'),
                             'show', 'version'], capture_output=True, text=True, timeout=15)
         check('fuzz: fake_ctl authenticates with the file: token', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py'),
                             '--control-port', '%d' % (15963 + BASE), '--control-token', 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_no_file'),
                             'show', 'version'], capture_output=True, text=True, timeout=15)
         check('fuzz: a missing token reference fails fast, one line', r.returncode != 0
               and 'cannot read control-token' in (r.stderr + r.stdout)
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
         open(os.path.join(SCRATCH, 'ctl_fuzz_token_lax'), 'w').write('laxsecret\n')          # the umask default (0644)
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--listen', '127.0.0.1:%d' % (15962 + BASE), '--dry-run',
                             '--control-token', 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_token_lax')],
                            capture_output=True, text=True, timeout=15)
@@ -192,13 +192,13 @@ def main():
               and 'Traceback' not in (r.stderr + r.stdout), repr((r.stderr + r.stdout)[-120:]))
 
         # 6c. the file: reference rides the token env like the flag
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py'),
                             '--control-port', '%d' % (15964 + BASE), 'show', 'version'],
                            capture_output=True, text=True, timeout=15,
                            env={**os.environ, 'CONTROL_TOKEN': 'file:' + os.path.join(SCRATCH, 'ctl_fuzz_token')})
         check('fuzz: fake_ctl honors CONTROL_TOKEN=file:...', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py'),
                             '--listen', '127.0.0.1:%d' % (15962 + BASE), '--dry-run', '--metrics-server',
                             '--metrics-listen', '127.0.0.1:%d' % (15967 + BASE)],
                            capture_output=True, text=True, timeout=15,
@@ -268,12 +268,12 @@ def main():
             aud, ok = str(e), False
         check('ops: both roles audited (role=ops show, role=admin set, the denials included)',
               ok, aud[-300:])
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py'),
                             '--control-port', '%d' % (15982 + BASE), '--control-token', 'opstok', 'show', 'version'],
                            capture_output=True, text=True, timeout=15)
         check('ops: fake_ctl reads with the ops token', r.returncode == 0
               and r.stdout.startswith('ok fake-inverter'), repr(r.stdout[:80]))
-        r = subprocess.run([sys.executable, os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'),
+        r = subprocess.run([sys.executable, os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py'),
                             '--control-port', '%d' % (15982 + BASE), '--control-token', 'opstok', 'set', 'pv', '2000'],
                            capture_output=True, text=True, timeout=15)
         check('ops: fake_ctl cannot steer with the ops token', 'forbidden' in r.stdout

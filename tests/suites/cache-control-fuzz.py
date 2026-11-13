@@ -19,8 +19,8 @@ import time
 
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
-P = os.path.join(REPO, 'cache', 'bin', 'modbus-cache.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+P = os.path.join(REPO, 'apps', 'cache', 'bin', 'modbus-cache.py')
+F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
 
 TOKEN = 'sekrit'
 AUTH_PORT = 15965 + BASE   # the fuzz cache runs token'd (F5): roundtrip authenticates first there

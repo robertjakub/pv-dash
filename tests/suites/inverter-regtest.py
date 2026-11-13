@@ -27,8 +27,8 @@ import subprocess
 import sys
 import time
 
-F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
-CTL = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py')
+F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
+CTL = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py')
 LOG = os.path.join(SCRATCH, 'inv_regtest.log')
 
 A_MODBUS, A_CTL = 15970 + BASE, 15971 + BASE        # --max-clients 1
@@ -961,7 +961,7 @@ def main():
 
         # ---- --man: every tool prints its generated roff page
         for tool, title in ((F, 'MODBUS-FAKE-INVERTER'),
-                            (os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'), 'MODBUS-FAKE-CLI')):
+                            (os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py'), 'MODBUS-FAKE-CLI')):
             r = subprocess.run([sys.executable, tool, '--man'], capture_output=True, text=True, timeout=30)
             check('--man: %s prints the page' % os.path.basename(tool),
                   r.returncode == 0 and r.stdout.startswith('.TH %s 1' % title), r.stdout[:40] or r.stderr[-80:])
@@ -1150,7 +1150,7 @@ def main():
         # the logout verb: the cli's local session-close (quit's sibling) —
         # the session ends with stdin still open (the exit is logout's, not
         # EOF's) — the tty edition, the piped stdin is the batch now
-        m_pty, p_cli = pty_cli(os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py'),
+        m_pty, p_cli = pty_cli(os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py'),
                                24, 80, env_extra={'CTL': msock})
         time.sleep(1.0)          # the banner + the prompt
         pty_send(m_pty, 'logout\n')

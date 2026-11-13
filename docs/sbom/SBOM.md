@@ -22,7 +22,7 @@ first-party code (`common.*`, the subproject's own `lib.*`) — the
 generator's `ast` walk counts the lazy imports too:
 
 ```bash
-grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashboard/bin dashboard/lib profiles/bin \
+grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib profiles/bin \
     | sed -E 's/^(import|from) ([a-zA-Z_0-9.]+).*/\2/' | sort -u
 ```
 
@@ -40,10 +40,10 @@ Every name in that list is stdlib (`argparse`, `ast`, `collections`,
 |---|---|---|---|
 | [`common/`](../../common/README.md) | the package (21 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
 | [`profiles/`](../../profiles/README.md) | 6 device-profile JSONs + 2 tools | none — stdlib only | data + linter/formatter |
-| [`cache/`](../../cache/README.md) | `modbus-cache.py` + `lib/` (10 modules) + 1 control clients | none — stdlib only (+ `common`) | proxy daemon |
-| [`inverter/`](../../inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (12 modules) + 1 control clients | none — stdlib only (+ `common`) | simulator |
-| [`scraper/`](../../scraper/README.md) | `modbus-scraper.py` + `lib/` (10 modules) + 1 control clients | none — stdlib only (+ `common`) | exporter |
-| [`dashboard/`](../../dashboard/README.md) | `bin/dashboard.py` + `lib/` (6 modules) + 1 control clients + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
+| [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (10 modules) + 1 control clients | none — stdlib only (+ `common`) | proxy daemon |
+| [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (12 modules) + 1 control clients | none — stdlib only (+ `common`) | simulator |
+| [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (10 modules) + 1 control clients | none — stdlib only (+ `common`) | exporter |
+| [`apps/dashboard/`](../../apps/dashboard/README.md) | `bin/dashboard.py` + `lib/` (6 modules) + 1 control clients + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 
 ## Runtime and deployment layers
 
@@ -76,7 +76,7 @@ python3 scripts/generators/sbom.py --check
 
 # the human form of the import scan (module level; the generator's ast
 # walk is stricter)
-grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashboard/bin dashboard/lib profiles/bin | sort -u
+grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib profiles/bin | sort -u
 
 # the container layer
 docker build -t pv-sbom-check --build-context profiles=../profiles \

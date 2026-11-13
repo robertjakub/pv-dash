@@ -1,0 +1,12 @@
+#!/bin/sh
+# the dev launcher: the daemon straight from the checkout against the
+# shipped samples — the packaged-root defaults don't exist in a source
+# tree (the loader never reaches into examples/ on its own). The audit
+# trail rides stdout (-) so the dev terminal streams it. The upstream
+# Prometheus: $PROM_URL overrides. Extra flags/env pass through:
+# apps/dashboard/dev --dry-run
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+exec python3 "$DIR/bin/dashboard.py" \
+    --config "$DIR/examples/dashboard.conf" \
+    --config-js "$DIR/examples/config.js" \
+    --audit-log - "$@"

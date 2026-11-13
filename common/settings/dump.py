@@ -2,7 +2,7 @@
 """The family's settings state dumps: the live setting overrides as one JSON
 file — the write-behind that lets a daemon restart carry its overrides
 instead of losing them (stdlib only). The cache's richer dump (the cached
-words + their stamps beside the settings) lives in cache/lib/persist.py;
+words + their stamps beside the settings) lives in apps/cache/lib/persist.py;
 this is the settings-only shape the other tools dump. The reload state
 files (`<config>.reload` — the whole-daemon reload's write-behind) ride the
 same writer and reader: one shape, one seal for the family.
@@ -178,7 +178,7 @@ def write_dump(path, settings, key=None):
 
 
 def open_dump(path, format_name, label, key=None):
-    """The shared dump read (common/settings/dump.py and cache/lib/persist.py): the
+    """The shared dump read (common/settings/dump.py and apps/cache/lib/persist.py): the
     stat + the group/world-writable refusal, the parse, the format check,
     and the unseal when the envelope is the version-2 sealed shape. Returns
     the state dict (sealed: the inner; plain: the file's). Raises ValueError

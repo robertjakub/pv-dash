@@ -98,7 +98,7 @@ def readme_findings(rel):
 def main():
     bad = 0
     for t in TOOLS:
-        rel = os.path.join(t, 'README.md')
+        rel = os.path.join('apps', t, 'README.md')
         for msg in readme_findings(rel):
             bad += 1
             print('readmes: %s: %s' % (rel, msg))

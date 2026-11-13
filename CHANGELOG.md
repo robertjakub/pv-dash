@@ -170,7 +170,9 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   container is the image's own). The generated surfaces regenerate (the
   eight man pages, the four MANUAL.md pages, the example confs, the SBOM
   pair, docs/family-drift.md); the READMEs, the book pages and the docs
-  re-point; the ten suites pass through the battery runner.
+  re-point; the battery's quick profile passes all green, and the full
+  nightly's failures reproduce on the pre-move tree (the similarity-pass
+  wave's own — not the move's).
 
 - **The similarity pass's common blocks move home** — the AST similarity
   sweep (scripts/family_drift.py's own pair pass, cross-tool over the four

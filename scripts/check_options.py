@@ -48,7 +48,7 @@ def control_checks(tool_dir):
     """The CHECKS registry's names, out of the tool's control module source
     (a textual scan — importing the module would drag the daemon's whole
     wire stack into the lint)."""
-    path = os.path.join(REPO, tool_dir, 'lib', 'control.py')
+    path = os.path.join(REPO, 'apps', tool_dir, 'lib', 'control.py')
     m = re.search(r'CHECKS\s*=\s*\{([^}]*)\}', open(path).read(), re.S)
     return set(re.findall(r"['\"]([a-z0-9-]+)['\"]\s*:", m.group(1))) if m else set()
 
@@ -106,7 +106,7 @@ def check_tool(tool):
     rows.append((not tagged_env, '%s: the env twins spell bare names%s'
                  % (tool, ' — tagged: %s' % ', '.join(tagged_env) if tagged_env else '')))
     src = ''
-    for root, dirs, files in os.walk(os.path.join(REPO, tool_dir)):
+    for root, dirs, files in os.walk(os.path.join(REPO, 'apps', tool_dir)):
         dirs[:] = [d for d in dirs if d not in ('__pycache__', 'man', 'examples')]
         for fn in files:
             if fn.endswith('.py'):
@@ -149,7 +149,7 @@ def check_tool(tool):
     # secret never does (the None ladder-end, categorically), and every
     # given default parses as the row's conv — a str-typed int or a JSON
     # NaN would poison the resolver and the renderers downstream
-    lib_dir = os.path.join(REPO, tool_dir, 'lib')
+    lib_dir = os.path.join(REPO, 'apps', tool_dir, 'lib')
     reasons = NO_ROW_DEFAULT.get(tool, {})
     nodefaul = sorted('--' + o.name for o in options
                       if o.flag and not o.node and not o.secret
@@ -212,7 +212,7 @@ def check_tool(tool):
     # dashboard (no unit knob) sits out
     if any(o.name in ('unit', 'modbus-unit') for o in options):
         tool_src = ''
-        for scan_dir in (lib_dir, os.path.join(REPO, tool_dir, 'bin')):
+        for scan_dir in (lib_dir, os.path.join(REPO, 'apps', tool_dir, 'bin')):
             for name in sorted(os.listdir(scan_dir)):
                 if name.endswith('.py'):
                     with open(os.path.join(scan_dir, name), encoding='utf-8') as f:

@@ -161,20 +161,20 @@ ENV_TOOLS = (
 # run.
 CONF_TOOLS = (
     ('cache', 'modbus-cache', 'modbus-cache.conf',
-     ('The dev wrapper (`cache/dev`) points --config here; the docker '
+     ('The dev wrapper (`apps/cache/dev`) points --config here; the docker '
       'image copies the file to /pv-suite/cache/modbus-cache.conf — its '
       'default --config target — where the CMD flags and the env twins '
       'carry the deployment shape. Copy the file, uncomment what you '
       'change.',), {}),
     ('scraper', 'modbus-scraper', 'modbus-scraper.conf',
-     ('The dev wrapper (`scraper/dev`) points --config here; the docker '
+     ('The dev wrapper (`apps/scraper/dev`) points --config here; the docker '
       'image copies the file to /pv-suite/scraper/modbus-scraper.conf — '
       'its '
       'default --config target — where the CMD flags and the env twins '
       'carry the deployment shape. Copy the file, uncomment what you '
       'change.',), {}),
     ('inverter', 'modbus-fake-inverter', 'modbus-fake-inverter.conf',
-     ('The dev wrapper (`inverter/dev`) points --config here; the docker '
+     ('The dev wrapper (`apps/inverter/dev`) points --config here; the docker '
       'image copies the file to /pv-suite/inverter/'
       'modbus-fake-inverter.conf — the '
       'default --config target. The fake\'s demo machines (`set pv`, '
@@ -453,7 +453,7 @@ def main(argv):
     for tool, daemon, name, intro, demo in CONF_TOOLS:
         rows, _ = load(tool)
         page = render_conf(tool, daemon, name, intro, demo, rows)
-        path = os.path.join(REPO, tool, 'examples', name)
+        path = os.path.join(REPO, 'apps', tool, 'examples', name)
         drift = emit(path, page, check, 'examples',
                      rerun='python3 scripts/generators/examples.py') or drift
     # the prometheus example stays hand-written; the gate reads it: every

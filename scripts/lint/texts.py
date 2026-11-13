@@ -18,10 +18,10 @@ import re
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REGISTRY = os.path.join(REPO, 'shared', 'suite', 'texts.json')
 SCAN_ROOTS = ['common',
-              os.path.join('cache', 'bin'), os.path.join('cache', 'lib'),
-              os.path.join('scraper', 'bin'), os.path.join('scraper', 'lib'),
-              os.path.join('inverter', 'bin'), os.path.join('inverter', 'lib'),
-              os.path.join('dashboard', 'bin'), os.path.join('dashboard', 'lib'),
+              os.path.join('apps', 'cache', 'bin'), os.path.join('apps', 'cache', 'lib'),
+              os.path.join('apps', 'scraper', 'bin'), os.path.join('apps', 'scraper', 'lib'),
+              os.path.join('apps', 'inverter', 'bin'), os.path.join('apps', 'inverter', 'lib'),
+              os.path.join('apps', 'dashboard', 'bin'), os.path.join('apps', 'dashboard', 'lib'),
               'scripts']
 REF = re.compile(r"\bT\('([a-z0-9_.]+)'\)")
 SEGMENT = re.compile(r'^[a-z0-9_]+$')

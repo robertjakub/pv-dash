@@ -29,7 +29,7 @@ from lib import REPO
 from lib.emit import emit
 SBOM_MD = os.path.join(REPO, 'docs', 'sbom', 'SBOM.md')
 SBOM_CDX = os.path.join(REPO, 'docs', 'sbom', 'sbom.cdx.json')
-VENDOR = os.path.join(REPO, 'dashboard', 'static', 'vendor', 'echarts.min.js')
+VENDOR = os.path.join(REPO, 'apps', 'dashboard', 'static', 'vendor', 'echarts.min.js')
 
 # the shipped tree, one scan per subproject (the claim is per subproject)
 SCAN_DIRS = ('common', 'profiles', 'cache', 'inverter', 'scraper', 'dashboard')
@@ -172,9 +172,9 @@ def tool_facts():
              'scraper': 'modbus-scraper.py', 'dashboard': 'dashboard.py'}
     facts = {}
     for tool, main in mains.items():
-        lib = [f for f in os.listdir(os.path.join(REPO, tool, 'lib'))
+        lib = [f for f in os.listdir(os.path.join(REPO, 'apps', tool, 'lib'))
                if f.endswith('.py') and f != '__init__.py']
-        bin_ = [f for f in os.listdir(os.path.join(REPO, tool, 'bin'))
+        bin_ = [f for f in os.listdir(os.path.join(REPO, 'apps', tool, 'bin'))
                 if f.endswith('.py') and f != main]
         facts[tool] = {'modules': len(lib), 'clients': len(bin_)}
     facts['common'] = {'modules': len([f
@@ -334,7 +334,7 @@ first-party code (`common.*`, the subproject's own `lib.*`) — the
 generator's `ast` walk counts the lazy imports too:
 
 ```bash
-grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashboard/bin dashboard/lib profiles/bin \\
+grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib profiles/bin \\
     | sed -E 's/^(import|from) ([a-zA-Z_0-9.]+).*/\\2/' | sort -u
 ```
 
@@ -348,10 +348,10 @@ grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashb
 |---|---|---|---|
 | [`common/`](../../common/README.md) | the package (%(common_modules)d modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
 | [`profiles/`](../../profiles/README.md) | %(profiles_jsons)d device-profile JSONs + %(profiles_tools)d tools | none — stdlib only | data + linter/formatter |
-| [`cache/`](../../cache/README.md) | `modbus-cache.py` + `lib/` (%(cache_modules)d modules) + %(cache_clients)d control clients | none — stdlib only (+ `common`) | proxy daemon |
-| [`inverter/`](../../inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (%(inverter_modules)d modules) + %(inverter_clients)d control clients | none — stdlib only (+ `common`) | simulator |
-| [`scraper/`](../../scraper/README.md) | `modbus-scraper.py` + `lib/` (%(scraper_modules)d modules) + %(scraper_clients)d control clients | none — stdlib only (+ `common`) | exporter |
-| [`dashboard/`](../../dashboard/README.md) | `bin/dashboard.py` + `lib/` (%(dashboard_modules)d modules) + %(dashboard_clients)d control clients + the static page | **Apache ECharts %(ech)s** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
+| [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (%(cache_modules)d modules) + %(cache_clients)d control clients | none — stdlib only (+ `common`) | proxy daemon |
+| [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (%(inverter_modules)d modules) + %(inverter_clients)d control clients | none — stdlib only (+ `common`) | simulator |
+| [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (%(scraper_modules)d modules) + %(scraper_clients)d control clients | none — stdlib only (+ `common`) | exporter |
+| [`apps/dashboard/`](../../apps/dashboard/README.md) | `bin/dashboard.py` + `lib/` (%(dashboard_modules)d modules) + %(dashboard_clients)d control clients + the static page | **Apache ECharts %(ech)s** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 """ % {'common_modules': common['modules'],
        'profiles_jsons': profiles['jsons'], 'profiles_tools': profiles['tools'],
        'cache_modules': cache['modules'], 'cache_clients': cache['clients'],
@@ -392,7 +392,7 @@ python3 scripts/generators/sbom.py --check
 
 # the human form of the import scan (module level; the generator's ast
 # walk is stricter)
-grep -rhE '^import |^from ' --include='*.py' common cache inverter scraper dashboard/bin dashboard/lib profiles/bin | sort -u
+grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib profiles/bin | sort -u
 
 # the container layer
 docker build -t pv-sbom-check --build-context profiles=../profiles \\

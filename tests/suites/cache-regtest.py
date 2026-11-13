@@ -27,10 +27,10 @@ import sys
 import threading
 import time
 
-CACHE_DIR = os.path.join(REPO, 'cache')
+CACHE_DIR = os.path.join(REPO, 'apps', 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
 R = os.path.join(REPO, 'profiles', 'profiles', 'sun2000.json')
 
 CACHE_PORT = 15505 + BASE

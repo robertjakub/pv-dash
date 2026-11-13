@@ -10,10 +10,10 @@ the Deye hybrids — packaged together as one Nix flake:
 
 | Subproject | Package / app | What it is |
 |---|---|---|
-| [`dashboard/`](dashboard/README.md) | `dashboard` | Single-page energy-flow dashboard fed by Prometheus, with a bundled stdlib-only proxy server and a NixOS module |
-| [`scraper/`](scraper/README.md) | `modbus-scraper` | Prometheus exporter for a Modbus TCP inverter (stdlib only) with a NixOS module |
-| [`cache/`](cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
-| [`inverter/`](inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
+| [`apps/dashboard/`](apps/dashboard/README.md) | `dashboard` | Single-page energy-flow dashboard fed by Prometheus, with a bundled stdlib-only proxy server and a NixOS module |
+| [`apps/scraper/`](apps/scraper/README.md) | `modbus-scraper` | Prometheus exporter for a Modbus TCP inverter (stdlib only) with a NixOS module |
+| [`apps/cache/`](apps/cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
+| [`apps/inverter/`](apps/inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
 | [`profiles/`](profiles/README.md) | — | Shared device profiles (one JSON schema consumed by all three Modbus tools; [the format](profiles/README.md)): `name → register/type/scale` with per-entry descriptions — ships `sun2000`, `sun2000_full`, `demo-fc4`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`; a linter and a formatter keep them in shape |
 | [`extras/`](extras/README.md) | — | The operator-side packs nothing in the suite loads: the alert rules (`alerts/`, one file per watched exporter), the shared sample files the tools' `file:` acl gates point at (`examples/` — `acl-ip-prefix.json`, [docs/common/ACL.md](docs/common/ACL.md)) and the Graylog content pack (`graylog/`) |
 | [`shared/`](shared/README.md) | — | The family's shared data, outside every package — `texts.json` (the static texts `common/render/texts.py`'s `T()` reads) and [`shared/schema/`](shared/schema/README.md) (the shared JSON Schemas, draft 2020-12 — `acl-ip-prefix.schema.json`, the standalone acl file's schema (the loader stays the strict word)) |
@@ -26,7 +26,7 @@ JSON-lines control server, a settings registry, an append-only audit trail,
 a reconnecting console session — TAB/`?` complete and describe every word,
 the registry's hierarchy nodes file the listings, the non-value reply lines
 ride the `% ` prefix). Every knob lives in its registry
-(`<tool>/lib/options.json`); the per-tool [MANUAL.md](cache/MANUAL.md)
+(`apps/<tool>/lib/options.json`); the per-tool [MANUAL.md](apps/cache/MANUAL.md)
 tables render it (generated, `--check`-gated), and
 `python3 scripts/list_options.py` is the cross-tool census on demand.
 
@@ -49,10 +49,11 @@ reference** — the modules, their option maps, the secrets discipline
 
 ```
 pv-suite/
-├── dashboard/    # the dashboard web UI + proxy server
-├── scraper/      # modbus-scraper exporter
-├── cache/        # modbus-cache proxy
-├── inverter/     # fake inverter + control clients (test/demo tool)
+├── apps/          # the four tools — one self-contained dir each:
+│   ├── dashboard/  #   the dashboard web UI + proxy server
+│   ├── scraper/    #   modbus-scraper exporter
+│   ├── cache/      #   modbus-cache proxy
+│   └── inverter/   #   fake inverter + control clients (test/demo tool)
 ├── nixos/        # the Nix tree: the packages (pkgs/<tool>/), the service
 │                 #   modules (modules/<tool>.nix) and the [Nix reference](nixos/README.md)
 ├── profiles/     # shared device profiles + the linter/formatter ([the format](profiles/README.md))

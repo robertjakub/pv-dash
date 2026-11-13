@@ -1,3 +1,3 @@
 # the dashboard
 
-{{#include ../../../dashboard/README.md}}
+{{#include ../../../apps/dashboard/README.md}}

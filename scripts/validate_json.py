@@ -3,12 +3,12 @@
 
   python3 scripts/validate_json.py SCHEMA [FILE|- ...]
   python3 scripts/validate_json.py shared/schema/modbus-cache-filter.schema.json extras/examples/modbus-cache-filter.json
-  python3 scripts/validate_json.py scraper/schema/metrics.schema.json scraper/examples/metrics.json
+  python3 scripts/validate_json.py scraper/schema/metrics.schema.json apps/scraper/examples/metrics.json
   python3 scripts/validate_json.py shared/schema/acl-write-registers.schema.json extras/examples/acl-write-registers.json
   cat doc.json | python3 scripts/validate_json.py shared/schema/acl-ip-prefix.schema.json -
 
 The keyword set is the draft-2020-12 core the repo's schemas speak
-(shared/schema/, scraper/schema, cache/schema): "type", "enum", "const", "properties",
+(shared/schema/, apps/scraper/schema, apps/cache/schema): "type", "enum", "const", "properties",
 "required", "additionalProperties", "patternProperties", "propertyNames",
 "items" (both the mapping and the draft-07 tuple form), "minItems",
 "maxItems", "uniqueItems", "minLength", "maxLength", "pattern", "minimum",

@@ -10,10 +10,10 @@ def targets():
     out = []
     for t in TOOLS:
         for sub in ('lib', 'bin'):
-            d = os.path.join(REPO, t, sub)
+            d = os.path.join(REPO, 'apps', t, sub)
             for f in sorted(os.listdir(d)):
                 if f.endswith('.py'):
-                    out.append((t, f'{t}/{sub}/' + f, os.path.join(d, f)))
+                    out.append((t, f'apps/{t}/{sub}/' + f, os.path.join(d, f)))
     d = os.path.join(REPO, 'common')
     for root, dirs, files in os.walk(d):
         dirs[:] = [x for x in dirs if x != '__pycache__']

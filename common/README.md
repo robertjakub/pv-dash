@@ -1,8 +1,8 @@
 # common — the code shared by the pv-suite subprojects
 
 One stdlib-only Python package (imported as `common`) used by
-[modbus-scraper](../scraper/README.md), [modbus-cache](../cache/README.md),
-the [fake inverter](../inverter/README.md) and the [dashboard](../dashboard/README.md),
+[modbus-scraper](../apps/scraper/README.md), [modbus-cache](../apps/cache/README.md),
+the [fake inverter](../apps/inverter/README.md) and the [dashboard](../apps/dashboard/README.md),
 organized into functional subpackages. The shared layer's behavior specs
 live in [docs/common/](../docs/common/README.md) — the Modbus reference,
 the ACL map, the defaults ladder:

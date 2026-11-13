@@ -54,7 +54,7 @@ import os
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-for _p in (os.path.join(REPO, 'cache'), REPO):
+for _p in (os.path.join(REPO, 'apps', 'cache'), REPO):
     sys.path.insert(0, _p)
 
 # `lib` is contested: the cache's own lib/ package (the gate loader here)
@@ -393,17 +393,17 @@ def main():
     if not paths:
         paths = sorted(p for p in glob.glob(os.path.join(REPO, 'extras', 'examples', '**', 'acl-*.json'),
                                             recursive=True)
-                       + glob.glob(os.path.join(REPO, 'cache', '**', 'acl-*.json'),
+                       + glob.glob(os.path.join(REPO, 'apps', 'cache', '**', 'acl-*.json'),
                                             recursive=True)
-                       + glob.glob(os.path.join(REPO, 'scraper', '**', 'acl-*.json'),
+                       + glob.glob(os.path.join(REPO, 'apps', 'scraper', '**', 'acl-*.json'),
                                    recursive=True)
-                       + glob.glob(os.path.join(REPO, 'inverter', '**', 'acl-*.json'),
+                       + glob.glob(os.path.join(REPO, 'apps', 'inverter', '**', 'acl-*.json'),
                                    recursive=True)
-                       + glob.glob(os.path.join(REPO, 'dashboard', '**', 'acl-*.json'),
+                       + glob.glob(os.path.join(REPO, 'apps', 'dashboard', '**', 'acl-*.json'),
                                    recursive=True)
                        if not p.endswith('.schema.json'))   # the JSON Schemas OF the acl files lint nothing
         if not paths:
-            print('no acl-*.json file under extras/examples/, cache/, scraper/, inverter/ or dashboard/ — pass the path(s)')
+            print('no acl-*.json file under extras/examples/, apps/cache/, apps/scraper/, apps/inverter/ or apps/dashboard/ — pass the path(s)')
             return 1
     bad = False
     for path in paths:

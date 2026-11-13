@@ -78,7 +78,7 @@ import signal
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-for _p in (ROOT, os.path.join(ROOT, 'scripts'), os.path.join(ROOT, 'cache')):
+for _p in (ROOT, os.path.join(ROOT, 'scripts'), os.path.join(ROOT, 'apps', 'cache')):
     sys.path.insert(0, _p)
 
 # `lib` is a contested name: the cache's own lib/ package (the gate loader
@@ -94,7 +94,7 @@ from lib.config import _GATE_TYPES, _write_gate_object   # the loader's own gate
 _lib_cache = sys.modules.pop('lib')                       # — the window opens
 for _k in [k for k in sys.modules if k.startswith('lib.')]:
     sys.modules.pop(_k)
-_cache_root = os.path.join(ROOT, 'cache')   # acl's own inserts ride along — every copy out
+_cache_root = os.path.join(ROOT, 'apps', 'cache')   # acl's own inserts ride along — every copy out
 sys.path[:] = [p for p in sys.path if p != _cache_root]
 from lint.options import lint, proposals, render_registry   # noqa: E402
 from lib import clean_path, row_span   # the scripts' common registry-editing helpers  # noqa: E402

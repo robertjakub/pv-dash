@@ -31,10 +31,10 @@ import time
 import urllib.error
 import urllib.request
 
-SCRAPER_DIR = os.path.join(REPO, 'scraper')
+SCRAPER_DIR = os.path.join(REPO, 'apps', 'scraper')
 
 P = os.path.join(SCRAPER_DIR, 'bin', 'modbus-scraper.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
 # the suite's spec — via the env (a test's explicit --metrics-spec still wins);
 # examples/ is never a loader default, a checkout has no bundled spec
 os.environ['METRICS_SPEC'] = os.path.join(SCRAPER_DIR, 'examples', 'metrics.json')
@@ -520,7 +520,7 @@ try:
           ctl('show soc', 15571))
 
     # 2d. modbus-fake-cli.py: the client tool speaks TCP and unix-socket control servers
-    C = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py')
+    C = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py')
     r = subprocess.run([sys.executable, C, '--control-port', '15571', 'set', 'pv', '2700'], capture_output=True, text=True)
     check('fake_ctl: TCP pin via tool', r.returncode == 0 and r.stdout.startswith('ok pv=2700 '), r.stdout.strip())
     time.sleep(1.5)
@@ -893,7 +893,7 @@ try:
 
     # 2g1. modbus-fake-cli.py: the Cisco-style session — silent set confirmations,
     # full show/status replies, [confirm] before shutdown
-    K = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-cli.py')
+    K = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-cli.py')
 
     def cli(stdin, port=15571, audit=None):
         extra = ['--audit-log', audit] if audit else []
@@ -1508,7 +1508,7 @@ try:
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; Metrics(%r)'
-                        % (os.path.join(REPO, 'scraper'), '/nonexistent/metrics.json')],
+                        % (os.path.join(REPO, 'apps', 'scraper'), '/nonexistent/metrics.json')],
                        capture_output=True)
     check('missing metrics.json: clean rc=1', r.returncode == 1 and b'metrics spec /nonexistent/metrics.json not found' in r.stderr)
     with open(os.path.join(SCRATCH, 'bad_spec.json'), 'w') as fh:
@@ -1516,7 +1516,7 @@ try:
     r = subprocess.run([sys.executable, '-c',
                         'import sys; sys.path.insert(0, %r);'
                         'from lib.metrics import Metrics; Metrics(%r)'
-                        % (os.path.join(REPO, 'scraper'), os.path.join(SCRATCH, 'bad_spec.json'))],
+                        % (os.path.join(REPO, 'apps', 'scraper'), os.path.join(SCRATCH, 'bad_spec.json'))],
                        capture_output=True)
     check('corrupt metrics.json: clean rc=1', r.returncode == 1 and b'not valid JSON' in r.stderr)
 

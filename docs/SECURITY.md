@@ -8,14 +8,14 @@ stay separate and are linked where they answer a security question —
 (the supply chain), [../nixos/README.md](../nixos/README.md) (the NixOS
 hardening and the option map).
 
-Scope: the `cache/`, `scraper/`, `inverter/` and `dashboard/` subprojects plus
+Scope: the `apps/cache/`, `apps/scraper/`, `apps/inverter/` and `apps/dashboard/` subprojects plus
 the shared `common/` package, `profiles/`, `docker/` and `scripts/`. Method:
 manual code review of every module (wire handling, control servers, CLIs,
 config/token/dump loading, audit trail, metrics endpoints, Nix/Docker
 deployment) against the NIS2 (EU 2022/2555, art. 21.2) and DORA
 (EU 2022/2554, art. 8–14) control checklists, plus targeted offline
 verification of the suspicious paths found. This is a design-and-code audit,
-not a penetration test. The `inverter/` fake is a test device simulator —
+not a penetration test. The `apps/inverter/` fake is a test device simulator —
 its risk class is "developer/demo infrastructure", not production OT;
 findings there are weighted accordingly. Findings keep their numbers across
 revisions; the open ones are in § 8.1 — every closed finding's fix and
@@ -67,7 +67,7 @@ format, and at least yearly otherwise (§ 11).
 verification suites cited in §4) are part of the story but hold no runtime
 trust of their own.
 
-| Surface | cache/ | scraper/ | inverter/ | dashboard/ | Auth |
+| Surface | apps/cache/ | apps/scraper/ | apps/inverter/ | apps/dashboard/ | Auth |
 |---|---|---|---|---|---|
 | Modbus TCP listener | `--listen`, default `127.0.0.1:15502`; `connect-acl` on top | n/a (outbound only) | `--listen`, default `127.0.0.1:5502` (Docker `0.0.0.0:5502`); the connect-acl (inline grammar only) | n/a | none (protocol-inherent, F1) |
 | HTTP surface | `/metrics`: `--metrics-server` (live-settable), off; `--metrics-listen` default `127.0.0.1:9351`; `metrics/acl` at accept | the exporter: `--listen` default `127.0.0.1:9350`, two GET routes (`/`, `/metrics`), `Cache-Control: no-store`, `metrics/acl` at accept | `/metrics`: `--metrics-server`, off, default `127.0.0.1:9352`; `metrics/acl` at accept | page + proxy: `--listen` default `127.0.0.1:8080`, GET-only, the realpath-guarded static tree; own `/metrics` default `127.0.0.1:9353` | bearer token (`hmac.compare_digest`) mandatory beyond loopback on every HTTP surface (F13/F21); the loopback bind serves tokenless; `metrics/acl` sits at accept ahead of the caps — never instead of the token |

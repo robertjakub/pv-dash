@@ -6,8 +6,8 @@ client toward the inverter) and the **fake inverter** (server). The wire
 core and the shared primitives live in the **`common/modbus`** package —
 one implementation, stdlib only (`protocol.py` the wire core,
 `client.py` the connect/reply ladders, `writes.py` the write shapes) —
-and the per-tool layers stack on it (`scraper/lib/protocol.py`,
-`cache/lib/upstream.py`, `cache/lib/proxy.py`, `inverter/lib/inverter.py`).
+and the per-tool layers stack on it (`apps/scraper/lib/protocol.py`,
+`apps/cache/lib/upstream.py`, `apps/cache/lib/proxy.py`, `apps/inverter/lib/inverter.py`).
 The dashboard never speaks Modbus.
 
 One scheme, three shapes: every tool runs the same Modbus TCP dialect —
@@ -242,8 +242,8 @@ B    B            N × 2 bytes
 FC   byte_count   word0 word1 ...      # byte_count = count × 2
 ```
 
-Client-side validation, in order (`scraper/lib/protocol.py` `_read`,
-`cache/lib/upstream.py` `read`): header length bounds; `txn` matches the
+Client-side validation, in order (`apps/scraper/lib/protocol.py` `_read`,
+`apps/cache/lib/upstream.py` `read`): header length bounds; `txn` matches the
 outstanding one; `proto == 0`; `unit` matches the configured unit;
 `func == fc + 0x80` → Modbus exception (the cache raises `DeviceError`
 carrying `.code` so it can replay the device's code to its clients);
@@ -260,7 +260,7 @@ exception (code 2): 00 09 00 00 00 03 01 83 02
 ```
 
 Every read address carries the scraper's `modbus-offset` added on
-(`scraper/lib/protocol.py` `_read`).
+(`apps/scraper/lib/protocol.py` `_read`).
 
 ### The bit reads (FC1 / FC2)
 
@@ -332,7 +332,7 @@ The builder is `exception_frame` (`common/modbus/protocol.py`): a PDU of
 | 3 | ILLEGAL_VALUE | malformed frame/count; nonzero protocol id |
 | 11 (`0x0B`) | GATEWAY_FAILED | upstream unreachable, timed out or hostile |
 
-**Cache server decision table** (`cache/lib/proxy.py`), in order: nonzero
+**Cache server decision table** (`apps/cache/lib/proxy.py`), in order: nonzero
 `proto` or empty PDU → 03; write frame too short to carry an address →
 03; writes disabled / client not on the write ACL / span outside the
 allow-list → 01; FC15/16 byte count inconsistent with the register count
@@ -345,7 +345,7 @@ reply, no device contact; otherwise → forward, with an upstream failure
 or hostile reply becoming 11. A bad MBAP `length` closes the connection
 without a reply.
 
-**Fake inverter decision table** (`inverter/lib/inverter.py`): bad
+**Fake inverter decision table** (`apps/inverter/lib/inverter.py`): bad
 `length` → log and close; writes disabled (`allow-write` off — the
 default) with a well-addressed write frame → 01, audited
 `WRITE-REFUSED`; FC3/4 count outside `1..125` or address
@@ -371,7 +371,7 @@ Shared client error texts: `transaction id mismatch`,
 ## 7. The diagnostics block (registers 65000-65003)
 
 Four synthesized words served by the cache on **FC3 only** — never
-fetched, never cached, never forwarded (`cache/lib/proxy.py` `_diag`):
+fetched, never cached, never forwarded (`apps/cache/lib/proxy.py` `_diag`):
 
 | Register | Word | Meaning |
 |---|---|---|
@@ -560,6 +560,6 @@ random PDUs, pipelined bursts, trickled frames), `tests/cache-stress.py`
 
 *Credits: the suite auth handshake is MK's design — see
 [CONTRIBUTORS.md](../CONTRIBUTORS.md). The per-tool behavior prose lives in
-the [cache](../../cache/README.md), [scraper](../../scraper/README.md) and
-[inverter](../../inverter/README.md) READMEs; the knobs live in the
+the [cache](../../apps/cache/README.md), [scraper](../../apps/scraper/README.md) and
+[inverter](../../apps/inverter/README.md) READMEs; the knobs live in the
 per-tool registries (`<tool>/lib/options.json`), tabled by the MANUALs.*

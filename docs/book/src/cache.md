@@ -1,3 +1,3 @@
 # modbus-cache
 
-{{#include ../../../cache/README.md}}
+{{#include ../../../apps/cache/README.md}}

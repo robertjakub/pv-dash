@@ -8,8 +8,8 @@ it), the spanning items keep the `[cache]` `[scraper]` `[inverter]`
 means the whole family), and every other theme stays tag-per-item.
 The per-subproject `TODO.md` files keep only the **Done/history**
 records for their tool —
-[cache](../cache/TODO.md), [scraper](../scraper/TODO.md),
-[inverter](../inverter/TODO.md), [dashboard](../dashboard/TODO.md).
+[cache](../apps/cache/TODO.md), [scraper](../apps/scraper/TODO.md),
+[inverter](../apps/inverter/TODO.md), [dashboard](../apps/dashboard/TODO.md).
 The **one-product sweep** (the consistency items — the same knobs, the
 same words, the same env layer everywhere) rides as its own section
 below; its verified-aligned ledger lives in
@@ -61,15 +61,15 @@ they name the wire.
 
 1. **The scraper's live `system/listen` has no F13 floor** — the
    dashboard refuses the move beyond loopback (F21 template,
-   `dashboard/lib/control.py:135`) and the cache guards its metrics
-   endpoint (`cache/lib/control.py:176`, the live branch `:315-321`),
+   `apps/dashboard/lib/control.py:135`) and the cache guards its metrics
+   endpoint (`apps/cache/lib/control.py:176`, the live branch `:315-321`),
    but the scraper's restart preamble probe-binds and records the
    pending listen without ever asking `is_loopback_host` (the word
    does not appear in the file; the branch is
-   `scraper/lib/control.py:175-182`), and the restart-state fold lands
+   `apps/scraper/lib/control.py:175-182`), and the restart-state fold lands
    *after* `resolve_config()`'s startup F13 check
-   (`scraper/bin/modbus-scraper.py:92` resolve — the check sits inside,
-   `scraper/lib/config.py:104-106` — `:100-101` fold): a tokenless
+   (`apps/scraper/bin/modbus-scraper.py:92` resolve — the check sits inside,
+   `apps/scraper/lib/config.py:104-106` — `:100-101` fold): a tokenless
    scraper can `set system listen 0.0.0.0:9350`, `request reload`, and
    serve beyond loopback with no token. The preamble's second key
    `'metrics-listen'` is dead — no row carries that flat name (the
@@ -77,13 +77,13 @@ they name the wire.
    `listen`). Outcome: the F21 move-refusal template, verbatim, in the
    scraper's restart preamble.
 2. **`AUTH_TOKEN` means two different secrets** — the /metrics bearer
-   on the scraper (`scraper/lib/options.json:117`, flag `--auth-token`,
+   on the scraper (`apps/scraper/lib/options.json:117`, flag `--auth-token`,
    console `metrics/auth/token`) and the page bearer on the dashboard
-   (`dashboard/lib/options.json:38`, console `auth/token`), while the
+   (`apps/dashboard/lib/options.json:38`, console `auth/token`), while the
    same /metrics bearer is `metrics-token`/`METRICS_TOKEN` on the
-   cache (`cache/lib/options.json:165`), the inverter
-   (`inverter/lib/options.json:216`) and the dashboard itself
-   (`dashboard/lib/options.json:89`). The shipped stacks carry both
+   cache (`apps/cache/lib/options.json:165`), the inverter
+   (`apps/inverter/lib/options.json:216`) and the dashboard itself
+   (`apps/dashboard/lib/options.json:89`). The shipped stacks carry both
    meanings of the one variable: the scraper's `AUTH_TOKEN:
    file:/config/metrics.token` against the dashboard's
    `file:/config/page.token` (`docker/demo/compose.yaml:126,177`,
@@ -99,15 +99,15 @@ they name the wire.
 
 - **the unit id, two spellings** `[scraper]` `[inverter]`
   — the cache joined the scraper's spelling (the `modbus-unit`/
-  `--modbus-unit`/`MODBUS_UNIT` row, `cache/lib/options.json:11`),
+  `--modbus-unit`/`MODBUS_UNIT` row, `apps/cache/lib/options.json:11`),
   the inverter stays `unit` with no env twin and no live at all
-  (`inverter/lib/options.json:50` — startup-only by absence). The
+  (`apps/inverter/lib/options.json:50` — startup-only by absence). The
   range half landed: one shared tree gates every tool with a unit knob
   (`shared/suite/protocol.json` — 1..247, `unit_in_range`; start and
   reload validate, the Modbus servers refuse out-of-range ids in-band,
   `check_options.py` gates the check). What remains: the scraper's row
   still declares `min: 0, max: 255` and only its live set gates on it
-  (`scraper/lib/control.py:306`) while start refuses `<1`. Outcome:
+  (`apps/scraper/lib/control.py:306`) while start refuses `<1`. Outcome:
   one name, one flag, one env, live everywhere, the row bounds = the
   shared tree's range (the NixOS `unitId`/`modbusUnit` renames follow).
 - **the listener caps, the console schemes** `[all]` — the flat names
@@ -117,7 +117,7 @@ they name the wire.
   flat names (the cache is the master; the scraper's old bare spellings
   retired). The console paths still split: `limits/*` on the cache's
   Modbus listener vs `metrics/limits/*` on both metrics surfaces
-  (`cache/lib/options.json:102-114`, `scraper:75-92`), and the inverter
+  (`apps/cache/lib/options.json:102-114`, `scraper:75-92`), and the inverter
   and dashboard keep the bare scheme (`inverter:149-158`,
   `dashboard:21-30`); the cache's own metrics leaf is
   `metrics/limits/timeout` while its socket leaf is
@@ -126,52 +126,52 @@ they name the wire.
   leaf is `client-timeout` everywhere.
 - **the /metrics caps, four postures** `[scraper]` `[inverter]`
   `[dashboard]` — the cache has the full trio (defaults 64/5.0/0,
-  `METRICS_*` envs, bounds, live, `cache/lib/options.json:179-195`);
+  `METRICS_*` envs, bounds, live, `apps/cache/lib/options.json:179-195`);
   the scraper has **no rows at all** (its base trio *is* the /metrics
   trio); the inverter has the rows but no live, no env, no bounds
-  (`env: null` + the F11 note, `inverter/lib/options.json:227-240`);
+  (`env: null` + the F11 note, `apps/inverter/lib/options.json:227-240`);
   the dashboard has envs but **defaults `metrics-max-clients` 16** vs
-  64 (`dashboard/lib/options.json:102`) and no live/bounds. Outcome:
+  64 (`apps/dashboard/lib/options.json:102`) and no live/bounds. Outcome:
   the cache's row shape family-wide, default vector {64, 0, 5.0}, the
   scraper's always-on endpoint documented as the exception.
 - **`metrics/listen` means two sockets** `[cache]` `[scraper]` — the
   cache's `metrics-listen` is the /metrics bind
-  (`cache/lib/options.json:159`); the scraper's `listen` row carries
-  `"alias": "metrics/listen"` (`scraper/lib/options.json:57`), so the
+  (`apps/cache/lib/options.json:159`); the scraper's `listen` row carries
+  `"alias": "metrics/listen"` (`apps/scraper/lib/options.json:57`), so the
   console's `set metrics listen <addr>` translates to the flat `listen`
   and moves the *main* HTTP listen there. The worst
   same-words-different-socket in the family, now one translation step
   away. Outcome: the alias dies; `metrics/listen` is the /metrics bind
   only.
 - **the access-audit trio, three names, one job** `[all]` —
-  `audit-requests` (cache, `cache/lib/options.json:241`, an interval
+  `audit-requests` (cache, `apps/cache/lib/options.json:241`, an interval
   knob), `log-access` (scraper/dashboard, on/off), `log-queries`
-  (dashboard only, no startup env, `dashboard/lib/options.json:153`);
+  (dashboard only, no startup env, `apps/dashboard/lib/options.json:153`);
   the inverter has none. The cache row's own `min: 1` contradicts its
   help's `0 = off` (`:230-233` vs the resolver's
-  `must be >= 0 (0 = off)`, `cache/lib/config.py:330`; the live path
+  `must be >= 0 (0 = off)`, `apps/cache/lib/config.py:330`; the live path
   maps `'0'` to off before the row gate ever sees it,
-  `cache/lib/control.py:369`). Outcome: decide the family shape (an
+  `apps/cache/lib/control.py:369`). Outcome: decide the family shape (an
   interval knob beats on/off), spell it once, give the inverter its
   row, fix the min/help.
 - **`upstream`, one name, three layers** `[cache]` `[scraper]`
   `[dashboard]` — the env is `UPSTREAM` on the two Modbus tools and
-  `PROM_URL` on the dashboard (`cache/lib/options.json:7`,
+  `PROM_URL` on the dashboard (`apps/cache/lib/options.json:7`,
   `scraper:4`, `dashboard:7`); the cache marks it `restart: true`, the
   scraper says nothing; the dashboard has no live. Outcome: the env
   does not fork (`PROM_URL` at most a back-compat alias); the restart
   mark decided once.
 - **the poll interval, two namespaces** `[cache]` `[scraper]` — same
   conv, same default 10.0, console `modbus/interval` vs
-  `metrics/interval` (`cache/lib/options.json:43`,
+  `metrics/interval` (`apps/cache/lib/options.json:43`,
   `scraper:161`). Outcome: `modbus/interval` in both (the knob polls
   the device on both tools).
 - **near-miss console paths** `[scraper]` `[inverter]` — `max-kwp`
   consoles as `modbus/caps/max-pv` on the scraper and bare `max-kwp` on
-  the inverter (hint `KW` vs `kW`, `scraper/lib/options.json:57` vs
+  the inverter (hint `KW` vs `kW`, `apps/scraper/lib/options.json:57` vs
   `inverter:57`); `connect-acl` consoles as `acl/connect` on the cache
   and bare on the inverter, whose help also omits the `file:<path>`
-  form its sibling supports (`cache/lib/options.json:80` vs
+  form its sibling supports (`apps/cache/lib/options.json:80` vs
   `inverter:138`). Outcome: the node-ful
   spelling wins each time.
 - **the knob sweep's blind spots** `[common]` — `family_drift.py`
@@ -191,68 +191,68 @@ they name the wire.
   `common/wire/control.py:591` (the set-path restart note beside the
   clear path's `T()`), `:637` (reload failed, beside the leaf's use at
   `:1224`), the cache's whole dump/restore error set
-  (`cache/lib/control.py:745-789`), the cache bin's sealed/skipped
-  suffixes (`cache/bin/modbus-cache.py:88,218,327`), the scraper's
-  ops-token listen line (`scraper/bin/modbus-scraper.py:117`), its
-  hand-rolled `must be on or off` (`scraper/lib/control.py:283`) with
-  a second copy on the fake (`inverter/lib/control.py:334`), the
-  unknown-setting lines (`scraper/lib/control.py:289`,
-  `cache/lib/control.py:437` — the leaf exists; the fake uses it), the
-  fake's config head + comment (`inverter/lib/control.py:126-128`),
+  (`apps/cache/lib/control.py:745-789`), the cache bin's sealed/skipped
+  suffixes (`apps/cache/bin/modbus-cache.py:88,218,327`), the scraper's
+  ops-token listen line (`apps/scraper/bin/modbus-scraper.py:117`), its
+  hand-rolled `must be on or off` (`apps/scraper/lib/control.py:283`) with
+  a second copy on the fake (`apps/inverter/lib/control.py:334`), the
+  unknown-setting lines (`apps/scraper/lib/control.py:289`,
+  `apps/cache/lib/control.py:437` — the leaf exists; the fake uses it), the
+  fake's config head + comment (`apps/inverter/lib/control.py:126-128`),
   and `cannot bind` spelled by hand in the four bins
-  (`cache/bin/modbus-cache.py:369`, `scraper/bin/modbus-scraper.py:133`
-  and `:267`, `inverter/bin/modbus-fake-inverter.py:395`,
-  `dashboard/bin/dashboard.py:348`) plus two live refusals
-  (`dashboard/lib/control.py:189`, `inverter/lib/control.py:323`).
+  (`apps/cache/bin/modbus-cache.py:369`, `apps/scraper/bin/modbus-scraper.py:133`
+  and `:267`, `apps/inverter/bin/modbus-fake-inverter.py:395`,
+  `apps/dashboard/bin/dashboard.py:348`) plus two live refusals
+  (`apps/dashboard/lib/control.py:189`, `apps/inverter/lib/control.py:323`).
   `texts.py` cannot see a literal that equals a leaf. Outcome:
   the leaves win; the lint learns the literal-equals-leaf check.
 - **the cache's dump/restore replies are a fourth dialect** —
   `ok dumped %d word(s), %d setting(s) to ...` vs the family's
-  `ok dumped %d setting(s) to ...` (`cache/lib/control.py:767,788`;
+  `ok dumped %d setting(s) to ...` (`apps/cache/lib/control.py:767,788`;
   the family leaves render in the base, `common/wire/control.py:1261`,
   `:1277`). The override is deliberate and documented (the words ride
-  along beside the settings, `cache/lib/control.py:736`). Keep the
+  along beside the settings, `apps/cache/lib/control.py:736`). Keep the
   cache's extra count if the payload demands it, but reuse the family
   leaves for every error and suffix.
 - **the fake's dialects** `[inverter]` — unknown tails answer the
   whole path unquoted where the family answers the first word quoted
-  (`inverter/lib/control.py:544-552` vs
+  (`apps/inverter/lib/control.py:544-552` vs
   `common/wire/control.py:665-682`); `inspect` folds `uptime` into
-  `now` (`inverter/lib/control.py:611`) and drops the app name from
-  `version` (`:602`, the family prefixes it, `cache/lib/control.py:556`);
+  `now` (`apps/inverter/lib/control.py:611`) and drops the app name from
+  `version` (`:602`, the family prefixes it, `apps/cache/lib/control.py:556`);
   its `command_help` omits `inspect` (`:478`). The parse/refusal legs
   landed (the fake parses through `num`/`numi`/`on_off`). Documented
   as F11 colour — keep only what the docstring rules, align the rest.
 - **one health word, two spellings** `[scraper]` `[dashboard]` — the
   `set` reply summary spells the upstream health `poll=ok|down` on the
   cache and scraper but `upstream_ok=` on the dashboard
-  (`cache/lib/control.py:539`, `scraper:410`, `dashboard:279`).
+  (`apps/cache/lib/control.py:539`, `scraper:410`, `dashboard:279`).
   Outcome: one key.
 - **the help one-liners** `[all]` — `help show/set/clear` differ (the
-  cache names reports in the bracket, `cache/lib/options.json:321-324`,
+  cache names reports in the bracket, `apps/cache/lib/options.json:321-324`,
   the other three show example knobs); `show knobs` is "the dictionary
   of all knobs" vs the inverter's "of the registry" (`:284` vs
   `inverter:313`); `show config` is "the effective configuration" vs
   the inverter's "the startup options"; the metrics-acl-table help is
   long on cache/scraper, short on inverter/dashboard; the inverter's
   `connect-acl` help says "the cache's connect-acl, mirrored" — a
-  cross-tool reference in a user row (`inverter/lib/options.json:139`,
-  it reached `inverter/lib/man.py:117` and `inverter/MANUAL.md:119`).
+  cross-tool reference in a user row (`apps/inverter/lib/options.json:139`,
+  it reached `apps/inverter/lib/man.py:117` and `apps/inverter/MANUAL.md:119`).
   Outcome: one line per verb, per-tool brackets only.
 - **the knob descriptions, four voices** `[all]` — `control-port`
   alone has three dialects ("control server target..." /
-  "JSON-lines control server target...", `cache/lib/options.json:119`
+  "JSON-lines control server target...", `apps/cache/lib/options.json:119`
   vs `scraper:83`); `max-clients` describes a Modbus socket on two
   tools and an HTTP one on two (correct per tool, but the sentence
   templates should match); the audit sink rows say "audit trail" while
-  the rotate rows say "audit log" (`cache/lib/options.json:199,219`,
+  the rotate rows say "audit log" (`apps/cache/lib/options.json:199,219`,
   the same split on scraper/inverter), and the cache's setting-helps
   keep their own shapes (`:199`, `:225` where the other three agree);
   `metrics-token` carries two Bearer phrasings (`cache:167` vs
   `dashboard:91`); the scraper's man page has no `--metrics-token` to
   match the cache's cross-reference (its bearer is `--auth-token`,
-  `scraper/lib/man.py:41`; the cache's help says "the same scheme the
-  scraper speaks", `cache/lib/options.json:169`). Outcome: one
+  `apps/scraper/lib/man.py:41`; the cache's help says "the same scheme the
+  scraper speaks", `apps/cache/lib/options.json:169`). Outcome: one
   template per concept, the surface noun as the only variable.
 - **the restart-marker vocabularies** `[all]` — the same fact ships
   as `note restart required (startup-only knob)` (the wire leaf,
@@ -262,20 +262,20 @@ they name the wire.
   `common/settings/options.py:390-408`),
   `*(restart)*` / `startup-only (secret)` (MANUAL.md,
   `scripts/generators/manual.py:143-146`), `restart: true` + the wire phrase
-  (only the cache's man carries the trio now, `cache/lib/man.py:98-107`),
-  and "restart to apply" (inverter/README.md:204). Outcome: a
+  (only the cache's man carries the trio now, `apps/cache/lib/man.py:98-107`),
+  and "restart to apply" (apps/inverter/README.md:204). Outcome: a
   two-phrase lexicon in `shared/suite/texts.json`, every surface renders it,
   the marker rule ("the % changed exception") stays.
 - **the scraper's man page still ships `unset`** `[scraper]` —
-  `scraper/lib/man.py:70` reads `set/unset/show/help` and the
-  generated page carries it (`scraper/man/modbus-scraper.1:254`); the
+  `apps/scraper/lib/man.py:70` reads `set/unset/show/help` and the
+  generated page carries it (`apps/scraper/man/modbus-scraper.1:254`); the
   other three say `set/clear`. The `--check` gate passes because the
   *source* is stale — it catches stale output, not stale prose. (The
   cli pages' `% changed` / `[confirm]` divergence stays open too — a
   docs nicety, not a lie.) Outcome: the source line, regenerate.
 - **the cache's ops-token refusal renders the secret** `[cache]` —
   the validate `fail()` prints the value it looked up
-  (`cache/lib/config.py:286-288`), and for `control-ops-token` that
+  (`apps/cache/lib/config.py:286-288`), and for `control-ops-token` that
   value *is* the token (`:432`): `--control-ops-token sekret` answers
   `invalid control-ops-token = 'sekret': ...` (verified live). The
   common `check_control_tokens()` the scraper and dashboard use
@@ -283,12 +283,12 @@ they name the wire.
   (the family's secret posture).
 - **the rc discipline splits on the unsafe-config refusals** —
   the F13 start refusal exits 2 on cache/dashboard
-  (`cache/bin/modbus-cache.py:156-160`,
-  `dashboard/bin/dashboard.py:313-321`) and 1 on scraper/fake
-  (`scraper/lib/config.py:104-105`, `inverter/bin/modbus-fake-inverter.py:277-280`);
+  (`apps/cache/bin/modbus-cache.py:156-160`,
+  `apps/dashboard/bin/dashboard.py:313-321`) and 1 on scraper/fake
+  (`apps/scraper/lib/config.py:104-105`, `apps/inverter/bin/modbus-fake-inverter.py:277-280`);
   TCP-control-without-token exits 2 on the cache (`:149-153`) and 1 on
   scraper (the config validator, `:107-110`) and dashboard (its check
-  moved into the validator too, `dashboard/lib/config.py:152-153`;
+  moved into the validator too, `apps/dashboard/lib/config.py:152-153`;
   verified live). Outcome: one rc for "the config is unsafe" — the
   evidence leans 2 (CLI-config mistakes), the fake's rc 1 stays its F11
   posture; also pick one *presentation* (the cache/dashboard log an
@@ -304,11 +304,11 @@ they name the wire.
   `[inverter]` — the cache prefixes "the metrics endpoint serves
   register values: ", the dashboard "the metrics endpoint serves the
   request counters: ", the fake sends the bare sentence
-  (`cache/lib/control.py:318`, `dashboard/lib/control.py:176`,
-  `inverter/lib/control.py:313`); the drift doc records the
+  (`apps/cache/lib/control.py:318`, `apps/dashboard/lib/control.py:176`,
+  `apps/inverter/lib/control.py:313`); the drift doc records the
   divergence. Outcome: the bare sentence, one `T()` leaf.
 - **the metrics toggle's three-surface label** `[all]` — the knob/wire
-  name is `metrics-server` (`cache/lib/options.json:154`,
+  name is `metrics-server` (`apps/cache/lib/options.json:154`,
   `dashboard:78`, `inverter:203`), the console spelling is
   `set metrics enable` (the live path `metrics/enable`), and the help
   prose says "the live `set metrics enable` toggle". The flat-wire
@@ -317,20 +317,20 @@ they name the wire.
   label per surface, name and live path agreeing.
 - **the mislabeled refusals' residue** — the label param landed, but
   the cache still mislabels `--metrics-listen`: `validate_config`
-  calls `parse_listen` unlabeled (`cache/lib/config.py:316`) and fires
-  before the bin's labeled call (`cache/bin/modbus-cache.py:155`), so
+  calls `parse_listen` unlabeled (`apps/cache/lib/config.py:316`) and fires
+  before the bin's labeled call (`apps/cache/bin/modbus-cache.py:155`), so
   `--metrics-listen nope` answers `--listen must be HOST:PORT`
   (verified live). And the control-port range check landed on the
   cache only: scraper/dashboard pass start validation and die later in
   the control thread with `OverflowError: bind()` (their validators
-  guard only the token sentence, `scraper/lib/config.py:107-110`,
-  `dashboard/lib/config.py:151-155`; verified live). Outcome: the
+  guard only the token sentence, `apps/scraper/lib/config.py:107-110`,
+  `apps/dashboard/lib/config.py:151-155`; verified live). Outcome: the
   labeled call and the range validator everywhere.
 - **the startup validation, two shapes** — cache/scraper/dashboard
-  say `invalid <key> = <val>: <rule>` (`cache/lib/config.py:286`,
+  say `invalid <key> = <val>: <rule>` (`apps/cache/lib/config.py:286`,
   `scraper:59`, `dashboard:147`); the fake says `--flag <rule>, got %r`
   and collects every problem before exiting
-  (`inverter/bin/modbus-fake-inverter.py:68-85,230-233`).
+  (`apps/inverter/bin/modbus-fake-inverter.py:68-85,230-233`).
   Both legitimate — pick the family shape (the `invalid k = v` form
   reads better in logs) or document the fake's as F11.
 - **the lenient-start policy is unstated** — a bad env/config value
@@ -346,9 +346,9 @@ they name the wire.
   promises "every command answered ok" (`common/render/manpage.py:46`).
   Outcome: decide (rc 1 when any reply is `fail`), reword EXIT STATUS.
 - **the 401 bodies, three spellings** — `unauthorized\n` (scraper
-  page, `scraper/lib/server.py:35`), `401 unauthorized\n` (common
+  page, `apps/scraper/lib/server.py:35`), `401 unauthorized\n` (common
   metrics, `common/serve/metrics_server.py:130`), the dashboard's long
-  cookie-bootstrap sentence (`dashboard/bin/dashboard.py:58` — fine,
+  cookie-bootstrap sentence (`apps/dashboard/bin/dashboard.py:58` — fine,
   it teaches the `?auth=` hop). Outcome: the common metrics pair wins
   on plain surfaces.
 - **the spellings rule is unwritten, in its new shape** — the old
@@ -357,7 +357,7 @@ they name the wire.
   `common/settings/options.py:749-765`), the console/cli/config files
   accept the rows' `live`/`alias` spellings beside it and translate
   (`common/wire/cli.py:35-54`), while startup refusals speak flags
-  (`set --metrics-token (or file:<path>)`, `scraper/lib/config.py:104`)
+  (`set --metrics-token (or file:<path>)`, `apps/scraper/lib/config.py:104`)
   beside knob words (`audit-forward must be ...`,
   `common/runtime/audit.py:104`). No doc states the rule. Outcome:
   write it down (the wire speaks flat names, the console translates,
@@ -374,8 +374,8 @@ they name the wire.
 ### The env plane — the same env layer everywhere
 
 - **the dashboard's man still sells `PORT`/`BIND`** `[dashboard]` —
-  `dashboard/lib/man.py:136-138` (baked into the generated page,
-  `dashboard/man/dashboard.1:314`) while the README and the config
+  `apps/dashboard/lib/man.py:136-138` (baked into the generated page,
+  `apps/dashboard/man/dashboard.1:314`) while the README and the config
   docstring were fixed — the last stale env claim of the first sweep.
   Outcome: the man prose follows the resolvers, regenerate.
 - **"empty = unset" means empty string, not blank** — the shared
@@ -839,5 +839,5 @@ re-open — is the history half:
   same wave.
 
 Per-tool **Done/history** lives in each subproject's own TODO.md
-([cache](../cache/TODO.md), [scraper](../scraper/TODO.md),
-[inverter](../inverter/TODO.md), [dashboard](../dashboard/TODO.md)).
+([cache](../apps/cache/TODO.md), [scraper](../apps/scraper/TODO.md),
+[inverter](../apps/inverter/TODO.md), [dashboard](../apps/dashboard/TODO.md)).

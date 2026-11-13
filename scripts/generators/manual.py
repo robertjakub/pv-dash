@@ -31,23 +31,23 @@ TOOLS = (
      'single-client devices: it polls the inverter once and serves every '
      'client from the cache.',
      'modbus-cache-ctl', 'modbus-cache-cli', '/tmp/modbus-cache-15502.socket',
-     '15509', 'request flush cache', True, 'cache/examples/modbus-cache.conf'),
+     '15509', 'request flush cache', True, 'apps/cache/examples/modbus-cache.conf'),
     ('scraper', 'modbus-scraper', 'modbus-scraper',
      'A dependency-free (Python stdlib only) Prometheus exporter that polls '
      'a Modbus device and exposes the metrics at /metrics.',
      'modbus-scraper-ctl', 'modbus-scraper-cli', '/tmp/modbus-scraper-9350.socket',
-     '15509', 'request poll now', True, 'scraper/examples/modbus-scraper.conf'),
+     '15509', 'request poll now', True, 'apps/scraper/examples/modbus-scraper.conf'),
     ('inverter', 'fake-inverter', 'modbus-fake-inverter',
      'A dependency-free (Python stdlib only) Modbus TCP server that plays '
      'an inverter — the battery, the smart meter, the diagnostics — for '
      'the family to develop and test against.',
      'modbus-fake-ctl', 'modbus-fake-cli', '/tmp/fake-inverter-5502.socket',
-     '15599', 'show registers', False, 'inverter/examples/modbus-fake-inverter.conf'),
+     '15599', 'show registers', False, 'apps/inverter/examples/modbus-fake-inverter.conf'),
     ('dashboard', 'dashboard', 'dashboard',
      'A single-page dashboard for home PV monitoring, fed by Prometheus: '
      'it serves the page and proxies the upstream queries.',
      'dashboard-ctl', 'dashboard-cli', '/tmp/dashboard-8080.socket',
-     '15598', 'request reload-config', True, 'dashboard/examples/dashboard.conf'),
+     '15598', 'request reload-config', True, 'apps/dashboard/examples/dashboard.conf'),
 )
 
 # the wire words no registry row carries (the registries' own audit's
@@ -396,7 +396,7 @@ def main(argv):
         page = render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port,
                       example, token_mandatory, conf, rows, shows, meta)
         raw_angle_guard(page, daemon)
-        path = os.path.join(REPO, tool, 'MANUAL.md')
+        path = os.path.join(REPO, 'apps', tool, 'MANUAL.md')
         drift = emit(path, page, check, 'manual',
                      rerun='python3 scripts/generators/manual.py') or drift
     if check:

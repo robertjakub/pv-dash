@@ -1,0 +1,522 @@
+.TH MODBUS-CACHE 1 "2026-11-05" "pv-suite 0.4.3" "User Commands"
+.SH NAME
+modbus-cache \- Modbus TCP caching proxy for single-client devices
+.SH SYNOPSIS
+.B modbus-cache
+.RI [ options ]
+.br
+.B modbus-cache \-\-dry-run
+.RI [ options ]
+
+.SH DESCRIPTION
+\fBmodbus-cache\fR owns the single Modbus TCP client connection a device
+allows (e.g. a Huawei SUN2000 inverter and its SDongle/EMMA radio accept
+exactly one) and multiplexes it: a background loop polls the configured
+register ranges into an in-memory cache, any number of clients are served
+FC3/FC4 reads from the cache, reads outside the map and other function
+codes are forwarded live, and writes (FC05/06/15/16/22/23) are forwarded
+when explicitly enabled and audited \(em gated by a register allow-list
+(\fB--write-registers\fR) that spells its ranges directly, takes the
+device profile's \fBacl\fR/\fBwrite\fR gate (the ordered rule chain:
+one \fBtype\fR allow/deny and a \fBrange\fR per rule \(em the last
+matching rule decides, a register no rule decides refuses, the word
+\fBany\fR = all registers), or reads a standalone acl file
+(\fBfile:<path>\fR \(em the same gate object a profile carries under
+write-acl, compiled at start and on every set). Every function code crossing the
+wire is named in the log and the audit trail (all standard FCs, FC1
+through FC43). A synthesized diagnostics block at registers
+65000\(en65003 lets clients tell cached data from live data.
+.PP
+Modbus auth (\fB--modbus-auth\fR): with \fBsuite\fR the cache's own clients
+prove a shared key (\fB--modbus-auth-key\fR, min 16 characters) with a crypt
+handshake right after every connect \(em 52 bytes: magic, fresh nonce,
+HMAC\-SHA256 proof; the cache answers \fBOK\fR (plain Modbus follows)
+or \fBERR\fR (the client is dropped before it ever sees a frame).
+\fB--modbus-auth-upstream\fR/\fB--modbus-auth-upstream-key\fR do the same toward
+the inverter: an \fBERR\fR fails the exchange like any other upstream
+fault and the poller retries. The upstream leg also speaks
+\fB--modbus-auth-upstream waveshare\fR for a Waveshare RS485\-to\-TCP
+gateway: the shared key goes out as the gateway's connection password
+(raw ASCII, right after every connect) and the gateway's \fBOK\fR opens
+the plain Modbus session \(em anything else fails the exchange like any
+other upstream fault. Empty auth = no auth at all.
+.PP
+Resilience: when the device dies, cached reads keep serving last-known
+values and forwarded reads get exception 0x0B; when the device rejects a
+range, the poll status is remembered instead of hammering it; garbage from
+either side is answered one line at a time and never fatal. Verified
+against the fake inverter, fuzzing and stress suites \-\- not against real
+hardware.
+
+.SH OPTIONS
+.TP
+.BI \-\-upstream " upstream"
+the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502)
+.TP
+.BI \-\-modbus\-unit " modbus-unit"
+Modbus unit id
+.TP
+.BI \-\-modbus\-timeout " modbus-timeout"
+Modbus connect/read timeout in seconds
+.TP
+.BI \-\-modbus\-auth " modbus-auth"
+the Modbus auth scheme: `suite` demands the crypt handshake (magic +
+nonce + HMAC proof of the shared key) right after every connect — the
+peer answers OK, or ERR and the session drops; none/empty = no auth at
+all
+.TP
+.BI \-\-modbus\-auth\-key " modbus-auth-key"
+the shared key the cache's clients prove with the suite handshake (min
+16 characters); the value may be `file:<path>` — the first line of an
+owner\-only 0600 file (a systemd LoadCredential rides as
+file:/run/credentials/...)
+.TP
+.BI \-\-modbus\-auth\-upstream " modbus-auth-upstream"
+the auth scheme toward the upstream inverter: `suite` proves the shared
+auth\-upstream\-key with a crypt handshake right after every connect
+(the peer answers OK, or ERR and the connection fails — the poller keeps
+retrying); `waveshare` sends the shared auth\-upstream\-key as the
+Waveshare TCP connection password right after every connect (the gateway
+answers OK, or anything else/nothing and the connection fails — the
+poller keeps retrying); none/empty = no auth at all
+.TP
+.BI \-\-modbus\-auth\-upstream\-key " modbus-auth-upstream-key"
+the key the cache presents to the upstream inverter — the suite
+handshake's shared key (min 16 characters) or the Waveshare TCP
+connection password (non\-empty ASCII, the gateway's own rule); the
+value may be `file:<path>` — the first line of an owner\-only 0600 file
+(a systemd LoadCredential rides as file:/run/credentials/...)
+.TP
+.BI \-\-modbus\-interval " modbus-interval"
+seconds between polls
+.TP
+.BI \-\-modbus\-read\-delay " modbus-read-delay"
+seconds between consecutive inverter reads within a poll cycle, 0 = no
+delay
+.TP
+.BI \-\-modbus\-merge\-gap " modbus-merge-gap"
+max register gap when merging ranges into block reads, 0 = read ranges
+separately
+.TP
+.BI \-\-cache\-ttl " cache-ttl"
+per\-register cache TTL: cached registers older than this are refetched
+from the inverter, 0 = never expire, serve last known values forever
+.TP
+.B \-\-allow\-write
+forward write requests (FC05/06/15/16/22/23) to the inverter; without it
+they refuse with a Modbus illegal\-function exception
+.TP
+.BI \-\-write\-registers " write-registers"
+address ranges a (forwarded) write may touch — the register writes
+(FC06/16/22/23) and the coil writes (FC05/15, the coil space) are gated
+by the same ranges: comma\-separated START:COUNT, e.g.
+47400:100,47600:100; "any" = unrestricted; "none" = nothing writable;
+"profile" = the device profile's write acl ("acl": {"write": {"rules":
+[{"type": "allow"|"deny", "range": "START:COUNT"}]}} — a whitelist: the
+last matching rule decides, a register no rule decides refuses);
+"file:<path>" = the standalone acl file (the same gate object a profile
+carries under "acl"/"write", read and compiled at start and on every
+set)
+.TP
+.BI \-\-modbus\-profile " modbus-profile"
+device profile JSON (the shared profiles/ schema)
+.TP
+.BI \-\-selection " selection"
+selection JSON: {"registers": ["pv\-power",...]} — the profile names to
+fetch
+.TP
+.BI \-\-connect\-acl " connect-acl"
+clients allowed to connect: "any", "none" (refuse everyone),
+comma\-separated IPs/prefixes like 10.0.0.7,10.48.0.0/16, or
+"file:<path>" — the standalone ip\-prefix acl file (the gate object
+{"type": "ip\-prefix", "rules": [{"type": "allow"|"deny", "prefix":
+\&...}]}: the last matching rule decides, a client no rule decides
+refuses; "any" = 0.0.0.0/0, the whole space)
+.TP
+.BI \-\-write\-acl " write-acl"
+clients allowed to write (requires \-\-allow\-write): "any", "none"
+(refuse everyone), comma\-separated IPs/prefixes, or "file:<path>" — the
+standalone ip\-prefix acl file (the same gate object acl/connect reads:
+the last matching rule decides, a client no rule decides refuses)
+.TP
+.BI \-\-listen " listen"
+listen address HOST:PORT
+.TP
+.B \-\-local\-time
+log timestamps in the system time zone instead of UTC
+.TP
+.BI \-\-max\-clients " max-clients"
+refuse further connections past this many simultaneous clients, 0 = no
+limit
+.TP
+.BI \-\-client\-timeout " client-timeout"
+disconnect clients silent for this many seconds, 0 = never
+.TP
+.BI \-\-max\-conn\-per\-ip " max-conn-per-ip"
+refuse further connections from one peer IP past this many simultaneous
+connections, 0 = no per\-IP limit
+.TP
+.BI \-\-control\-port " control-port"
+JSON\-lines control server target: unix socket path or TCP port number
+on 127.0.0.1; 0 = off
+.TP
+.BI \-\-control\-token " control-token"
+require a token on control connections: the client authenticates with
+{"cmd": "auth", "token":...}; over the unix socket a trusted peer (root,
+the daemon's own user or \-\-control\-trust\-uids — SO_PEERCRED) skips
+the token; the value may be `file:<path>` — the first line of an
+owner\-only 0600 file (a systemd LoadCredential rides as
+file:/run/credentials/...)
+.TP
+.BI \-\-control\-ops\-token " control-ops-token"
+a second, read\-only control token: sessions authenticating with it may
+run its policy's verbs only (the default policy: show,flush) (no
+set/clear, no request poll now, no request dump/restore, no restart, no
+shutdown) — the ops shift against the admin key, both audited; the value
+may be `file:<path>` — the first line of an owner\-only 0600 file (a
+systemd LoadCredential rides as file:/run/credentials/...)
+.TP
+.BI \-\-control\-ops\-verbs " control-ops-verbs"
+the read\-only ops role's RBAC policy: the verbs its sessions may run,
+comma\-separated
+.TP
+.BI \-\-control\-trust\-uids " control-trust-uids"
+extra peer uids the unix control socket trusts without the token
+(SO_PEERCRED — a local systemd unit speaks without the secret); root and
+the daemon's own user are always trusted
+.TP
+.B \-\-control\-socket\-group
+leave the unix control socket group\-accessible (chmod 0660 instead of
+the plain 0600) ($CONTROL_SOCKET_GROUP)
+.TP
+.B \-\-control\-log\-replies
+DEBUG\-log the full output of every control command
+.TP
+.B \-\-metrics\-server
+serve the tool's own Prometheus /metrics endpoint (the live `set metrics
+enable` toggle exists too)
+.TP
+.BI \-\-metrics\-listen " metrics-listen"
+the metrics bind address HOST:PORT — 0.0.0.0:PORT serves every
+interface, a token is mandatory beyond loopback (a token\-less
+non\-loopback bind refuses to start, F13)
+.TP
+.BI \-\-metrics\-token " metrics-token"
+require Authorization: Bearer <token> on the /metrics endpoint (the same
+scheme the scraper speaks); the value may be `file:<path>` — the first
+line of an owner\-only 0600 file (a systemd LoadCredential rides as
+file:/run/credentials/...)
+.TP
+.BI \-\-metrics\-acl " metrics-acl"
+clients allowed to connect to the /metrics endpoint: "any", "none"
+(refuse everyone), comma\-separated IPs/prefixes like
+10.0.0.7,10.48.0.0/16, or "file:<path>" — the standalone ip\-prefix acl
+file (the gate object {"type": "ip\-prefix", "rules": [{"type":
+"allow"|"deny", "prefix": ...}]}: the last matching rule decides, a
+client no rule decides refuses; "any" = 0.0.0.0/0, the whole space);
+checked at accept — a client off the ACL is closed without a reply
+.TP
+.BI \-\-metrics\-max\-clients " metrics-max-clients"
+maximum concurrent HTTP clients on the /metrics endpoint; extras get an
+immediate 503, 0 = unlimited
+.TP
+.BI \-\-metrics\-client\-timeout " metrics-client-timeout"
+seconds an idle /metrics client is kept before the socket times out, 0 =
+the built\-in 5 s cap
+.TP
+.BI \-\-metrics\-max\-conn\-per\-ip " metrics-max-conn-per-ip"
+maximum concurrent /metrics connections from one peer IP, 0 = no per\-IP
+limit
+.TP
+.BI \-\-audit\-log " audit-log"
+the audit trail: a file path or \- for stdout (the docker/journald way);
+`none` turns the local file off (with a forward spelled that is the
+remote\-only mode); the XDG state home when unset
+.TP
+.BI \-\-audit\-forward " audit-forward"
+also forward the audit trail: syslog (the local socket auto\-scan),
+syslog:/path (an explicit socket), udp://host[:514] (RFC5426,
+best\-effort) or tcp://host[:514] (RFC6587 framing) — the off\-box copy
+carries the per\-writer hash chain, so a scheduled search at the
+collector can alert on a chain break; docs/AUDIT.md
+.TP
+.BI \-\-audit\-forward\-format " audit-forward-format"
+the remote forward's envelope: RFC5424 (the default) or CEF — the local
+syslog forms keep the verbatim send (remote targets only)
+.TP
+.BI \-\-audit\-instance " audit-instance"
+the audit lines' instance=<id> word — which daemon wrote the line: the
+control port when unset/empty (unique per host by construction), the
+override when spelled; 1\-64 characters (letters, digits, . _ : @ \-);
+make an override unique among everything that shares one collector
+.TP
+.BI \-\-audit\-max\-mb " audit-max-mb"
+rotate the audit log at this size in MB, keeping N backups; 0 = no size
+rotation
+.TP
+.B \-\-audit\-daily
+also rotate the audit log at UTC midnight
+.TP
+.BI \-\-audit\-files " audit-files"
+rotated audit backups to keep
+.TP
+.B \-\-no\-audit\-log
+disable the audit trail
+.TP
+.BI \-\-audit\-requests " audit-requests"
+audit one REQUESTS tally per client per this many seconds, 0 = off
+.TP
+.BI \-\-log\-level " log-level"
+log level
+.TP
+.B \-\-log\-access
+log client connects/disconnects at INFO instead of DEBUG
+.TP
+.BI \-\-dump\-path " dump-path"
+the state dump (write\-behind): the live setting overrides and — with
+\-\-dump\-with\-cache — the cached words, as one JSON, written 0600 with
+an integrity hash (a restore refuses a tampered, unsigned or
+group\-writable dump); dumped on shutdown, on the request dump command
+and every \-\-dump\-interval seconds; loaded on start only with
+\-\-restore\-on\-start, on demand with the request restore command
+.TP
+.BI \-\-dump\-key " dump-key"
+the key that seals the state dumps and the reload's state file: the
+words and the settings ride encrypted (an HMAC\-SHA256 counter\-mode
+keystream, authenticated — a restore refuses a wrong or missing key, and
+a configured key refuses an unsealed dump); the reload re\-exec
+re\-resolves the same key, so the state file reads on the other side; no
+key = the dumps stay 0600 plaintext with the integrity hash; a dump path
+without a key warns at start and on set; the value may be `file:<path>`
+— the first line of an owner\-only 0600 file (a systemd LoadCredential
+rides as file:/run/credentials/...)
+.TP
+.B \-\-dump\-with\-cache
+dump the cached words too: `request dump` and the \-\-dump\-interval
+loop write the words + the settings (`request dump with\-cache` always
+includes them; the restore takes either shape) ($DUMP_WITH_CACHE)
+.TP
+.BI \-\-dump\-interval " dump-interval"
+seconds between the automatic state dumps, 0 = on request (the request
+dump command and the shutdown)
+.TP
+.B \-\-restore\-on\-start
+load the state dump when the daemon starts (needs \-\-dump\-path) — a
+restart serves last\-known values instead of cold misses; without it the
+dump loads on demand
+.TP
+.B \-\-config
+config file — the set grammar: every line a `set <name> <value>`,
+comments start with # ($CONFIG, then modbus\-cache.conf next to this
+script, then the subproject root)
+.TP
+.B \-\-dry\-run
+validate the configuration and register map, print the effective
+settings and exit (nothing is bound or connected)
+
+
+.SH SIGNALS
+.TP
+.B SIGHUP
+reload the configuration and the register map without dropping clients
+(the file always wins over live settings; a broken file keeps the previous
+state). The listen address and the log level need a restart.
+.TP
+.B SIGUSR1
+clean the cache: all cached values, on-demand entries and poll-status
+errors are dropped; the poller repopulates immediately.
+.TP
+.BR SIGTERM ", " SIGINT
+graceful shutdown.
+
+.SH CONTROL
+The control server speaks JSON lines: one request
+\fB{"cmd": "..."}\fR per line, one reply
+\fB{"status": "ok|fail|note|bye", "text": "..."}\fR per line. Commands
+(the settings registry drives the grammar):
+.BR set ", " clear ", " show ", " help ,
+the reports
+.BR inspect ", " "show connections" ,
+.BR "show cache" " [all]" ", " "show write-registers-table" ,
+.BR "show uplink" ", " "show uplink-sources" ", " "show version" ,
+.BR "show connect-acl-table" ", " "show write-acl-table" ,
+.BR "show metrics-acl-table" ,
+the ops
+.BR "request dump" ", " "request restore" ", " "request flush cache" ,
+.BR "request reload" ", " "request reload-config" ", " "request restart" ", " shutdown ", " quit .
+.RS
+.IP \(bu 2
+.B set <setting> <value>
+changes a setting live (modbus-interval, cache-ttl, modbus-read-delay,
+modbus-merge-gap, allow-write, write-registers, max-clients,
+client-timeout, upstream, modbus-unit, metrics-server,
+metrics-listen, the metrics caps, metrics-acl,
+audit-requests, dump-interval, log-level, local-time, modbus-profile,
+selection, connect-acl, write-acl, modbus-timeout, modbus-auth,
+modbus-auth-upstream, control-port, control-ops-verbs, control-trust-uids,
+control-socket-group, audit-log, audit-forward, audit-max-mb,
+no-audit-log, dump-path, dump-with-cache); a SIGHUP \(em or the wire's
+\fBrequest reload-config\fR \(em re-applies the config
+(the file always wins). A knob the registry marks
+.B restart: true
+answers the note
+.B restart required (startup-only knob)
+from set/clear \-\- the set records the value (show renders it; the
+whole-daemon reload folds it into the fresh process before the binds),
+the config (and a SIGHUP) changes it too. Every secret in the registry
+is restart-marked (the tokens, the auth keys, dump-key) and refuses
+set/clear outright: a secret never rides the reload state (a secret knob
+refuses to show at all \-\- the value renders nowhere) \-\- it passes
+by flag/env/config and a restart.
+.IP \(bu 2
+.B show cache-all
+prints every cached entry: name, words, values, age, expiry, poll status.
+.IP \(bu 2
+.B show uplink
+analyses the inverter link: session counters (connects, exchanges, bytes,
+errors) and one row per poll block with its status, latency (last/mean/max)
+and last error.
+.B show uplink-sources
+spells the register map: one row per polled register \(em its fc,
+register address, the range that fetches it and the source name (the
+health columns stay the blocks').
+.IP \(bu 2
+.B show write-registers-table
+renders the write gate as its acl chain (show-only): \fBallow any\fR /
+\fBdeny any\fR, a range list as its whitelist (deny any, then one allow
+line per range), and in profile or file mode the gate's own rules \(em
+the gate's desc as the % line, then one allow/deny line per range with
+its desc, the comments aligned.
+.IP \(bu 2
+.B show acl connect table
+/ \fBshow write-acl-table\fR / \fBshow metrics-acl-table\fR render the
+IP ACL as its chain, one
+entry per line (show-only): \fBallow 0.0.0.0/0\fR (any), \fBdeny
+0.0.0.0/0\fR (none), \fBdeny 0.0.0.0/0\fR then one \fBallow\fR line
+per network (the whitelist) \(em and in file mode the ip-prefix gate's
+own rules, the gate desc as the % line, the rule descs as aligned
+comments.
+.IP \(bu 2
+.B request dump
+/ \fBrequest restore\fR: the write-behind state (the cached words + stamps,
+the live setting overrides) to/from the \fB--dump-path\fR file; the startup
+restore and the shutdown dump run the same path automatically. An overridden
+secret rides as \fB*** SECRET REMOVED ***\fR \(em the knob renders, the
+value never lands in the file, the restore skips the placeholder and names
+it. With \fB--dump-key\fR the dump is sealed: the state rides encrypted
+(an HMAC\-SHA256 counter\-mode keystream, authenticated \(em a restore
+refuses a wrong or missing key). The dump
+commands \(em and the \fBdump-interval\fR setting \(em show up in the
+listings only when a dump path is configured.
+.IP \(bu 2
+.B request flush cache
+/ SIGUSR1, \fBrequest restart\fR (drop the upstream + the cache, repoll),
+\fBrequest reload\fR (save the live overrides to a state file and re-exec the
+whole daemon \(em the fresh process re-resolves the config, so the
+restart-marked knobs take their configured values, and the saved
+overrides re-apply once; the cache starts empty),
+\fBrequest reload-config\fR (re-read the config file without the
+restart \(em the same re-apply as a SIGHUP; a broken file keeps the
+previous settings),
+\fBshutdown\fR (the same as SIGTERM).
+.RE
+.PP
+See
+.BR modbus-cache-cli (1)
+for the client.
+
+.SH SECURITY
+The control surface is loopback-only (TCP) or a 0600 unix socket; a TCP
+control-port without a token refuses to start (F5); with a token the
+wire is signed and the commands/replies verify end to end; a second,
+read-only ops token (\fB--control-ops-token\fR) authenticates sessions
+into its policy's verbs only \(em the default policy: show,flush \(em
+no set/clear, no request dump/restore, no request reload, no request
+restart, no shutdown \(em
+the ops shift against the admin key, both roles audited. A secret knob
+(control token, the ops token, the metrics token, modbus auth key, dump
+key) never shows its value: \fBshow\fR answers \fBerr <name> is a
+secret \(em it never shows\fR, \fBclear\fR refuses \(em pass the
+secret by flag/env, or as \fBfile:<path>\fR; \fBshow config\fR and the
+dumps render the knob as \fB*** SECRET REMOVED ***\fR (the config
+parser refuses the placeholder \(em it is never a value).
+.PP
+The Modbus port is read-only until the write gate says otherwise:
+writes ride \fB--write-registers\fR (the direct ranges, the profile's
+write-acl chain or a \fBfile:<path>\fR acl) and every accepted or
+refused write lands in the audit trail (WRITE / WRITE\-REFUSED). The
+\fB--connect-acl\fR IP gate (connect-acl) filters who may connect at
+all; the metrics endpoint carries the family's one /metrics stack (F13):
+a token-less non-loopback bind refuses to start, the metrics-acl IP
+gate narrows who reaches the endpoint, the caps bound the concurrency.
+With \fB--dump-key\fR the state file is sealed (an HMAC\-SHA256
+counter\-mode keystream, authenticated \(em a restore refuses a wrong
+or missing key). The audit trail (in the XDG state home when
+\fB--audit-log\fR is unset, prefix CACHE) records the control commands
+with their roles, the auth failures, the writes and the reloads. With
+\fB--audit-forward\fR every line \(em the per\-writer hash chain
+included \(em is mirrored onward: \fBsyslog\fR (the local socket
+auto\-scan), \fBsyslog:/path\fR (an explicit socket),
+\fBudp://host[:514]\fR (RFC5426, best\-effort) or
+\fBtcp://host[:514]\fR (RFC6587 framing) \(em the off\-box copy
+(F10): a scheduled search at the collector can chain\-verify the
+extracted prefix/chain fields and alert on a break. The remote envelope
+rides \fB--audit-forward-format\fR (\fBrfc5424\fR, the default, or
+\fBcef\fR); the local forms keep the verbatim send. Every line names
+its writer daemon in \fBinstance=<id>\fR \(em the control port when
+\fB--audit-instance\fR is unset (unique per host by construction), the
+override when spelled (1\-64 characters, letters, digits, . _ : @ \-);
+make an override unique among everything that shares one collector: the
+chain groups by it. A send failure
+notes once and the next event re\-arms. \fB--audit-log none\fR turns
+the local file off: with a forward spelled that is the remote\-only
+mode (the collector is the sole holder, the chain reseeds at GENESIS
+per run), without one the audit is disabled (the state
+\fB--no-audit-log\fR spells).
+
+.SH ENVIRONMENT
+.TP
+.B CTL
+control target for the daemon's clients when the flag is unset (flag
+\fB--control-port\fR wins).
+.TP
+.B LISTEN ", " INTERVAL ", " ALLOW_WRITE ", " ...
+every flag has an environment twin of the same bare name (no tool
+prefix — the exceptions spell their own: `--control-port`'s is `CTL`,
+`--cache-ttl`'s `TTL`); the flag wins over the env, the env over the
+config script.
+
+.SH FILES
+.TP
+.I /tmp/modbus-cache-<port>.socket
+the control socket used when \fB--control-port\fR is unset (stale files
+replaced, unlinked on shutdown).
+.TP
+.I ~/.local/state/modbus-cache/audit.log
+the audit trail when \fB--audit-log\fR is unset.
+.TP
+.I apps/cache/examples/modbus-cache.conf ", " extras/examples/modbus-cache-filter.json ,
+.I extras/examples/acl-write-registers.json
+the packaged sample config, the example selection and the example acl
+file in the shared examples home (the deye write policy for \fB--write-registers
+file:<path>\fR \(em
+a group/world-readable acl file warns in the log, the audit trail
+(ACL-FILE) and on the set/clear reply; chmod 0600 silences it).
+
+.SH EXIT STATUS
+.TP
+.B 0
+success (\fB--dry-run\fR: valid configuration).
+.TP
+.B 1
+invalid configuration or a failed bind (reason on stderr).
+.TP
+.B 2
+command-line misuse.
+
+.SH SEE ALSO
+.BR modbus-cache-cli (1),
+.BR modbus-scraper (1),
+.BR modbus-fake-inverter (1)
+.PP
+\fBcache/README.md\fR in the suite checkout \(em the full documentation.

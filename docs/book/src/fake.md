@@ -1,3 +1,3 @@
 # modbus-fake-inverter
 
-{{#include ../../../inverter/README.md}}
+{{#include ../../../apps/inverter/README.md}}

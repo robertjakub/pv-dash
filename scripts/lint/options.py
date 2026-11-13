@@ -529,7 +529,7 @@ def main():
         from common.settings.options import load_canon
         canon = load_canon()
         for tool in TOOLS:
-            path = os.path.join(REPO, tool, 'lib', 'options.json')
+            path = os.path.join(REPO, 'apps', tool, 'lib', 'options.json')
             try:
                 meta = json.load(open(path, encoding='utf-8'))
             except ValueError as e:
@@ -546,7 +546,7 @@ def main():
         return 0
     bad = False
     for tool in TOOLS:
-        path = os.path.join(REPO, tool, 'lib', 'options.json')
+        path = os.path.join(REPO, 'apps', tool, 'lib', 'options.json')
         nits, canon = lint(path)
         for nit in [n for n in nits if 'canonical' not in n]:
             print(nit)

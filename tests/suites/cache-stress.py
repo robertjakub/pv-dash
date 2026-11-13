@@ -17,10 +17,10 @@ import time
 
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
-CACHE_DIR = os.path.join(REPO, 'cache')
+CACHE_DIR = os.path.join(REPO, 'apps', 'cache')
 
 P = os.path.join(CACHE_DIR, 'bin', 'modbus-cache.py')
-F = os.path.join(REPO, 'inverter', 'bin', 'modbus-fake-inverter.py')
+F = os.path.join(REPO, 'apps', 'inverter', 'bin', 'modbus-fake-inverter.py')
 PORT, CACHE_PORT = 15601 + BASE, 15602 + BASE
 CLIENTS, DURATION = (50, 5.0) if PROFILE == 'quick' else (100, 15.0)
 

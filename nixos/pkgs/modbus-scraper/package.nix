@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-scraper";
-  version = "0.4.3";
+  version = "0.5.0";
 
   src = lib.cleanSource ../../../apps/scraper;
 

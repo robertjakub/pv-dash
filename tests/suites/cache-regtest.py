@@ -581,7 +581,7 @@ try:
           os.stat(gsock).st_mode & 0o777 == 0o660, oct(os.stat(gsock).st_mode))
     r = cli('show version\nquit\n', 15516 + BASE, {'CTL': gsock}, use_flag=False)
     check('control: the group socket speaks (the owner, us)', r.returncode == 0
-          and 'modbus-cache 0.4.3' in r.stdout, repr(r.stdout[-120:]))
+          and 'modbus-cache 0.5.0' in r.stdout, repr(r.stdout[-120:]))
 
     # 5b-2. the console pager: the pure arithmetic (no tty) + the pty smoke
     #       (the welcome-wave trick: a real pty against a real daemon — the

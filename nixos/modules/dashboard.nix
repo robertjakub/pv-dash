@@ -182,7 +182,7 @@ in
       default = null;
       description = ''
         Override the packaged static/ directory (e.g. custom index.html).
-        null = the package's own assets (share/dashboard/static) — the
+        null = the package's own assets (share/static) — the
         Exec pins the dir explicitly either way.
       '';
     };
@@ -268,7 +268,7 @@ in
         ExecStart = "${
           lib.getExe cfg.package
         } --static-dir ${
-          if cfg.staticDir != null then toString cfg.staticDir else "${cfg.package}/share/dashboard/static"
+          if cfg.staticDir != null then toString cfg.staticDir else "${cfg.package}/share/static"
         }";
         ExecReload = "${pkgs.util-linux}/bin/kill -HUP $MAINPID";
         EnvironmentFile = [ "${envFile}" ];

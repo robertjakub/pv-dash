@@ -42,7 +42,7 @@ scripts.
 - **[`lint/options.py`](lint/options.py)** — lint + reformat the four
   `lib/options.json` registries: the canonical row order, the
   hand-formatted layout (edits must be surgical — the lint enforces
-  it). `--check` for the gates.
+  it). `--check` for the gates; `format` is the write verb.
 - **`editor.py`** — the combined terminal editor, word subcommands:
   `options [<project>]` (the registry's dialog + line mode, the
   row surgery the hand-formatting demands) and `acl [--type <t>]
@@ -106,7 +106,12 @@ prose gates apart from the runners:
 
 - **[`lint/acl.py`](lint/acl.py)** — the acl gate-objects: the standalone
   `file:<path>` targets and the `extras/examples/` acl files; the typed
-  rule chain's grammar. Bare run globs the root.
+  rule chain's grammar. Bare run lints the root; `format` is the write
+  verb.
+- **[`lint/profile.py`](lint/profile.py)** — the device profiles: the
+  schema + style lint (the default verb) and `format`, the canonical
+  in-place rewrite (`--check`/`--diff` report the drift without writing).
+  Bare run lints `profiles/profiles/*.json`.
 - **`validate_json.py`** — the JSON documents against a JSON Schema
   (stdlib only): the loader-valid ⊂ schema-valid contract.
 - **`audit_verify.py`** — the audit trail's chained-hash verifier

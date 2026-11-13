@@ -26,13 +26,20 @@ description field, and the file itself renders in the canonical layout
 (the sections and blocks in their landed order, a block's fields in the
 row rank).
 
-  python3 scripts/lint/options.py             # reformat in place + report
-  python3 scripts/lint/options.py --check     # report only, exit 1 if off-form
-  python3 scripts/lint/options.py --diff      # show the unified diff, no write
+  python3 scripts/lint/options.py             # lint the four registries + the canon file
+  python3 scripts/lint/options.py format      # reformat in place + report
+  python3 scripts/lint/options.py format --check   # report only, rc 1 if off-form
+  python3 scripts/lint/options.py format --diff    # show the unified diff, no write
+  python3 scripts/lint/options.py --propose   # the drafts report (read-only)
 """
 import json
 import os
 import sys
+
+try:
+    from lint._common import diff_dump, grammar
+except ImportError:   # the bare run — the script's own dir is sys.path[0]
+    from _common import diff_dump, grammar
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # scripts/ — the common lib rides there
 from lib import REPO, TOOLS   # the scripts' common lib — the canon fold rides the loader's own
@@ -522,9 +529,12 @@ def family_lint():
 
 
 def main():
-    check, diff, propose = ('--check' in sys.argv[1:], '--diff' in sys.argv[1:],
-                            '--propose' in sys.argv[1:])
-    write = not check and not diff and not propose
+    args = sys.argv[1:]
+    mode, check, diff, _paths = grammar(args)
+    if mode == 'usage':
+        return 2
+    propose = '--propose' in args
+    write = mode == 'format' and not check and not diff and not propose
     if propose:
         from common.settings.options import load_canon
         canon = load_canon()
@@ -565,10 +575,7 @@ def main():
             print('%s: off the canonical layout' % path)
             bad = True
             if diff:
-                import difflib
-                sys.stdout.writelines(difflib.unified_diff(
-                    disk.splitlines(True), canon.splitlines(True),
-                    path, path + ' (canonical)'))
+                diff_dump(disk, canon, path)
     canon_path = os.path.join(REPO, 'shared', 'suite', 'options.json')
     try:
         with open(canon_path, encoding='utf-8') as f:
@@ -588,19 +595,17 @@ def main():
             print('shared/suite/options.json: off the canonical layout')
             bad = True
             if diff:
-                import difflib
-                sys.stdout.writelines(difflib.unified_diff(
-                    canon_disk.splitlines(True), canon_text.splitlines(True),
-                    canon_path, canon_path + ' (canonical)'))
+                diff_dump(canon_disk, canon_text, canon_path)
     family = family_lint()
     for nit in family:
         print(nit)
         bad = True
     if bad:
-        sys.exit(1)
+        return 1
     print('lint: the four registries and the canon file clean and canonical '
           '(the family passes too)')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

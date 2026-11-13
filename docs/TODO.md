@@ -514,7 +514,7 @@ re-open — is the history half:
   today (the drift sweep's schema/example pass). Give the family's
   remaining JSON artifacts schemas and one gate: `shared/suite/texts.json`,
   the four `options.json`/`defaults.json` pairs, the profiles' format
-  (profile-lint checks it in code — a schema would let editors speak
+  (profile.py lint checks it in code — a schema would let editors speak
   it) and the config-defaults placeholders; decide the surface (a lint
   script riding the release battery, a drift-sweep type or its own CI
   leg).
@@ -795,25 +795,25 @@ re-open — is the history half:
   removal: there are no `*_FILE` twins — `file:<path>` inside the plain
   token value is the one spelling.)
 - **the man pages** — one roff page per tool in each subproject's `man/`
-  (`man/` per subproject; 14 pages: the three cache binaries,
-  the three inverter binaries, the three scraper binaries, the dashboard
-  server + its two clients, the two profile tools), installed by the Nix
+  (`man/` per subproject; 13 pages: the three cache binaries,
+  the three inverter binaries, the three scraper binaries and the
+  dashboard server + its two clients), installed by the Nix
   packages (`share/man/man1/`) and linted with `mandoc -Tlint`.
 - **the demo stack, the Modbus chain** — `docker/compose.yaml`: the three
   alpine images (one Dockerfile per tool, unprivileged `pvsuite`, tools on
   `PATH`), the shared external `config` volume seeded by `entrypoint.sh`
   (bundled defaults copied in, existing files kept), the profiles +
   `common/` riding in as named build contexts.
-- **the profile linter** — `profiles/bin/profile-lint.py`: the required
-  keys and their family order, the register bounds, the type width, the
-  fc, the per-entry ttl, the mappings vs a register word, the duplicate
-  names, the same-fc overlaps, the terse-ASCII style; all four shipped
-  profiles lint clean.
-- **the profile formatter** — `profiles/bin/profile-format.py`: rewrites
-  any profile into the sun2000.json layout in place — one mappings entry
-  per line, one register per line, keys in the family order;
-  content-preserving and idempotent (the sun2000 itself comes back
-  byte-for-byte).
+- **the profile tool** — `scripts/lint/profile.py` (lint + format, one
+  script, the lint/ home's member): lint = the required keys and their
+  family order, the register bounds, the type width, the fc, the
+  per-entry ttl, the mappings vs a register word, the duplicate names,
+  the same-fc overlaps, the terse-ASCII style; all shipped profiles lint
+  clean. format rewrites any profile into the sun2000.json layout in
+  place — one mappings entry per line, one register per line, keys in
+  the family order; content-preserving and idempotent (the sun2000
+  itself comes back byte-for-byte), `--check`/`--diff` reporting the
+  drift without the write.
 - **the common/ package** — the shared core extracted: version, audit,
   config plumbing, the Modbus wire core, the UTC log formatter; the suite
   talks one vocabulary — and the control plane followed (the ctl/cli

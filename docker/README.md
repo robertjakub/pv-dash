@@ -38,8 +38,9 @@ artifacts. The pattern:
   later `set control-port <unix-path>` re-arms it), the
   Prometheus image probes `/-/ready` with busybox wget
 - the shared [`profiles/`](../profiles/README.md) JSON files copied flat to
-  `/pv-suite/profiles/` (the subproject's `bin/` tools stay out of the
-  image) — the profile resolution finds them relative to the checkout layout
+  `/pv-suite/profiles/` (the subproject is pure data — its lint/format
+  tool lives in `scripts/lint/profile.py`) — the profile resolution finds
+  them relative to the checkout layout
 - the **config volume** (`/config`, `VOLUME` + `ENTRYPOINT
   pv-entrypoint`): the entrypoint seeds it with the **required file
   artifacts only** — the generated `metrics.token`, the generated

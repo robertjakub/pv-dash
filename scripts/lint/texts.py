@@ -5,7 +5,10 @@ segment must be a clean lowercase word; every reference in the tree must
 resolve; every key must be referenced somewhere (the orphan gate); and no
 two leaves may share a value (one text, one home).
 
-    python3 scripts/lint/texts.py --check   # exit 1 on any failure
+    python3 scripts/lint/texts.py             # the report (the lint verb, the default)
+    python3 scripts/lint/texts.py --check     # the gate spelling, rc 1 on any failure
+
+No format verb — the registry is hand-authored, the edits stay human.
 
 A reference is a bare T call with a single quoted dotted key — the
 consumer imports the loader as `from common.render.texts import T`. The suites
@@ -14,6 +17,7 @@ call the loader, the docs quote it. Stdlib only."""
 import json
 import os
 import re
+import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REGISTRY = os.path.join(REPO, 'shared', 'suite', 'texts.json')
@@ -44,6 +48,10 @@ def leaves(node, prefix=''):
 
 
 def main():
+    args = sys.argv[1:]
+    if 'format' in args:
+        print('usage: no format verb — the registry is hand-authored, the edits stay human')
+        return 2
     try:
         with open(REGISTRY, encoding='utf-8') as f:
             texts = leaves(json.load(f))
@@ -79,10 +87,11 @@ def main():
     if bad:
         for b in bad:
             print('texts: ' + b)
-        raise SystemExit(1)
+        return 1
     print('texts: %d key(s), %d reference(s) across %d file(s) — clean'
           % (len(texts), len(refs), files))
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

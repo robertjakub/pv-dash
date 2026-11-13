@@ -4,8 +4,8 @@ option's file:<path> points at (extras/examples/acl-write-registers.json
 is the shipped write example, extras/examples/acl-ip-prefix.json the
 shared IP-kind one — both under extras/examples/; scripts/editor.py acl
 edits one). A device profile's
-embedded acl/write gate belongs to profiles/bin/profile-lint.py +
-profile-format.py.
+embedded acl/write gate belongs to the sibling profile.py (lint +
+format, one script).
 
 The root of the file IS the gate object: an optional terse-ASCII "desc"
 and the ordered "rules" list — one {"type": "allow"|"deny", matcher-key:
@@ -41,17 +41,22 @@ desc, the unknown keys after), the matchers inline, the trailing newline.
 The content is untouched — descs, matchers and their spellings land
 byte-for-byte as parsed.
 
-  python3 scripts/lint/acl.py                # the shipped example(s)
-  python3 scripts/lint/acl.py my.json        # lint + reformat in place
-  python3 scripts/lint/acl.py --check        # report only, exit 1 if off-form
-  python3 scripts/lint/acl.py --diff         # show the unified diff, no write
+  python3 scripts/lint/acl.py                # lint the shipped example(s)
+  python3 scripts/lint/acl.py my.json        # lint one file
+  python3 scripts/lint/acl.py format my.json # reformat in place
+  python3 scripts/lint/acl.py format --check # the drift report only, rc 1 = off-form
+  python3 scripts/lint/acl.py format --diff  # show the unified diff, no write
 """
-import difflib
 import glob
 import ipaddress
 import json
 import os
 import sys
+
+try:
+    from lint._common import diff_dump, fmt_one, grammar, lint_desc, lint_ranges
+except ImportError:   # the bare run — the script's own dir is sys.path[0]
+    from _common import diff_dump, fmt_one, grammar, lint_desc, lint_ranges
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for _p in (os.path.join(REPO, 'apps', 'cache'), REPO):
@@ -72,26 +77,6 @@ if _lib_saved is not None:
     sys.modules['lib'] = _lib_saved
 
 
-def lint_desc(d, where):
-    if d is not None and (not isinstance(d, str) or not d.strip() or not d.isascii()):
-        return ['%s: "desc" must be terse ASCII' % where]
-    return []
-
-
-def parse_range(t, where, issues):
-    """'START:COUNT' -> the (start, end) span, or None (said)."""
-    try:
-        s, c = (int(x) for x in t.split(':'))
-    except ValueError:
-        issues.append('%s: %r must be START:COUNT' % (where, t))
-        return None
-    if s < 0 or c < 1 or s + c > MAX_REGISTERS:
-        issues.append('%s: range %d:%d out of bounds (0..%d)'
-                      % (where, s, c, MAX_REGISTERS - 1))
-        return None
-    return (s, s + c)
-
-
 def lint_matcher(v, where, kind='range'):
     """One rule matcher -> (issues, spans): the spans the matcher
     decides, for the overlap and dead-rule passes. The register kind's
@@ -100,28 +85,7 @@ def lint_matcher(v, where, kind='range'):
     share no number line."""
     if kind == 'prefix':
         return lint_prefix_matcher(v, where)
-    issues = []
-    out = []
-    if isinstance(v, str):
-        t = v.strip().lower()
-        if t == 'any':
-            return issues, [(t, (0, MAX_REGISTERS))]
-        r = parse_range(t, where, issues)
-        if r:
-            out.append((t, r))
-        return issues, out
-    if isinstance(v, list):
-        for x in v:
-            t = str(x).strip().lower() if isinstance(x, str) else None
-            if t == 'any' or t is None:
-                issues.append('%s: %r must be START:COUNT (the word any stands alone)'
-                              % (where, x))
-                continue
-            r = parse_range(t, where, issues)
-            if r:
-                out.append((t, r))
-        return issues, out
-    return (['%s must be a range ("START:COUNT"), a list of ranges, or "any"' % where], out)
+    return lint_ranges(v, where, MAX_REGISTERS)
 
 
 def lint_prefix_matcher(v, where):
@@ -350,7 +314,7 @@ def lint_file(path):
     if 'acl' in data:
         issues.append('%s: the root IS the gate — an "acl" key is the full-profile shape and '
                       'refuses (move the gate object up, or lint the profile with '
-                      'profile-lint.py)' % base)
+                      'profile.py)' % base)
     rules = data.get('rules')
     n_rules = len(rules) if isinstance(rules, list) else 0
     issues += lint_gate(data, base)
@@ -364,9 +328,7 @@ def lint_file(path):
 
 def fmt_rule(rule):
     """One rule on one line, keys in the family order, extras after."""
-    keys = [k for k in ('type', 'range', 'prefix', 'desc') if k in rule] \
-        + [k for k in rule if k not in ('type', 'range', 'prefix', 'desc')]
-    return json.dumps({k: rule[k] for k in keys})
+    return fmt_one(rule, ('type', 'range', 'prefix', 'desc'))
 
 
 def fmt_gate(gate):
@@ -386,10 +348,10 @@ def fmt_gate(gate):
 
 
 def main():
-    args = sys.argv[1:]
-    check, diff = '--check' in args, '--diff' in args
-    write = not check and not diff
-    paths = [a for a in args if not a.startswith('--')]
+    mode, check, diff, paths = grammar(sys.argv[1:])
+    if mode == 'usage':
+        return 2
+    write = mode == 'format' and not check and not diff
     if not paths:
         paths = sorted(p for p in glob.glob(os.path.join(REPO, 'extras', 'examples', '**', 'acl-*.json'),
                                             recursive=True)
@@ -426,9 +388,7 @@ def main():
             print('%s: off the canonical layout' % rel)
             bad = True
             if diff:
-                sys.stdout.writelines(difflib.unified_diff(
-                    text.splitlines(True), canon.splitlines(True),
-                    rel, rel + ' (canonical)'))
+                diff_dump(text, canon, rel)
     print('lint: %d file(s), %s' % (len(paths), 'issues above' if bad else 'all clean'))
     return 1 if bad else 0
 

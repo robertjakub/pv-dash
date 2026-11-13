@@ -184,8 +184,6 @@ def tool_facts():
     facts['profiles'] = {
         'jsons': len([f for f in os.listdir(os.path.join(REPO, 'profiles', 'profiles'))
                       if f.endswith('.json')]),
-        'tools': len([f for f in os.listdir(os.path.join(REPO, 'profiles', 'bin'))
-                      if f.endswith('.py')]),
     }
     return facts
 
@@ -205,7 +203,7 @@ def render_cdx(f):
         {'bom-ref': 'pv-suite:profiles', 'type': 'file', 'name': 'profiles', 'version': v,
          'licenses': bsd,
          'properties': [{'name': 'pv-suite:content',
-                         'value': '%d device-profile JSONs + profile-lint.py + profile-format.py (stdlib only)' % f['tools']['profiles']['jsons']}]},
+                         'value': '%d device-profile JSONs (data only — the lint/format tool lives in scripts/lint/profile.py)' % f['tools']['profiles']['jsons']}]},
         {'bom-ref': 'pv-suite:modbus-cache', 'type': 'application', 'name': 'modbus-cache', 'version': v,
          'licenses': bsd},
         {'bom-ref': 'pv-suite:modbus-scraper', 'type': 'application', 'name': 'modbus-scraper', 'version': v,
@@ -334,7 +332,7 @@ first-party code (`common.*`, the subproject's own `lib.*`) — the
 generator's `ast` walk counts the lazy imports too:
 
 ```bash
-grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib profiles/bin \\
+grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib \\
     | sed -E 's/^(import|from) ([a-zA-Z_0-9.]+).*/\\2/' | sort -u
 ```
 
@@ -347,13 +345,13 @@ grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter app
 | Subproject | First-party code | Third-party runtime | Notes |
 |---|---|---|---|
 | [`common/`](../../common/README.md) | the package (%(common_modules)d modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
-| [`profiles/`](../../profiles/README.md) | %(profiles_jsons)d device-profile JSONs + %(profiles_tools)d tools | none — stdlib only | data + linter/formatter |
+| [`profiles/`](../../profiles/README.md) | %(profiles_jsons)d device-profile JSONs | none — stdlib only | data; the lint/format tool = `scripts/lint/profile.py` |
 | [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (%(cache_modules)d modules) + %(cache_clients)d control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (%(inverter_modules)d modules) + %(inverter_clients)d control clients | none — stdlib only (+ `common`) | simulator |
 | [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (%(scraper_modules)d modules) + %(scraper_clients)d control clients | none — stdlib only (+ `common`) | exporter |
 | [`apps/dashboard/`](../../apps/dashboard/README.md) | `bin/dashboard.py` + `lib/` (%(dashboard_modules)d modules) + %(dashboard_clients)d control clients + the static page | **Apache ECharts %(ech)s** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |
 """ % {'common_modules': common['modules'],
-       'profiles_jsons': profiles['jsons'], 'profiles_tools': profiles['tools'],
+       'profiles_jsons': profiles['jsons'],
        'cache_modules': cache['modules'], 'cache_clients': cache['clients'],
        'inverter_modules': inverter['modules'], 'inverter_clients': inverter['clients'],
        'scraper_modules': scraper['modules'], 'scraper_clients': scraper['clients'],
@@ -392,7 +390,7 @@ python3 scripts/generators/sbom.py --check
 
 # the human form of the import scan (module level; the generator's ast
 # walk is stricter)
-grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib profiles/bin | sort -u
+grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter apps/scraper apps/dashboard/bin apps/dashboard/lib | sort -u
 
 # the container layer
 docker build -t pv-sbom-check --build-context profiles=../profiles \\

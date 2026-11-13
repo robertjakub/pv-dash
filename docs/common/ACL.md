@@ -116,7 +116,7 @@ schema plus what the loader cannot say: a no-op rule, a dead rule —
 everything it decides a later rule re-decides — and the canonical layout)
 and `scripts/editor.py acl` (the dialog and the line mode, `--type` seeds a
 fresh gate and migrates a typeless one). Both speak both kinds; the
-embedded profile gates belong to `profiles/bin/profile-lint.py`. The
+embedded profile gates belong to `scripts/lint/profile.py`. The
 shipped examples — one shared copy each under `extras/examples/`:
 `acl-write-registers.json` (the deye register policy: the
 clean-slate deny, the allows, the deny carves, the re-opens) and

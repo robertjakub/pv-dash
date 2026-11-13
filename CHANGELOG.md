@@ -155,6 +155,46 @@ history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
+- **The lint/ directory speaks one CLI grammar** — profile.py's, all
+  five members: `lint` is the default verb and never writes (acl.py's
+  and options.py's write-by-default bare runs retire — the write is the
+  explicit `format` verb, `format --check`/`--diff` report the canonical
+  drift without touching the files), `--check` bare stays the CI gate
+  spelling everywhere, and the two members without a renderer
+  (readmes.py, texts.py) refuse `format` — their edits stay human. The
+  mains return their rc (options.py's `sys.exit(1)` fold, readmes.py's
+  findings summary prints to stdout); no consumer of the old spellings
+  existed outside the docs' `--check` gates, which all keep working. The
+  common code hoists into the sibling `scripts/lint/_common.py` — the
+  grammar parser, the terse-ASCII desc check, the START:COUNT range
+  matcher (acl.py's spans return folded with profile.py's issues-only
+  one), the one-line-object render and the --diff emission — imported
+  dual-mode (`lint._common` under the package, `_common` on the bare
+  run): the scripts' own `lib` is contested and lint/acl.py executes
+  with the cache's binding under editor.py's window, so the sibling
+  import never touches it; the contested-lib dances stay local (two
+  members, their comments are the value).
+
+- **The profiles' two tools merge into one — and re-home to the lint/
+  directory** — `profiles/bin/profile-lint.py` + `profile-format.py`
+  become `scripts/lint/profile.py` beside the other linters (lint +
+  format, one script: the lint verb is the default and `format` rewrites
+  in place — the old invocations keep their behavior and exit codes;
+  `format --check`/`--diff` report the canonical-layout drift without
+  the write, the acl.py grammar). `profiles/` becomes pure data: the
+  hand-written `man/` pair drops (its prose lives in the profiles
+  README), the empty `bin/` goes, and the docker images' story is
+  untouched (they only ever copied `profiles/profiles/`). The merge
+  heals two stale spots the old linter had carried — `lib.statics`'s
+  renamed `REGISTER_TYPES` → `REGISTERS_TYPE` import and the missing
+  repo-root `sys.path` entry its `common.*` imports need (the old
+  script died on both against the current cache lib); the contested-`lib`
+  dance runs acl.py's, so the module imports cleanly as `lint.profile`.
+  The six shipped profiles lint clean and the format round-trip is
+  byte-identical. The SBOM pair regenerates (profiles = the JSONs, the
+  tool's row re-points) and the pointers follow (scripts/lint/acl.py,
+  docs/common/ACL.md, docs/TODO.md, the scripts README).
+
 - **The four tool trees move under `apps/`** — `cache/`, `scraper/`,
   `inverter/` and `dashboard/` become `apps/cache/`, `apps/scraper/`,
   `apps/inverter/` and `apps/dashboard/`; the repo root now separates the

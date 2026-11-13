@@ -7,26 +7,31 @@ against the JSON files in `profiles/profiles/` first, then its own packaged
 copy. Every fact lives in the JSON — no hardcoded tables anywhere in the
 suite; a profile is addressed by bare name (this directory) or by path.
 
-Two standalone tools keep the profiles in shape (stdlib only, run as
-`python3 profiles/bin/<tool>.py` from the repo root):
+One tool keeps the profiles in shape — `scripts/lint/profile.py`, the
+lint/ home's member (stdlib only, run as `python3 scripts/lint/profile.py`
+from the repo root):
 
 ```bash
-python3 profiles/bin/profile-lint.py                    # lint all shipped profiles
-python3 profiles/bin/profile-lint.py my-device.json     # lint one file
-python3 profiles/bin/profile-format.py profiles/profiles/deye-sg03lp1.json
+python3 scripts/lint/profile.py                          # lint all shipped profiles
+python3 scripts/lint/profile.py my-device.json           # lint one file
+python3 scripts/lint/profile.py format profiles/profiles/deye-sg03lp1.json
+python3 scripts/lint/profile.py format --check           # the layout drift only, rc 1 = off-form
+python3 scripts/lint/profile.py format --diff            # the unified diff, no write
 ```
 
-- **`profile-lint.py`** — the schema and style checks: valid JSON, the
-  top-level shape, a non-empty `description`, the required keys and their
-  family order, the register bounds (0…65536 − width), the type width,
-  `fc` ∈ {3, 4} for the word types and {1, 2} for `bit`, a numeric
+- **lint** (the default verb) — the schema and style checks: valid JSON,
+  the top-level shape, a non-empty `description`, the required keys and
+  their family order, the register bounds (0…65536 − width), the type
+  width, `fc` ∈ {3, 4} for the word types and {1, 2} for `bit`, a numeric
   `ttl ≥ 0`, terse-ASCII `desc`s, the mappings vs a register word, the
   write acl tree, duplicate names and same-fc register overlaps. Exits
   non-zero on the first issue found.
-- **`profile-format.py`** — rewrites any profile in place into the
-  canonical layout (the `sun2000.json` shape): description first, then the
-  acl tree, then the mappings, then the registers — one entry per line,
-  keys in the family order. Content-preserving and idempotent.
+- **`format`** — rewrites any profile in place into the canonical layout
+  (the `sun2000.json` shape): description first, then the acl tree, then
+  the mappings, then the registers — one entry per line, keys in the
+  family order. Content-preserving and idempotent. `--check` reports the
+  drift without writing (rc 1 when anything is off-form), `--diff` shows
+  the unified diff instead.
 
 ## Format
 

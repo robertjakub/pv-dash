@@ -45,9 +45,9 @@ stdenv.mkDerivation (finalAttrs: {
     install -m644 ${../../../common}/modbus/*.py $out/share/dashboard/common/modbus/
     install -m644 ${../../../shared}/suite/protocol.json $out/share/dashboard/shared/suite/
     cp -r static $out/share/dashboard/static
-    install -Dm644 examples/config.js $out/share/dashboard/config.js
-    install -Dm644 examples/dashboard.conf $out/share/dashboard/dashboard.conf
-    install -Dm644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/dashboard/acl-ip-prefix.json
+    install -dm755 $out/share/dashboard/examples
+    install -m644 examples/config.js examples/dashboard.conf $out/share/dashboard/examples/
+    install -m644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/dashboard/examples/
     install -Dm644 ${../../../shared}/schema/acl-ip-prefix.schema.json $out/share/dashboard/acl-ip-prefix.schema.json
     install -dm755 $out/share/man/man1
     install -m644 man/*.1 $out/share/man/man1/

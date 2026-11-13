@@ -9,11 +9,13 @@ doc names something that exists.
 
 The two checks have different homes:
 
-- the LINKS check runs everywhere — a broken link is broken navigation,
-  the history records included;
+- the LINKS check runs everywhere except the CHANGELOG — a broken link
+  is broken navigation, the history records included; the CHANGELOG is
+  a record file, its released halves keep their landed spellings;
 - the TOKEN check runs on the current half only and skips
-  docs/history/ and the per-tool TODO.md files — the history records
-  keep their landed spellings (the convention since the scripts split).
+  docs/history/, the per-tool TODO.md files and the CHANGELOG — the
+  history records keep their landed spellings (the convention since
+  the scripts split).
 
 The generated layer is excluded from both — docs/family-drift.md, the
 four <tool>/MANUAL.md pages and docs/sbom/SBOM.md speak their
@@ -35,6 +37,7 @@ SPAN = re.compile(r'`([^`\n]+)`')
 ROOTED = re.compile(r'^(apps|docs|shared|common|extras|docker|nixos|scripts|tests)/'
                     r'[A-Za-z0-9][A-Za-z0-9_./-]*$')
 GENERATED = ('/MANUAL.md', 'docs/family-drift.md', 'docs/sbom/SBOM.md')
+RECORDS = ('CHANGELOG.md',)
 TOKEN_SKIP = ('docs/history/', )
 TOKEN_SKIP_FILES = ('CHANGELOG.md', 'docs/docs-redo.md')
 
@@ -80,11 +83,15 @@ def findings():
         rel = os.path.relpath(path, REPO)
         if any(rel.endswith(suffix) or rel == suffix for suffix in GENERATED):
             continue
+        record = any(rel.endswith(suffix) or rel == suffix for suffix in RECORDS)
         base = os.path.dirname(path)
-        current_token_file = not any(part in rel for part in TOKEN_SKIP) \
+        current_token_file = not record \
+            and not any(part in rel for part in TOKEN_SKIP) \
             and not rel.endswith('/TODO.md') \
             and rel not in TOKEN_SKIP_FILES
         for number, line in prose_lines(path):
+            if record:
+                continue
             for target in INCLUDE.findall(line):
                 miss = resolves(base, target.strip())
                 if miss:

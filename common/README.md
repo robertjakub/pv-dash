@@ -4,7 +4,7 @@ One stdlib-only Python package (imported as `common`) used by
 [modbus-scraper](../apps/scraper/README.md), [modbus-cache](../apps/cache/README.md),
 the [fake inverter](../apps/inverter/README.md) and the [dashboard](../apps/dashboard/README.md),
 organized into functional subpackages. The shared layer's behavior specs
-live in [docs/common/](../docs/common/README.md) — the Modbus reference,
+live in [docs/specs/](../docs/specs/README.md) — the Modbus reference,
 the ACL map, the defaults ladder:
 
 ## `render/` — the human-facing rendering

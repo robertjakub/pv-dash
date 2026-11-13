@@ -25,7 +25,7 @@ samples, and every `package.nix` installs its packaged copy into
   families). Every tool's ip-prefix `file:` acl knob reads this shape —
   the cache's `acl/connect` + `acl/write`, the scraper's and the fake
   inverter's `metrics/acl`, the dashboard's `metrics-acl`
-   ([docs/common/ACL.md](../../docs/common/ACL.md) is the family-wide story).
+   ([docs/common/ACL.md](../../docs/specs/ACL.md) is the family-wide story).
 - **`acl-write-registers.json`** — the standalone acl file:
   the write-registers gate (the deye policy, worked out — the
   clean-slate deny, the allows, the deny carves, the re-opens). The

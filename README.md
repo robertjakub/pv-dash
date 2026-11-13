@@ -14,7 +14,7 @@ the Deye hybrids — packaged together as one Nix flake:
 | [`apps/scraper/`](apps/scraper/README.md) | `modbus-scraper` | Prometheus exporter for a Modbus TCP inverter (stdlib only) with a NixOS module |
 | [`apps/cache/`](apps/cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`apps/inverter/`](apps/inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
-| [`extras/`](extras/README.md) | — | The operator-side packs nothing in the suite loads: the alert rules (`alerts/`, one file per watched exporter), the shared sample files the tools' `file:` acl gates point at (`examples/` — `acl-ip-prefix.json`, [docs/common/ACL.md](docs/common/ACL.md)) and the Graylog content pack (`graylog/`) |
+| [`extras/`](extras/README.md) | — | The operator-side packs nothing in the suite loads: the alert rules (`alerts/`, one file per watched exporter), the shared sample files the tools' `file:` acl gates point at (`examples/` — `acl-ip-prefix.json`, [docs/specs/ACL.md](docs/specs/ACL.md)) and the Graylog content pack (`graylog/`) |
 | [`shared/`](shared/README.md) | — | The family's shared data, outside every package — the device profiles ([`shared/profiles/`](shared/profiles/README.md), one JSON schema consumed by all three Modbus tools: `name → register/type/scale` with per-entry descriptions; ships `sun2000`, `sun2000_full`, `demo-fc4`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`, a linter and a formatter keep them in shape), `texts.json` (the static texts `common/render/texts.py`'s `T()` reads) and [`shared/schema/`](shared/schema/README.md) (the shared JSON Schemas, draft 2020-12 — `acl-ip-prefix.schema.json`, the standalone acl file's schema (the loader stays the strict word)) |
 | [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`), six functional subpackages: `render/` (texts, man pages), `runtime/` (daemon ladder, audit, version), `settings/` (the option registry — one knob, one source — config plumbing, dumps), `wire/` (the signed wire + RBAC, both ctl/cli ends), `serve/` (the gates + metrics skeleton), `modbus/` (the wire core) |
 
@@ -72,8 +72,8 @@ pv-suite/
 ├── docs/         # the family-level docs, filed by grain in the
 │                 #   [design doc](docs/DESIGN.md) (the shape + the docs redo): the
 │                 #   [security doc](docs/SECURITY.md), the
-│                 #   [Modbus protocol reference](docs/common/MODBUS.md), the
-│                 #   [ACL map](docs/common/ACL.md), the
+│                 #   [Modbus protocol reference](docs/specs/MODBUS.md), the
+│                 #   [ACL map](docs/specs/ACL.md), the
 │                 #   [family-wide TODO](docs/TODO.md) (every open item — the one-product
 │                 #   sweep rides as its section), the
 │                 #   [SBOM](docs/sbom/SBOM.md) and the history home

@@ -28,9 +28,9 @@ and as a full pass whenever a wave landed doc ripples across tools.
 
 | Grain | Home |
 |---|---|
-| the mechanism specs (the shared core) | [common/MODBUS.md](common/MODBUS.md) (the protocol, the profiles, the auth), [common/ACL.md](common/ACL.md) (the gates), [common/static-defaults.md](common/static-defaults.md) (the defaults ladder + the gate) |
+| the mechanism specs (the shared core) | [specs/MODBUS.md](specs/MODBUS.md) (the protocol, the profiles, the auth), [specs/ACL.md](specs/ACL.md) (the gates), [specs/static-defaults.md](specs/static-defaults.md) (the defaults ladder + the gate) |
 | the security ledger | [SECURITY.md](SECURITY.md) — the open findings, the posture, the NIS2/DORA map; the closed half in [history/AUDIT.md](history/AUDIT.md) (the closed findings with fix + verification, the per-revision walk) |
-| the ledgers (open vs history) | [TODO.md](TODO.md) — the open items (the one-product sweep rides as its section) + the per-tool `TODO.md` Done records; [history/family-unify.md](history/family-unify.md) — the sweep's verified-aligned ledger (do not re-open); the generated [family-drift.md](family-drift.md) (the census + the open findings) + [history/family-drift.md](history/family-drift.md) (the landed legs) |
+| the ledgers (open vs history) | [TODO.md](TODO.md) — the open items (the one-product sweep rides as its section) + the per-tool `TODO.md` Done records; [history/family-unify.md](history/family-unify.md) — the sweep's verified-aligned ledger (do not re-open); the alignment waves' contracts ([history/options-align.md](history/options-align.md), [history/show-commands-align.md](history/show-commands-align.md) — landed, do not re-fly); the generated [family-drift.md](family-drift.md) (the census + the open findings) + [history/family-drift.md](history/family-drift.md) (the landed legs) |
 | the release history | the root [CHANGELOG](../CHANGELOG.md) (Unreleased + the current release), [history/CHANGELOG.md](history/CHANGELOG.md) (the archive — `scripts/release.py` maintains the split) |
 | the maintenance | this page's redo (below), [scripts/README.md](../scripts/README.md) (the gates + the editors) |
 | the deployment | [docker/README.md](../docker/README.md) (the stacks, the env files, the secrets), [nixos/README.md](../nixos/README.md) (the one Nix reference) |
@@ -38,8 +38,8 @@ and as a full pass whenever a wave landed doc ripples across tools.
 | the operator packs | [extras/](../extras/README.md) — the [alert rules](../extras/alerts/README.md) (one file per watched exporter), the [shared sample files](../extras/examples/README.md) the `file:` acl gates point at, the [graylog pack](../extras/graylog/README.md) |
 
 The per-tool surfaces live in the tools' own READMEs and MANUALs; the
-book (`docs/book/`, built from `book/src/`) carries the reader tour,
-this page beside the index.
+book (`docs/book/`, built from `book/src/`) carries the reader tour —
+this page beside the index, the four manuals gathered on one page.
 
 The ledger rules (every doc family is TWO files — the current half
 answers "what is true now", the history half "how did we get here"):
@@ -87,7 +87,7 @@ release.
    the generator's constants if the verdict prose moved), not the doc.
 
 2. **The retired-vocabulary hunt** in the HAND-written docs (the
-   READMEs, docs/DESIGN.md, docs/common/, nixos/README.md,
+   READMEs, docs/DESIGN.md, docs/specs/, nixos/README.md,
    docs/TODO.md, docs/SECURITY.md) — targeted
    greps for the vocabularies that died:
    retired commands (`show settings`), retired flags (`--host`,

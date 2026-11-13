@@ -4,7 +4,7 @@ This is the family's **one security document**: the posture, the trust
 boundaries, the implemented controls, the per-tool stories, the audit
 findings and the supply-chain claim. The mechanism references of their own
 stay separate and are linked where they answer a security question —
-[common/ACL.md](common/ACL.md) (the ACL grammar), [sbom/SBOM.md](sbom/SBOM.md)
+[common/ACL.md](specs/ACL.md) (the ACL grammar), [sbom/SBOM.md](sbom/SBOM.md)
 (the supply chain), [../nixos/README.md](../nixos/README.md) (the NixOS
 hardening and the option map).
 
@@ -311,11 +311,11 @@ claim (CycloneDX), import-scan-gated and release-checked:
 The two ACL planes — who may reach a listener (the IP plane) and which
 registers a forwarded write may touch (the register plane) — speak one
 gate-object schema with two matcher kinds; the grammar, the per-tool knobs
-and the enforcement map: [common/ACL.md](common/ACL.md). The control-plane
+and the enforcement map: [common/ACL.md](specs/ACL.md). The control-plane
 auth is NOT an ACL: the tokens, the RBAC ops role and the `trust-uids`
 list decide who may drive the control socket (§ 4), and the Modbus
 `modbus-auth` handshake is a wire-level proof between peers
-([common/MODBUS.md](common/MODBUS.md)).
+([common/MODBUS.md](specs/MODBUS.md)).
 
 ## 8. Findings
 

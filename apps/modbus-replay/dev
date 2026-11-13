@@ -1,0 +1,16 @@
+#!/bin/sh
+# the dev launcher: the daemon straight from the checkout — capture
+# against the bench device by default (--upstream, the UPSTREAM env
+# overrides); the trace rides --capture FILE. Replay rides --replay
+# FILE and DROPS the upstream default (the arg-rebuild below — the two
+# modes refuse each other). The logs run at DEBUG here; an explicit
+# --log-level wins (the last flag wins in argparse).
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || exit 1
+for a in "$@"; do
+    case "$a" in --replay|--replay=*) REPLAY=1 ;; esac
+done
+if [ "$REPLAY" != 1 ]; then
+    set -- --upstream "${UPSTREAM:-10.48.3.137:5502}" "$@"
+fi
+exec python3 "$DIR/bin/modbus-replay.py" \
+    --log-level DEBUG "$@"

@@ -24,7 +24,7 @@ scripts.
   emit-and-check doc writer (render, write or diff, exit 1 on stale —
   the generators' `--check` rides it). The NAME is contested: the
   per-tool `lib/` packages own `lib` wherever a tool root precedes
-  `scripts/` on sys.path, so `editor.py` opens the house's
+  `scripts/` on sys.path, so the editor opens the house's
   one-module-named-`lib`-at-a-time dance around its imports — the rule
   is documented in `lib/__init__.py`.
 
@@ -44,7 +44,8 @@ scripts.
   `lib/options.json` registries: the canonical row order, the
   hand-formatted layout (edits must be surgical — the lint enforces
   it). `--check` for the gates; `format` is the write verb.
-- **`editor.py`** — the combined terminal editor, word subcommands:
+- **[`editor/editor.py`](editor/editor.py)** — the combined terminal
+  editor, word subcommands:
   `options [<project>]` (the registry's dialog + line mode, the
   row surgery the hand-formatting demands) and `acl [--type <t>]
   <file>` (the standalone gate's editor — the loader-gated save,

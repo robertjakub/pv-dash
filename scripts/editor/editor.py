@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """The family's terminal editor — one tool, two faces, word subcommands:
 
-  python3 scripts/editor.py options [<project>]               the registry's dialog (curses) on a tty
-  python3 scripts/editor.py options --line <project>          the registry's line mode (also when piped)
-  python3 scripts/editor.py acl [--type <t>] [--line] <file>  the standalone acl file's editor
+  python3 scripts/editor/editor.py options [<project>]               the registry's dialog (curses) on a tty
+  python3 scripts/editor/editor.py options --line <project>          the registry's line mode (also when piped)
+  python3 scripts/editor/editor.py acl [--type <t>] [--line] <file>  the standalone acl file's editor
 
 The options face edits a tool's lib/options.json registry. The
 dialog: the knob index is the menu — arrows walk it, Enter opens the
@@ -77,7 +77,7 @@ import os
 import signal
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 for _p in (ROOT, os.path.join(ROOT, 'scripts'), os.path.join(ROOT, 'apps', 'cache')):
     sys.path.insert(0, _p)
 
@@ -1364,7 +1364,7 @@ class AclEditor:
             if 'acl' in self.gate:
                 raise ValueError('%s: the root IS the gate — an "acl" key is the full-profile '
                                  'shape (move the gate object up, or edit the profile with '
-                                 'scripts/editor.py)' % self.rel)
+                                 'scripts/editor/editor.py)' % self.rel)
             declared = self.gate.get('type')
             if declared is not None and declared not in _GATE_TYPES:
                 raise ValueError('%s: unknown gate type %r (write-registers | ip-prefix)'

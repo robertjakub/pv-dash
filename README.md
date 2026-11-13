@@ -59,9 +59,10 @@ pv-suite/
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
 ├── tests/        # the battery runner (tests/battery/ behind the
 │                 #   tests/battery/battery.py runner) + the suites, one or more per Modbus tool
-├── scripts/      # the tooling, filed by role: editor.py (the registry
-│                 #   editor), family_drift.py, release.py, list_options.py,
-│                 #   tui.py, the compare tools
+├── scripts/      # the tooling, filed by role: editor/ (the registry
+│                 #   editor + its curses primitives), family_drift.py,
+│                 #   release.py, list_options.py, options_compare.py
+│                 #   (the three compare lenses)
 │   ├── gates/    # everything rc-1-on-red: the lints (acl/options/readmes/
 │   │             #   texts/links/profile) + check_options/validate_json/audit_verify
 │   ├── lib/      # the scripts' common lib (the loaders, the registry, the tree-walk, emit)

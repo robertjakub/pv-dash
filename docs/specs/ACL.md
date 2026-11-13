@@ -114,7 +114,7 @@ file is read at start and on every `set`/`clear`:
 Two tools keep the files honest — `scripts/gates/acl.py` (the loader's
 schema plus what the loader cannot say: a no-op rule, a dead rule —
 everything it decides a later rule re-decides — and the canonical layout)
-and `scripts/editor.py acl` (the dialog and the line mode, `--type` seeds a
+and `scripts/editor/editor.py acl` (the dialog and the line mode, `--type` seeds a
 fresh gate and migrates a typeless one). Both speak both kinds; the
 embedded profile gates belong to `scripts/gates/profile.py`. The
 shipped examples — one shared copy each under `extras/examples/`:

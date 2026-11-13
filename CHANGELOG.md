@@ -501,6 +501,19 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   whole registry path as the canon label). The scripts README's three
   rows collapse into one.
 
+- **The editor moves into its own home** — `scripts/editor.py` +
+  `scripts/tui.py` (the shared curses primitives) become
+  `scripts/editor/{editor,tui}.py`: the boot's ROOT walk gains the
+  third dirname and the sys.path inserts spell the same three homes
+  (the repo root, `scripts/` for the lib-and-gates imports, the cache
+  root for the one-module-named-`lib` dance), `tui` resolves off the
+  script's own dir, and the invocation spelling is
+  `python3 scripts/editor/editor.py` — the docs (the specs' two
+  editor mentions, the examples README's acl edit, the gate docstring,
+  the root tree) follow. The battery's clean-slot re-run on the
+  compare-tools commit caught nothing here — the editor has no suite,
+  its proof is the boot (the usage render runs the whole import chain).
+
 ### Removed
 
 - **`scripts/set_group.py` + `scripts/set_live.py`** — the one-field

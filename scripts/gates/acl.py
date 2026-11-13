@@ -2,7 +2,7 @@
 """Lint and reformat the standalone acl files — the json a cache acl
 option's file:<path> points at (extras/examples/acl-write-registers.json
 is the shipped write example, extras/examples/acl-ip-prefix.json the
-shared IP-kind one — both under extras/examples/; scripts/editor.py acl
+shared IP-kind one — both under extras/examples/; scripts/editor/editor.py acl
 edits one). A device profile's
 embedded acl/write gate belongs to the sibling profile.py (lint +
 format, one script).

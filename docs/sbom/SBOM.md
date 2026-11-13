@@ -31,16 +31,16 @@ Every name in that list is stdlib (`argparse`, `ast`, `collections`,
 `json`, `logging`, `math`, `mimetypes`, `operator`, `os`, `random`, `re`,
 `readline`, `secrets`, `select`, `signal`, `socket`, `struct`, `subprocess`,
 `sys`, `termios`, `textwrap`, `threading`, `time`, `tty`, `types`,
-`unicodedata`, `urllib`) or `common`/`lib`. Nothing else. No `requests`, no
-`pyserial`, no `prometheus_client`.
+`unicodedata`, `urllib`, `zlib`) or `common`/`lib`. Nothing else. No
+`requests`, no `pyserial`, no `prometheus_client`.
 
 ## Per subproject
 
 | Subproject | First-party code | Third-party runtime | Notes |
 |---|---|---|---|
-| [`common/`](../../common/README.md) | the package (21 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
+| [`common/`](../../common/README.md) | the package (22 modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
 | [`shared/profiles/`](../../shared/profiles/README.md) | 6 device-profile JSONs | none — stdlib only | data; the lint/format tool = `dev/gates/profile.py` |
-| [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (11 modules) + 1 control clients | none — stdlib only (+ `common`) | proxy daemon |
+| [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (12 modules) + 1 control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (13 modules) + 1 control clients | none — stdlib only (+ `common`) | simulator |
 | [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (11 modules) + 1 control clients | none — stdlib only (+ `common`) | exporter |
 | [`apps/dashboard/`](../../apps/dashboard/README.md) | `bin/dashboard.py` + `lib/` (7 modules) + 1 control clients + the static page | **Apache ECharts 5.5.1** (Apache-2.0, vendored at `static/vendor/echarts.min.js`) — the only third-party code in the suite | no CDN, fully offline |

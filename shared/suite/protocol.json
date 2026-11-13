@@ -13,6 +13,12 @@
     "illegal_value": 3,
     "gateway_failed": 11
   },
+  "trace": {
+    "format": "pv-suite-modbus-trace",
+    "version": 1,
+    "binary_magic": "PVMB",
+    "binary_version": 1
+  },
   "registers_type": {
     "i16": 1,
     "u16": 1,

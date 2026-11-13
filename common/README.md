@@ -62,6 +62,7 @@ tools' `statics.py` alias it).
 | `client.py` | the shared client ladders: the connect + auth-handshake and reply-validation sequences both client legs speak |
 | `server.py` | the shared Modbus-TCP accept ladder and session opener — the family's two Modbus faces (the cache and the fake inverter) ride it with their face objects |
 | `writes.py` | the shared write shapes: the human description, the touched span and the consistency check for every write function code |
+| `trace.py` | the wire trace's one home: the PVMB file/record encoding, the `TraceWriter` and the record `FeedSocket` (0600 at bind) — the replay's capture/replay faces and the cache's record feed all speak it; the format identity rides the protocol tree's `trace` section |
 
 How `common` is found:
 

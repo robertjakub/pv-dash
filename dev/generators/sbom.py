@@ -42,7 +42,7 @@ STDLIB = (
     'hmac', 'http', 'ipaddress', 'json', 'logging', 'math', 'mimetypes', 'operator',
     'os', 'random', 'readline', 're', 'secrets', 'select', 'signal', 'socket', 'struct',
     'subprocess', 'sys', 'termios', 'textwrap', 'threading', 'time', 'tty', 'types',
-    'unicodedata', 'urllib',
+    'unicodedata', 'urllib', 'zlib',
 )
 FIRST_PARTY = ('common', 'lib')
 

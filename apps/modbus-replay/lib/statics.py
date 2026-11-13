@@ -11,12 +11,9 @@ STATIC = load_static_json(__file__)
 from common.modbus.protocol import PROTOCOL    # the family's one protocol tree
 MAX_PDU = PROTOCOL['max_pdu']                  # the largest accepted Modbus frame
 
-TRACE_FORMAT = STATIC['trace']['format']       # the JSON trace's format word (the v1 spelling)
-TRACE_VERSION = STATIC['trace']['version']     # (the replay side refuses a foreign one)
-TRACE_MAGIC = STATIC['trace_binary']['magic'].encode('ascii')
-"""The binary trace's magic (b'PVMB') — the file's first bytes, the
-format detection's peek and the resync scan's anchor."""
-TRACE_BINARY_VERSION = STATIC['trace_binary']['version']
+from common.modbus.trace import (TRACE_FORMAT, TRACE_MAGIC,      # the trace identity rides
+                                 TRACE_BINARY_VERSION, TRACE_VERSION)   # the family's one tree
+                                                                 # (lib/trace.py re-exports them too)
 
 EXC_GATEWAY = STATIC['replay_miss_code']       # 11 — gateway target device failed
                                                # to respond (the replay miss default)

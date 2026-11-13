@@ -59,11 +59,12 @@ pv-suite/
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
 ├── tests/        # the battery runner (tests/battery/ behind the
 │                 #   tests/battery/battery.py runner) + the suites, one or more per Modbus tool
-├── scripts/      # the gates + editors: check/lint, editor.py,
-│                 #   family_drift, validate_json, set_group/set_live,
-│                 #   release.py, audit_verify.py
-│   ├── lib/      # the scripts' common lib (the loaders, the tree-walk, emit)
-│   ├── lint/     # the linters: acl/options/readmes/texts
+├── scripts/      # the tooling, filed by role: editor.py (the registry
+│                 #   editor), family_drift.py, release.py, list_options.py,
+│                 #   tui.py, the compare tools
+│   ├── gates/    # everything rc-1-on-red: the lints (acl/options/readmes/
+│   │             #   texts/links/profile) + check_options/validate_json/audit_verify
+│   ├── lib/      # the scripts' common lib (the loaders, the registry, the tree-walk, emit)
 │   └── generators/  # the four generators: man/manual/examples/sbom
 ├── docker/       # one alpine image per tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))

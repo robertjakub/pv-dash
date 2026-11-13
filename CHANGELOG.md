@@ -481,6 +481,15 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   the protocol.json row moves from common/README's wire table into the
   shared/README table it belongs in.
 
+### Removed
+
+- **`scripts/set_group.py` + `scripts/set_live.py`** — the one-field
+  surgical setters (an option row's `group` / `live`), the pre-editor
+  era's row surgery. `scripts/editor.py`'s registry dialog edits every
+  field they did (`EDITABLE` carries `group` and `live` beside the
+  rest) and the compare tools remain for the reads; the scripts README's
+  row and the root README's tree line follow.
+
 ### Added
 
 - **the four CLIs** — **the console pager**: every console reply prints

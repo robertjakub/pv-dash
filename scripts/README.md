@@ -48,10 +48,9 @@ scripts.
   `options [<project>]` (the registry's dialog + line mode, the
   row surgery the hand-formatting demands) and `acl [--type <t>]
   <file>` (the standalone gate's editor — the loader-gated save,
-  the SIGINT-blocked writes, the ^C-safe dialogs).
-- **`set_group.py` / `set_live.py`** — the one-field surgical
-  setters (an option row's `group` / `live`), riding `lib`'s
-  row-locator and the live-name rule.
+  the SIGINT-blocked writes, the ^C-safe dialogs). The one-field
+  surgical setters (`set_group.py` / `set_live.py`) retired — the
+  dialog edits every field they did.
 - **`list_options.py`** — the knobs' one-line listing, one flat table
   with the tool as the first column (the live names, the flags, the
   env twins — the merged-knob census view; the hierarchy-node rows

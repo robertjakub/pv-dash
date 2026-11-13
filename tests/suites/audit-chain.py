@@ -2,7 +2,7 @@
 """Regression test for the audit trail's hash chain (docs/SECURITY.md F10):
 every entry carries a short hash right after the event name, chaining to the
 writer's previous entry,
-and scripts/audit_verify.py detects tampering (an edited
+and scripts/gates/audit_verify.py detects tampering (an edited
 line, a deleted line, reordered lines), passes legit trails (restarts chain
 seamlessly, rotation spans the backups), and reports legacy unsigned lines
 without failing them.
@@ -18,6 +18,8 @@ import sys
 import tempfile
 import time
 
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
 V = os.path.join(REPO, 'scripts', 'audit_verify.py')

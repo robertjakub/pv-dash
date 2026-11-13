@@ -17,6 +17,8 @@ import sys
 import threading
 import time
 
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
 P = os.path.join(REPO, 'apps', 'cache', 'bin', 'modbus-cache.py')

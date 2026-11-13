@@ -41,11 +41,11 @@ desc, the unknown keys after), the matchers inline, the trailing newline.
 The content is untouched — descs, matchers and their spellings land
 byte-for-byte as parsed.
 
-  python3 scripts/lint/acl.py                # lint the shipped example(s)
-  python3 scripts/lint/acl.py my.json        # lint one file
-  python3 scripts/lint/acl.py format my.json # reformat in place
-  python3 scripts/lint/acl.py format --check # the drift report only, rc 1 = off-form
-  python3 scripts/lint/acl.py format --diff  # show the unified diff, no write
+  python3 scripts/gates/acl.py                # lint the shipped example(s)
+  python3 scripts/gates/acl.py my.json        # lint one file
+  python3 scripts/gates/acl.py format my.json # reformat in place
+  python3 scripts/gates/acl.py format --check # the drift report only, rc 1 = off-form
+  python3 scripts/gates/acl.py format --diff  # show the unified diff, no write
 """
 import glob
 import ipaddress
@@ -54,7 +54,7 @@ import os
 import sys
 
 try:
-    from lint._common import diff_dump, fmt_one, grammar, lint_desc, lint_ranges
+    from gates._common import diff_dump, fmt_one, grammar, lint_desc, lint_ranges
 except ImportError:   # the bare run — the script's own dir is sys.path[0]
     from _common import diff_dump, fmt_one, grammar, lint_desc, lint_ranges
 

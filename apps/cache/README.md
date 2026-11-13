@@ -487,7 +487,7 @@ carry no host — pooled there, name them apart. The chain groups by the
 
 The 12-hex token after the event name is the entry's **chained hash** (the
 audit's F10): any edit, deletion or reordering shows up as a chain break in
-`scripts/audit_verify.py` (run it on this file, the family's XDG trails, or
+`scripts/gates/audit_verify.py` (run it on this file, the family's XDG trails, or
 a journald dump on stdin). **Every wire command is audited once, by the
 server** (with the client peer, the role, and the frame's mac when the wire
 is signed); the per-client **request accounting** rides the same trail (one
@@ -516,9 +516,9 @@ stdlib only, each starts its own fake inverter + proxy on scratch ports and
 cleans up after itself:
 
 ```bash
-tests/battery.py cache              # the cache profile: the regtest, the two fuzzes,
+tests/battery/battery.py cache              # the cache profile: the regtest, the two fuzzes,
                                     # the audit chain (the stress suite rides quick/full)
-tests/battery.py cache-regtest      # one suite — every run needs the runner (the suites
+tests/battery/battery.py cache-regtest      # one suite — every run needs the runner (the suites
                                     # refuse without the runner's PV_RUN_DIR)
 ```
 

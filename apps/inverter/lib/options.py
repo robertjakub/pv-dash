@@ -18,7 +18,7 @@ static-wired default would shadow the env/config layers — the flag never
 looks unset) and ladder flag > env > config > static in lib/config.py like
 every serving tool's resolver. The registry still drives `show config` (the
 set-grammar form of the running fake's effective startup options), the knob
--> control-command mapper and scripts/check_options.py."""
+-> control-command mapper and scripts/gates/check_options.py."""
 import os
 
 from common.settings.options import load_options_module, registry_view, unpack_registry_view
@@ -36,7 +36,7 @@ def _load_options():
     flag > env > config > static in lib/config.py like every serving
     tool's resolver; only the choice vocabularies ride here (log-level from
     defaults.json, the timezone — read directly so the module also imports
-    flat (scripts/check_options.py walks lib/ on sys.path))."""
+    flat (scripts/gates/check_options.py walks lib/ on sys.path))."""
     return load_options_module(globals(), os.path.dirname(os.path.realpath(__file__)),
                                extra_choices={'timezone': ('utc', 'local')})
 

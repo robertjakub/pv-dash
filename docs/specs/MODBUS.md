@@ -543,16 +543,16 @@ interval/...` rows. Startup logs name the schemes
 
 ## 12. Where the tests pin all this
 
-`tests/cache-regtest.py` (framing helpers at the top; the suite-auth block
+`tests/suites/cache-regtest.py` (framing helpers at the top; the suite-auth block
 at the end — good key, wrong key, non-handshake `ERR`+EOF, the scheme
 toggles live on both legs, the keys startup-only (set/clear refuse),
-secret refusal), `tests/inverter-regtest.py` (server-side
+secret refusal), `tests/suites/inverter-regtest.py` (server-side
 handshake, silent client, bad magic, the no-live-rotation respawn pins),
-`tests/scrape-regtest.py`
+`tests/suites/scrape-regtest.py`
 (client-side handshake, wrong-key counters, the startup-only key
 refusals + the fresh-start re-key, authed-vs-plain mismatch),
-`tests/cache-fuzz.py` (malformed MBAP lengths,
-random PDUs, pipelined bursts, trickled frames), `tests/cache-stress.py`
+`tests/suites/cache-fuzz.py` (malformed MBAP lengths,
+random PDUs, pipelined bursts, trickled frames), `tests/suites/cache-stress.py`
 (100 registers / 100 clients with pass-through and writes). The regtest
 `PASS suite auth: ...` lines are the executable form of §2.
 

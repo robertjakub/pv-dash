@@ -85,7 +85,7 @@ import difflib
 import hashlib
 import importlib
 import json
-import lint.readmes as readme_lint
+import gates.readmes as readme_lint
 import os
 import re
 import subprocess
@@ -212,7 +212,7 @@ def canon_coverage():
     """The help-canon's split: the canon blocks per section, the refing rows
     per tool, the exempt names options carries. The drift gate lives in
     lint/options --check — this report shows the fold's reach."""
-    from lint.options import EXEMPT
+    from gates.options import EXEMPT
     with open(os.path.join(REPO, 'shared', 'suite', 'options.json'), encoding='utf-8') as f:
         canon = json.load(f)
     refs = {t: {} for t in TOOLS}
@@ -875,7 +875,7 @@ The findings:
 - **The README skeleton** is the one-skeleton wave's shape (how it
   works -> usage -> configuration -> runtime control -> the features
   -> security -> testing -> nix -> source layout -> license) and
-  `scripts/lint/readmes.py --check` pins it: the canon H2s in order,
+  `scripts/gates/readmes.py --check` pins it: the canon H2s in order,
   the tool's own sections only in the slot between runtime control
   and security, and a `### Signals` block leading the Runtime-control
   H3s — this sweep prints the gate's verdict beside the ladders."""
@@ -1231,7 +1231,7 @@ def emit():
            + ' | '.join(str(refs[t][section]) for t in TOOLS) + ' |')
     ap('')
     ap(f'The exempt (intentionally per-tool) names: **{n_exempt}** —')
-    ap('each with its reason in `scripts/lint/options.py`.')
+    ap('each with its reason in `scripts/gates/options.py`.')
     ap('')
 
     # ---- 4. the wire-text sweep
@@ -1304,7 +1304,7 @@ def emit():
     for t in TOOLS:
         ap(f'- {t}: ' + (' -> '.join(readmes.get(t) or ['NO README'])))
     ap('')
-    ap('The skeleton verdict (`scripts/lint/readmes.py --check` gates it):')
+    ap('The skeleton verdict (`scripts/gates/readmes.py --check` gates it):')
     ap('')
     for t in TOOLS:
         rel = f'apps/{t}/README.md'

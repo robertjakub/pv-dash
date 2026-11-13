@@ -21,7 +21,7 @@
     "rules": {
       "type": "array",
       "minItems": 1,
-      "description": "The ordered rule chain. A rule that is never the last match for any address is dead (scripts/lint/acl.py catches it); the whole-space deny is [{\"type\": \"deny\", \"prefix\": \"any\"}].",
+      "description": "The ordered rule chain. A rule that is never the last match for any address is dead (scripts/gates/acl.py catches it); the whole-space deny is [{\"type\": \"deny\", \"prefix\": \"any\"}].",
       "items": {
         "$ref": "#/$defs/rule"
       }

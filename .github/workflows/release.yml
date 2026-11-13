@@ -30,7 +30,7 @@ jobs:
           - scrape-fuzz.py 300
     steps:
       - uses: actions/checkout@v4
-      - run: python3 tests/${{ matrix.suite }}
+      - run: python3 tests/suites/${{ matrix.suite }}
         env:
           PV_RUN_DIR: /tmp/pvbattery-ci
 

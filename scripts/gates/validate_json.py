@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Validate JSON documents against a JSON Schema file. Stdlib only.
 
-  python3 scripts/validate_json.py SCHEMA [FILE|- ...]
-  python3 scripts/validate_json.py shared/schema/modbus-cache-filter.schema.json extras/examples/modbus-cache-filter.json
-  python3 scripts/validate_json.py scraper/schema/metrics.schema.json apps/scraper/examples/metrics.json
-  python3 scripts/validate_json.py shared/schema/acl-write-registers.schema.json extras/examples/acl-write-registers.json
-  cat doc.json | python3 scripts/validate_json.py shared/schema/acl-ip-prefix.schema.json -
+  python3 scripts/gates/validate_json.py SCHEMA [FILE|- ...]
+  python3 scripts/gates/validate_json.py shared/schema/modbus-cache-filter.schema.json extras/examples/modbus-cache-filter.json
+  python3 scripts/gates/validate_json.py scraper/schema/metrics.schema.json apps/scraper/examples/metrics.json
+  python3 scripts/gates/validate_json.py shared/schema/acl-write-registers.schema.json extras/examples/acl-write-registers.json
+  cat doc.json | python3 scripts/gates/validate_json.py shared/schema/acl-ip-prefix.schema.json -
 
 The keyword set is the draft-2020-12 core the repo's schemas speak
 (shared/schema/, apps/scraper/schema, apps/cache/schema): "type", "enum", "const", "properties",

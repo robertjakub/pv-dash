@@ -1,11 +1,17 @@
 # tests/suites/ — the suite bodies
 
-The real suite modules live here; `tests/<name>.py` are thin wrappers
-(runpy, `__name__='__main__'`) so the battery's suite names, the zz_
-pgrep copy and the CI legs never change. The wrapper pre-seeds
-`tests/lib` onto sys.path — this dir (which run_path prepends) holds no
-harness.
+The real suite modules live here — one file per battery suite, no
+twins. Each body's first lines seed the harness home onto sys.path and
+boot from it:
 
-The boot is the import: each suite's first line is
-`from harness import *` (the PV_RUN_DIR gate, the scratch, the check
-accumulator, the frame builders — see `../lib/harness.py`).
+    import os, sys
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), 'lib'))
+    from harness import *
+
+(the seed exists because this dir holds no `lib/` of its own — the
+per-tool `lib` packages must never shadow `tests/lib`). The battery
+resolves `tests/suites/<name>.py` straight off the profile strings, the
+zz_ pgrep copy copies the body, and the CI legs run
+`python3 tests/suites/<name>.py` — one spelling everywhere, renames
+cannot desynchronize.

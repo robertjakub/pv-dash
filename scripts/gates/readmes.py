@@ -2,8 +2,8 @@
 """The READMEs' skeleton gate: the four tool READMEs speak ONE `##` section
 order (the one-skeleton wave's canon), and this lint keeps them speaking it.
 
-    python3 scripts/lint/readmes.py           # the findings report (the lint verb, the default)
-    python3 scripts/lint/readmes.py --check   # the gate spelling, rc 1 on any finding
+    python3 scripts/gates/readmes.py           # the findings report (the lint verb, the default)
+    python3 scripts/gates/readmes.py --check   # the gate spelling, rc 1 on any finding
 
 No format verb — the READMEs are hand-wrapped prose, the edits stay human.
 

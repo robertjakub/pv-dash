@@ -75,7 +75,7 @@ trust of their own.
 | state dump | `--dump-path`: the setting overrides (plus the cached words on `with-cache`) as one atomic JSON | n/a | n/a | n/a | created `0600` explicitly + a sha256 integrity hash, fail-closed restore (F18); sealed under `dump/key` when set |
 | token files | every secret knob takes `file:<path>` | same | same | same | owner-only (0600) enforced at the shared loader (F12); the bare `-file` siblings are gone — `file:` is the one spelling |
 | upstream connection | outbound to the inverter/SDongle | outbound poll (the device or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent) |
-| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/audit_verify.py` (F10); the opt-in forward mirrors every line to the local syslog or the off-box collector (the `udp://`/`tcp://` grammar, the RFC5424/CEF envelopes, the remote-only mode) |
+| audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `scripts/gates/audit_verify.py` (F10); the opt-in forward mirrors every line to the local syslog or the off-box collector (the `udp://`/`tcp://` grammar, the RFC5424/CEF envelopes, the remote-only mode) |
 | compose demo stack | five services on one `internal: true` network, **nothing published on the host**, one shared `config` volume, the generated 0600 `metrics.token` | | | | the internal network is the boundary; the exporter bearer-gated in the demo (F7) |
 
 Deployment (docker/): all three Modbus images run the tool as the
@@ -187,7 +187,7 @@ the intended demo feature, gated by control-server access only.
   | `restore` | `file`, `words`, `settings` (the cache's state dump) |
   | `acl-file` | `warn` (the file's permission posture, single-quoted) |
 - **Audit forwarding** — the trail's defense is three tiers: the local
-  chain (the file of record, per-writer hashes, `scripts/audit_verify.py`),
+  chain (the file of record, per-writer hashes, `scripts/gates/audit_verify.py`),
   the local journald mirror and **the off-box copy** — `--audit-forward`
   spells one target: `none`, `syslog` (the local socket auto-scan),
   `syslog:/path` (an explicit socket, must exist at bind), `udp://host[:514]`
@@ -337,7 +337,7 @@ verification and the per-revision walk (rev. 1–31):
 ## 9. Verification
 
 All ten suites print ALL PASS on the revised tree; `nix flake check`,
-`scripts/check_options.py` + `scripts/lint/options.py --check` clean; the
+`scripts/gates/check_options.py` + `scripts/gates/options.py --check` clean; the
 man pages regenerate (`mandoc -Tlint` clean). The per-finding verification
 and the per-revision walk-throughs: [history/AUDIT.md](history/AUDIT.md).
 
@@ -369,7 +369,7 @@ stateless, restart-clean; Prometheus holds the history).
 
 Dashboard deltas (rows where the dashboard matches are omitted): incident
 handling — the DSH trail (chained) + the wire macs; effectiveness —
-`tests/dashboard-control-fuzz.py`, the release workflow's matrix legs;
+`tests/suites/dashboard-control-fuzz.py`, the release workflow's matrix legs;
 crypto/hygiene — the
 constant-time compares (control + page/metrics bearers), the signed wire,
 no TLS (F14); access control — the family-hardened control plane + the

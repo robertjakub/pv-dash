@@ -13,8 +13,8 @@ so the killer NOTEs the status and frees the link itself — the same end
 state a TERMed run leaves (a stale link left behind anyway is the next
 battery start's slot reclaim, as ever).
 
-    python3 tests/battery_kill.py            # every live slot
-    python3 tests/battery_kill.py 2 slot3    # the named slot(s) only
+    python3 tests/battery/battery_kill.py            # every live slot
+    python3 tests/battery/battery_kill.py 2 slot3    # the named slot(s) only
 
 No live battery is exit 0 (nothing to kill); an unknown slot name is the
 one error. Stdlib only, like the rest of tests/battery/."""

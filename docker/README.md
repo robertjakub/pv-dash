@@ -39,7 +39,7 @@ artifacts. The pattern:
   Prometheus image probes `/-/ready` with busybox wget
 - the shared [`profiles/`](../shared/profiles/README.md) JSON files copied
   flat to `/pv-suite/profiles/` (pure data, home `shared/profiles/`; the
-  linter/formatter lives in `scripts/lint/profile.py`) — the profile
+  linter/formatter lives in `scripts/gates/profile.py`) — the profile
   resolution finds them relative to the checkout layout
 - the **config volume** (`/config`, `VOLUME` + `ENTRYPOINT
   pv-entrypoint`): the entrypoint seeds it with the **required file

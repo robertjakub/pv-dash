@@ -14,11 +14,11 @@ parsed. lint exits 1 when anything is off; format exits 1 when a file is
 not valid JSON, and --check/--diff report the layout drift without
 touching the files (rc 1 when anything is off-form).
 
-  python3 scripts/lint/profile.py                  # lint shared/profiles/*.json
-  python3 scripts/lint/profile.py my.json          # lint specific files
-  python3 scripts/lint/profile.py format my.json   # reformat files in place
-  python3 scripts/lint/profile.py format --check   # the drift report only, rc 1 = off-form
-  python3 scripts/lint/profile.py format --diff    # the unified diff, no write
+  python3 scripts/gates/profile.py                  # lint shared/profiles/*.json
+  python3 scripts/gates/profile.py my.json          # lint specific files
+  python3 scripts/gates/profile.py format my.json   # reformat files in place
+  python3 scripts/gates/profile.py format --check   # the drift report only, rc 1 = off-form
+  python3 scripts/gates/profile.py format --diff    # the unified diff, no write
 """
 import glob
 import json
@@ -26,7 +26,7 @@ import os
 import sys
 
 try:
-    from lint._common import diff_dump, fmt_one, grammar, lint_desc, lint_ranges
+    from gates._common import diff_dump, fmt_one, grammar, lint_desc, lint_ranges
 except ImportError:   # the bare run — the script's own dir is sys.path[0]
     from _common import diff_dump, fmt_one, grammar, lint_desc, lint_ranges
 

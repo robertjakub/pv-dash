@@ -23,14 +23,16 @@ import subprocess
 import sys
 import time
 
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
 GATES = (
-    ('lint/acl --check', ('scripts/lint/acl.py', '--check')),
-    ('lint/options --check', ('scripts/lint/options.py', '--check')),
-    ('lint/readmes --check', ('scripts/lint/readmes.py', '--check')),
-    ('lint/texts', ('scripts/lint/texts.py',)),
-    ('lint/profile --check', ('scripts/lint/profile.py', '--check')),
+    ('lint/acl --check', ('scripts/gates/acl.py', '--check')),
+    ('lint/options --check', ('scripts/gates/options.py', '--check')),
+    ('lint/readmes --check', ('scripts/gates/readmes.py', '--check')),
+    ('lint/texts', ('scripts/gates/texts.py',)),
+    ('lint/profile --check', ('scripts/gates/profile.py', '--check')),
     ('generators/manual --check', ('scripts/generators/manual.py', '--check')),
     ('generators/examples --check', ('scripts/generators/examples.py', '--check')),
     ('generators/sbom --check', ('scripts/generators/sbom.py', '--check')),

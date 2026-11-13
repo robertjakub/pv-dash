@@ -30,16 +30,17 @@ scripts.
 
 ## The registries (read, gate, edit)
 
-- **`check_options.py`** — the option gates, per tool: every live
+- **`gates/check_options.py`** — the option gates, per tool: every live
   setting unique and word-path clean, every flag/env/secret/restart
   row honest, the show/commands vocabularies, the README-flag and the
   NixOS-option parity, the row defaults present and conv-typed (a
   secret carries none), the ops-verbs default pinned to the
   derivation, the bundled configs naming registry options
-   only. `python3 scripts/check_options.py` — and a battery suite
-   itself: [tests/check-options.py](../tests/suites/check-options.py)
+   only. `python3 scripts/gates/check_options.py` — and a battery suite
+   itself:
+   [tests/suites/check-options.py](../tests/suites/check-options.py)
    runs the gate first in every profile and re-emits its rows.
-- **[`lint/options.py`](lint/options.py)** — lint + reformat the four
+- **[`gates/options.py`](gates/options.py)** — lint + reformat the four
   `lib/options.json` registries: the canonical row order, the
   hand-formatted layout (edits must be surgical — the lint enforces
   it). `--check` for the gates; `format` is the write verb.
@@ -101,33 +102,34 @@ scripts.
 
 ## The checks (the shipped artifacts)
 
-The linters live in [`lint/`](lint) — one directory, the registry and
-prose gates apart from the runners:
+The gates live in [`gates/`](gates) — one directory, everything that
+exits 1 on red (the registry and prose lints, the structural gates, the
+verifiers):
 
-- **[`lint/acl.py`](lint/acl.py)** — the acl gate-objects: the standalone
+- **[`gates/acl.py`](gates/acl.py)** — the acl gate-objects: the standalone
   `file:<path>` targets and the `extras/examples/` acl files; the typed
   rule chain's grammar. Bare run lints the root; `format` is the write
   verb.
-- **[`lint/profile.py`](lint/profile.py)** — the device profiles: the
+- **[`gates/profile.py`](gates/profile.py)** — the device profiles: the
   schema + style lint (the default verb) and `format`, the canonical
   in-place rewrite (`--check`/`--diff` report the drift without writing).
   Bare run lints `shared/profiles/*.json`.
-- **`validate_json.py`** — the JSON documents against a JSON Schema
+- **`gates/validate_json.py`** — the JSON documents against a JSON Schema
   (stdlib only): the loader-valid ⊂ schema-valid contract.
-- **[`lint/links.py`](lint/links.py)** — the hand-written docs' link
+- **[`gates/links.py`](gates/links.py)** — the hand-written docs' link
   gate: every relative markdown link and mdbook include target
   resolves, and every repo-rooted path token in a current doc names
   something that exists (the history records keep their landed
   spellings — the token check skips `docs/history/` and the per-tool
   TODOs; the links check runs everywhere). Bare run reports,
   `--check` is the gate spelling — and a battery suite itself:
-  [tests/links-check.py](../tests/suites/links-check.py) rides every
-  profile beside check-options. The family's other rc-1 gates ride the
-  `lint-gates` suite the same way (one check() row each): the
+  [tests/suites/links-check.py](../tests/suites/links-check.py) rides
+  every profile beside check-options. The family's other rc-1 gates
+  ride the `lint-gates` suite the same way (one check() row each): the
   acl/options/readmes/texts/profile lints, the manual/examples/sbom
   `--check`s and the drift doc's `--check` —
-  [tests/lint-gates.py](../tests/suites/lint-gates.py).
-- **`audit_verify.py`** — the audit trail's chained-hash verifier
+  [tests/suites/lint-gates.py](../tests/suites/lint-gates.py).
+- **`gates/audit_verify.py`** — the audit trail's chained-hash verifier
   (the F10 chain: every line carries its hash right after the event
   name).
 - **`family_drift.py`** — the drift workflow: the thirteen sweep
@@ -138,7 +140,7 @@ prose gates apart from the runners:
   [docs/family-drift.md](../docs/family-drift.md); the verdict prose
   lives in the script's blocks. `--check` exits 1 when the doc is
   stale.
-- **[`lint/readmes.py`](lint/readmes.py)** — the four tool READMEs' skeleton gate: the
+- **[`gates/readmes.py`](gates/readmes.py)** — the four tool READMEs' skeleton gate: the
   `##` canon in order (how it works → usage → configuration → runtime
   control → the tool's own sections in the feature slot → security →
   testing → Nix / NixOS → source layout → license) and a `### Signals`
@@ -186,7 +188,7 @@ edit to the rendered page dies at the next run):
 
 ## The release
 
-- **`release.py`** — the orchestrator: the battery (tests/battery.py
+- **`release.py`** — the orchestrator: the battery (tests/battery/battery.py
   `full` — the runner owns the run dir, the tally and the failed-run
   backups; the `--tests quick` pair rides `--depth full`) + the nix build
   gate first, the version bump, the CHANGELOG split maintenance
@@ -197,8 +199,8 @@ edit to the rendered page dies at the next run):
 ## Keeping it honest
 
 ```bash
-python3 scripts/check_options.py && python3 scripts/lint/options.py --check
-python3 scripts/lint/readmes.py --check    # the READMEs' skeleton gate
+python3 scripts/gates/check_options.py && python3 scripts/gates/options.py --check
+python3 scripts/gates/readmes.py --check    # the READMEs' skeleton gate
 python3 scripts/family_drift.py            # regenerate the drift doc
 python3 scripts/family_drift.py --check    # stale doc fails
 ```

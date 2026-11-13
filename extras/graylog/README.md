@@ -9,7 +9,7 @@ emits, Graylog consumes.
 The trail it consumes is docs/SECURITY.md's: one KV line per event —
 `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type>
 hash=<12-hex> [<detail kv words>]` — carried **verbatim** inside every
-forward envelope, so chain verification (scripts/audit_verify.py) works
+forward envelope, so chain verification (scripts/gates/audit_verify.py) works
 identically at the collector. The `instance=` word names the writer
 daemon — the control port when the tool's `--audit-instance` is unset,
 the override when spelled — the per-instance grouping key at the
@@ -54,7 +54,7 @@ unit (System → Content packs → upload, then Install) and creates:
   are attached** — create your notifier and select it per definition.
 
 The chain verification stays off-box: the pack does not watch the
-chain — the off-box verify is scripts/audit_verify.py over the
+chain — the off-box verify is scripts/gates/audit_verify.py over the
 collected file (the cron), the same three-tier story as docs/SECURITY.md.
 
 The pack was written against the content-pack v3 schema and verified by
@@ -190,7 +190,7 @@ field never matches) and the same names wear the `audit_` prefix
 - **the restart churn** — `_type:start` > 3 in 15 minutes per `_application`/`_instance`
   (the crash loop).
 - **the chain break** — NOT a Graylog search: the chain is stateful per
-  writer tag, so the off-box verify is `scripts/audit_verify.py` over the
+  writer tag, so the off-box verify is `scripts/gates/audit_verify.py` over the
   collected file (the cron), and the collector pages on its FAIL line
   (docs/SECURITY.md's three-tier story).
 

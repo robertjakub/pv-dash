@@ -506,7 +506,7 @@ re-open — is the history half:
   clear text. The Modbus side stays F1 (accepted, protocol-inherent).
 ## The pipeline (CI, releases, supply chain)
 
-- **schema every family JSON** `[common]` — `scripts/validate_json.py`
+- **schema every family JSON** `[common]` — `scripts/gates/validate_json.py`
   speaks the draft-2020-12 core but only the shipped spec pairs meet it
   today (the drift sweep's schema/example pass). Give the family's
   remaining JSON artifacts schemas and one gate: `shared/suite/texts.json`,
@@ -759,7 +759,7 @@ re-open — is the history half:
   samples and the NixOS modules render the set grammar, and the
   **one-knob-one-source** registry (`lib/options.json` + its loader
   `lib/options.py` per tool on `common/settings/options.py`) +
-  `scripts/check_options.py` gate the four
+  `scripts/gates/check_options.py` gate the four
   surfaces against drift. Also closed in the wave: the RBAC verb policy
   (`--control-ops-verbs`), the dashboard's own /metrics endpoint, the
   metrics.json sections + `--metric-prefix` + the `scraper_*` renames
@@ -782,7 +782,7 @@ re-open — is the history half:
   cache's endpoints live-togglable (`metrics-server` + `--metrics-listen`),
   the scraper refusing a non-loopback listen without a token (F13 closed).
 - **the integrity wave** — the audit trails carry chained per-writer
-  hashes verified by `scripts/audit_verify.py` (F10); the state dump is
+  hashes verified by `scripts/gates/audit_verify.py` (F10); the state dump is
   0600 + integrity-hashed with a fail-closed restore (F18); the dump
   splits by content (settings by default, with-cache on request).
 - **the release tooling** — `scripts/release.py` + the tag-triggered
@@ -808,7 +808,7 @@ re-open — is the history half:
   `PATH`), the shared external `config` volume seeded by `entrypoint.sh`
   (bundled defaults copied in, existing files kept), the profiles +
   `common/` riding in as named build contexts.
-- **the profile tool** — `scripts/lint/profile.py` (lint + format, one
+- **the profile tool** — `scripts/gates/profile.py` (lint + format, one
   script, the lint/ home's member): lint = the required keys and their
   family order, the register bounds, the type width, the fc, the
   per-entry ttl, the mappings vs a register word, the duplicate names,

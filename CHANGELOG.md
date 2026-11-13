@@ -183,14 +183,30 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Changed
 
-- **The battery runner's trio wraps flat** — `tests/battery_kill.py`
-  joins the wrapper row (`battery.py`, `battery_status.py`): the
-  killer was the one tests/ tool whose docs spelling went through the
-  nested home (`python3 tests/battery/battery_kill.py`), the runner's
-  README documented the exception and the ruling closes it — every
-  tests/ script follows the one structure (the thin runpy wrapper at
-  `tests/<name>.py`, the body in `tests/suites/` or `tests/battery/`),
-  the killer's own docstring invocations and the battery README follow.
+- **The tooling re-files: no wrappers, one gates home** — `tests/`
+  root dissolves: the fifteen thin runpy wrappers (`tests/<name>.py`,
+  the twin of the ten-plus suites and the two runner entries) die and
+  each suite body seeds `tests/lib` itself (the two-line boot — the
+  dir must hold no `lib/` of its own, the per-tool `lib` packages never
+  shadow the harness); the battery resolves `tests/suites/<name>.py`
+  straight off the profile strings (the exists-check + the zz_ pgrep
+  copy source), the release matrix legs run
+  `python3 tests/suites/<name>.py`, and release.py calls
+  `tests/battery/battery.py` — `tests/` root is three directories
+  (suites, lib, battery) and the killer's no-wrapper exception becomes
+  the universal rule. The gates join one home beside them:
+  `scripts/lint/` becomes `scripts/gates/` and absorbs the three root
+  gates (`check_options.py`, `validate_json.py`, `audit_verify.py`) —
+  everything rc-1-on-red in one dir, the generators and the drift
+  workflow stay apart, and the importers re-spell (editor.py's two,
+  family_drift.py, option_diff.py; the absorbed gates carry the
+  deeper-dir sys.path insert the lints already had). The suites' gate
+  argvs, the gate docstrings, the schema descriptions, the graylog
+  pack, the module docstrings that name a gate path and the READMEs
+  follow; the links gate caught the 29-token tail the hand sweep
+  missed (apps READMEs' audit_verify, the specs' suite paths,
+  shared/README's trio) — the gate proving its own worth on the wave
+  that moved it.
 
 - **The docs redo flies** — the full audit's work order
   (docs/history/docs-redo.md): `docs/common/` becomes `docs/specs/`

@@ -285,7 +285,7 @@ authenticating reverse proxy. The full story is
 ## Testing
 
 ```bash
-tests/battery.py dashboard             # the dashboard profile: the control fuzz +
+tests/battery/battery.py dashboard             # the dashboard profile: the control fuzz +
                                        #   the audit chain (the suites refuse without
                                        #   the runner's PV_RUN_DIR)
 ```

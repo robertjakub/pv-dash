@@ -5,8 +5,8 @@ segment must be a clean lowercase word; every reference in the tree must
 resolve; every key must be referenced somewhere (the orphan gate); and no
 two leaves may share a value (one text, one home).
 
-    python3 scripts/lint/texts.py             # the report (the lint verb, the default)
-    python3 scripts/lint/texts.py --check     # the gate spelling, rc 1 on any failure
+    python3 scripts/gates/texts.py             # the report (the lint verb, the default)
+    python3 scripts/gates/texts.py --check     # the gate spelling, rc 1 on any failure
 
 No format verb — the registry is hand-authored, the edits stay human.
 

@@ -8,8 +8,8 @@ from the parser; the bundled config's `set` lines must name registry
 options); the control-grammar vocabulary rides the rows too (every live
 name unique and one word-path, every `group` a clean word).
 
-  python3 scripts/check_options.py           # the whole family
-  python3 scripts/check_options.py cache     # one tool
+  python3 scripts/gates/check_options.py           # the whole family
+  python3 scripts/gates/check_options.py cache     # one tool
 
 Exit 0 = everything agrees, 1 = drift (the report says what and where).
 Stdlib only."""
@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))   # scripts/ — the common lib
 from lib import REPO   # the scripts' common lib
 from lib.registry import SURFACES, wired as load_registry
 

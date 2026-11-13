@@ -13,7 +13,7 @@ One canonical layout, so the hand styles stop diverging:
   - two-space indent per level, the rows at four, the continuations at
     six, the trailing newline.
 
-The lint (beyond scripts/check_options.py's grammar checks): unknown
+The lint (beyond scripts/gates/check_options.py's grammar checks): unknown
 keys, missing names/descriptions, duplicate names, the `only` mark —
 a known tool, the file's own tool, never beside `shared` (the canon
 ref is the family-wide mark; `only` pins the knob tool-exclusive) —
@@ -26,18 +26,18 @@ description field, and the file itself renders in the canonical layout
 (the sections and blocks in their landed order, a block's fields in the
 row rank).
 
-  python3 scripts/lint/options.py             # lint the four registries + the canon file
-  python3 scripts/lint/options.py format      # reformat in place + report
-  python3 scripts/lint/options.py format --check   # report only, rc 1 if off-form
-  python3 scripts/lint/options.py format --diff    # show the unified diff, no write
-  python3 scripts/lint/options.py --propose   # the drafts report (read-only)
+  python3 scripts/gates/options.py             # lint the four registries + the canon file
+  python3 scripts/gates/options.py format      # reformat in place + report
+  python3 scripts/gates/options.py format --check   # report only, rc 1 if off-form
+  python3 scripts/gates/options.py format --diff    # show the unified diff, no write
+  python3 scripts/gates/options.py --propose   # the drafts report (read-only)
 """
 import json
 import os
 import sys
 
 try:
-    from lint._common import diff_dump, grammar
+    from gates._common import diff_dump, grammar
 except ImportError:   # the bare run — the script's own dir is sys.path[0]
     from _common import diff_dump, grammar
 

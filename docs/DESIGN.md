@@ -73,10 +73,10 @@ release.
 
    ```bash
    python3 scripts/family_drift.py --check
-   python3 scripts/check_options.py
-   python3 scripts/lint/links.py --check
-   python3 scripts/lint/options.py --check
-   python3 scripts/lint/texts.py
+   python3 scripts/gates/check_options.py
+   python3 scripts/gates/links.py --check
+   python3 scripts/gates/options.py --check
+   python3 scripts/gates/texts.py
    python3 scripts/generators/manual.py --check
    python3 scripts/generators/examples.py --check
    python3 scripts/generators/sbom.py --check
@@ -129,4 +129,4 @@ release.
 Prose lines ≤ 80 characters (the tables and code blocks are exempt);
 the man pages wrap at 72; strict cmark-gfm shape (the lint and the
 book build watch it); the texts the code renders ride
-shared/suite/texts.json (`scripts/lint/texts.py`), not the docs.
+shared/suite/texts.json (`scripts/gates/texts.py`), not the docs.

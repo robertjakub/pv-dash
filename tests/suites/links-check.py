@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The docs' link gate as a suite: scripts/lint/links.py — every relative
+"""The docs' link gate as a suite: scripts/gates/links.py — every relative
 markdown link in the docs resolves, every mdbook include target exists,
 every repo-rooted path token in a current doc names something that exists
 — under the battery. The gate runs once for the whole family; the
@@ -15,17 +15,19 @@ import subprocess
 import sys
 import time
 
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
-GATE = os.path.join(REPO, 'scripts', 'lint', 'links.py')
+GATE = os.path.join(REPO, 'scripts', 'gates', 'links.py')
 
 try:
     r = subprocess.run([sys.executable, GATE, '--check'], capture_output=True, text=True, cwd=REPO)
 except OSError as e:
-    check('the links gate ran (scripts/lint/links.py --check)', False, str(e))
+    check('the links gate ran (scripts/gates/links.py --check)', False, str(e))
 else:
     tail = (r.stdout + r.stderr).strip().splitlines()
-    check('the links gate ran (scripts/lint/links.py --check)', r.returncode in (0, 1),
+    check('the links gate ran (scripts/gates/links.py --check)', r.returncode in (0, 1),
           'rc %d' % r.returncode)
     check('every docs link, include and rooted path resolves', r.returncode == 0,
           '; '.join(tail[-3:]))

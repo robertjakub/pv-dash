@@ -433,7 +433,7 @@ def kill_daemons():
 
 for i, s in enumerate(SUITES, 1):
     n, total = i, TOTAL
-    if not (REPO / 'tests' / (s + '.py')).exists():
+    if not (REPO / 'tests' / 'suites' / (s + '.py')).exists():
         say('%s SKIP %d/%d %s (no such suite)' % (time.strftime('%H:%M:%S'), n, total, s))
         continue
     quiet(n, total, s)
@@ -448,8 +448,8 @@ for i, s in enumerate(SUITES, 1):
     # the copy exists so a suite's processes carry the zz_ name the quiet
     # window and the housekeeping greps — the suites resolve their scratch
     # from PV_RUN_DIR themselves
-    zz = REPO / 'tests' / 'zz_bx.py'
-    shutil.copy(REPO / 'tests' / (s + '.py'), zz)
+    zz = REPO / 'tests' / 'suites' / 'zz_bx.py'
+    shutil.copy(REPO / 'tests' / 'suites' / (s + '.py'), zz)
     t0 = time.time()
     if s in ('cache-fuzz', 'scrape-fuzz'):
         # the fuzz budget + the mode: quick pools the basic shapes, full
@@ -457,10 +457,10 @@ for i, s in enumerate(SUITES, 1):
         # [quick|full]) — the spread follows the depth (the full profile,
         # or --depth full)
         fuzzprof = os.environ['PV_SUITE_PROFILE']
-        r = subprocess.run(['python3', 'tests/zz_bx.py', str(BUDGET or 3000), fuzzprof],
+        r = subprocess.run(['python3', 'tests/suites/zz_bx.py', str(BUDGET or 3000), fuzzprof],
                            cwd=REPO, stdout=open(RUNDIR / (s + '.log'), 'w'), stderr=subprocess.STDOUT)
     else:
-        r = subprocess.run(['python3', 'tests/zz_bx.py'], cwd=REPO,
+        r = subprocess.run(['python3', 'tests/suites/zz_bx.py'], cwd=REPO,
                            stdout=open(RUNDIR / (s + '.log'), 'w'), stderr=subprocess.STDOUT)
     rc = r.returncode
     ds = int(time.time() - t0)
@@ -492,7 +492,7 @@ for i, s in enumerate(SUITES, 1):
 if not PARALLEL:
     kill_daemons()
 try:
-    (REPO / 'tests' / 'zz_bx.py').unlink()
+    (REPO / 'tests' / 'suites' / 'zz_bx.py').unlink()
 except OSError:
     pass
 BT1 = time.time()

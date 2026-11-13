@@ -4,7 +4,7 @@ write verb, --check/--diff report the drift without the write, --check
 bare stays the gate spelling), the terse-ASCII desc check, the
 START:COUNT range matcher and the one-line-object render the acl and
 profile linters both carry, and the --diff emission. The sibling import
-is dual-mode — `lint._common` under the package, `_common` on the bare
+is dual-mode — `gates._common` under the package, `_common` on the bare
 run (the script's own dir is sys.path[0]) — because the scripts' own
 `lib` package is contested (the cache's lib/ owns the name wherever the
 cache root precedes scripts/ on the path; lint/acl.py executes with the

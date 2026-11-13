@@ -4,8 +4,8 @@ docs resolves against the tree, every mdbook `{{#include}}` target
 exists, and every repo-rooted path-shaped inline-code token in a CURRENT
 doc names something that exists.
 
-    python3 scripts/lint/links.py           # the findings report (the lint verb, the default)
-    python3 scripts/lint/links.py --check   # the gate spelling, rc 1 on any finding
+    python3 scripts/gates/links.py           # the findings report (the lint verb, the default)
+    python3 scripts/gates/links.py --check   # the gate spelling, rc 1 on any finding
 
 The two checks have different homes:
 

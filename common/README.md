@@ -11,7 +11,7 @@ the ACL map, the defaults ladder:
 
 | module | what |
 |---|---|
-| `texts.py` | the family's static texts, one JSON home (`shared/suite/texts.json` at the tree root — the directory that contains `common/`, the same walk in every layout): the console's faces and reconnect ladder, the ctl's, the welcome banners, the wire's fixed replies, the daemon bind/startup lines — the dotted `T(key)` resolves, the caller applies the `%`-format; `scripts/lint/texts.py --check` gates the references both ways (every reference resolves, every key referenced, no duplicated value) |
+| `texts.py` | the family's static texts, one JSON home (`shared/suite/texts.json` at the tree root — the directory that contains `common/`, the same walk in every layout): the console's faces and reconnect ladder, the ctl's, the welcome banners, the wire's fixed replies, the daemon bind/startup lines — the dotted `T(key)` resolves, the caller applies the `%`-format; `scripts/gates/texts.py --check` gates the references both ways (every reference resolves, every key referenced, no duplicated value) |
 | `manpage.py` | the man-page builder: the pages are GENERATED from the argparse parsers (`--man` prints one; `scripts/generators/man.py` ships them) |
 | `human.py` | `secs` — human time for the command reports: ms/s/m/h/d, one unit, always two decimals |
 

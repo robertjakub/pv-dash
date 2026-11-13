@@ -203,7 +203,7 @@ def render_cdx(f):
         {'bom-ref': 'pv-suite:shared', 'type': 'file', 'name': 'shared', 'version': v,
          'licenses': bsd,
          'properties': [{'name': 'pv-suite:content',
-                         'value': 'the shared data the tools load — %d device-profile JSONs (shared/profiles), the suite JSONs (shared/suite), the acl schemas (shared/schema); the lint/format tool lives in scripts/lint/profile.py)' % f['tools']['shared']['jsons']}]},
+                         'value': 'the shared data the tools load — %d device-profile JSONs (shared/profiles), the suite JSONs (shared/suite), the acl schemas (shared/schema); the lint/format tool lives in scripts/gates/profile.py)' % f['tools']['shared']['jsons']}]},
         {'bom-ref': 'pv-suite:modbus-cache', 'type': 'application', 'name': 'modbus-cache', 'version': v,
          'licenses': bsd},
         {'bom-ref': 'pv-suite:modbus-scraper', 'type': 'application', 'name': 'modbus-scraper', 'version': v,
@@ -345,7 +345,7 @@ grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter app
 | Subproject | First-party code | Third-party runtime | Notes |
 |---|---|---|---|
 | [`common/`](../../common/README.md) | the package (%(common_modules)d modules) | none — stdlib only | the shared core: audit, config, protocol, logutil, version |
-| [`shared/profiles/`](../../shared/profiles/README.md) | %(shared_jsons)d device-profile JSONs | none — stdlib only | data; the lint/format tool = `scripts/lint/profile.py` |
+| [`shared/profiles/`](../../shared/profiles/README.md) | %(shared_jsons)d device-profile JSONs | none — stdlib only | data; the lint/format tool = `scripts/gates/profile.py` |
 | [`apps/cache/`](../../apps/cache/README.md) | `modbus-cache.py` + `lib/` (%(cache_modules)d modules) + %(cache_clients)d control clients | none — stdlib only (+ `common`) | proxy daemon |
 | [`apps/inverter/`](../../apps/inverter/README.md) | `modbus-fake-inverter.py` + `lib/` (%(inverter_modules)d modules) + %(inverter_clients)d control clients | none — stdlib only (+ `common`) | simulator |
 | [`apps/scraper/`](../../apps/scraper/README.md) | `modbus-scraper.py` + `lib/` (%(scraper_modules)d modules) + %(scraper_clients)d control clients | none — stdlib only (+ `common`) | exporter |

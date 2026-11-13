@@ -328,7 +328,7 @@ timestamp — journald adds one.
 
 The control commands (with their wire macs), the auth failures, the
 reloads and the shutdowns land in the **SCR audit trail** (`--audit-log`,
-the XDG state home by default — `scripts/audit_verify.py` walks it like
+the XDG state home by default — `scripts/gates/audit_verify.py` walks it like
 the others). `--audit-forward` mirrors every line — the per-writer
 hash chain included — onward: `syslog` (the local socket auto-scan),
 `syslog:/path` (an explicit socket), `udp://host[:514]` (RFC5426,
@@ -370,7 +370,7 @@ stdlib only, each starts its own fake inverter + exporters on scratch
 ports and cleans up after itself:
 
 ```bash
-tests/battery.py scraper        # the scraper profile: the regtest, the fuzz, the
+tests/battery/battery.py scraper        # the scraper profile: the regtest, the fuzz, the
                                 #   audit chain (the suites refuse without the
                                 #   runner's PV_RUN_DIR)
 ```

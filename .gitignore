@@ -12,4 +12,4 @@ apps/scraper/metrics.json
 /docs/draft-*.md
 
 # the battery's per-suite copies (the runner's scratch, never committed)
-/tests/zz_*
+zz_*

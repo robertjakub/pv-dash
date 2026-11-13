@@ -58,7 +58,7 @@ pv-suite/
 ├── shared/       # the family's shared data: profiles/, schema/, suite/ ([docs](shared/README.md))
 ├── common/       # the shared Python package — render/ runtime/ settings/ wire/ serve/ modbus/ ([docs](common/README.md))
 ├── tests/        # the battery runner (tests/battery/ behind the
-│                 #   tests/battery.py wrapper) + the suites, one or more per Modbus tool
+│                 #   tests/battery/battery.py runner) + the suites, one or more per Modbus tool
 ├── scripts/      # the gates + editors: check/lint, editor.py,
 │                 #   family_drift, validate_json, set_group/set_live,
 │                 #   release.py, audit_verify.py
@@ -85,7 +85,7 @@ pv-suite/
 
 ## Testing
 
-The suites always run through the battery — `tests/battery.py` owns the
+The suites always run through the battery — `tests/battery/battery.py` owns the
 run dir (the suites' /tmp scratch rewrites into it), the port-space slot
 (concurrent batteries take disjoint port spaces), the daemon reaping
 between suites and the tally; a suite run outside it refuses (the marker
@@ -94,11 +94,11 @@ across sessions). The release verification and the CI matrix set the same
 marker for their legs.
 
 ```bash
-tests/battery.py                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
-tests/battery.py quick              # all ten, the fuzz budgets at 300 (~3 min) — the pre-push loop
-tests/battery.py full               # all ten, the suite defaults — the nightly
-tests/battery.py cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
-tests/battery.py control-fuzz       # named suite(s) — e.g. the one you are iterating on
+tests/battery/battery.py                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
+tests/battery/battery.py quick              # all ten, the fuzz budgets at 300 (~3 min) — the pre-push loop
+tests/battery/battery.py full               # all ten, the suite defaults — the nightly
+tests/battery/battery.py cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
+tests/battery/battery.py control-fuzz       # named suite(s) — e.g. the one you are iterating on
 ```
 
 The ten suites (stdlib only, scratch ports, self-cleaning; each prints
@@ -107,7 +107,7 @@ ALL PASS or a FAILURES list):
 - `cache-regtest` — the cache: the full functional battery
 - `inverter-regtest` — the fake: the F11/F13 surface (client caps, timeouts, per-IP, the count gate)
 - `scrape-regtest` — the scraper + the fake's machines
-- `audit-chain` — the audit trails' hash chains + `scripts/audit_verify.py`
+- `audit-chain` — the audit trails' hash chains + `scripts/gates/audit_verify.py`
 - `cache-stress` — the cache: 100 clients / 15 s load
 - `cache-fuzz` [n] / `scrape-fuzz` [n] — n hostile client / HTTP frames
 - `cache-control-fuzz` / `control-fuzz` / `dashboard-control-fuzz` — hostile JSON on the control servers

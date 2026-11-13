@@ -364,7 +364,7 @@ name their instances apart; the chain groups by the triple:
 
 The 12-hex token after the event name is the entry's **chained hash** (the
 audit's F10): any edit, deletion or reordering shows up as a chain break
-in `scripts/audit_verify.py`. **Every wire command is audited once, by the
+in `scripts/gates/audit_verify.py`. **Every wire command is audited once, by the
 server** (with the peer, the role, the mac); the clients audit their
 session and the local-only events; the fake logs its lifecycle (`START`,
 `RELOAD`, `RESET`, `SHUTDOWN`). ping/pong keepalives are never logged; the
@@ -384,7 +384,7 @@ The fake is the suites' workhorse — it is exercised from the suite-root
 [`tests/`](../../tests/):
 
 ```bash
-tests/battery.py inverter        # the inverter profile: the fake's regtest, the
+tests/battery/battery.py inverter        # the inverter profile: the fake's regtest, the
                                  #   control fuzz, the audit chain (the suites refuse
                                  #   without the runner's PV_RUN_DIR)
 ```

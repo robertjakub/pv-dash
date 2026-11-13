@@ -34,7 +34,7 @@ import os
 import sys
 
 from lib import REPO as ROOT, TOOLS   # the scripts' common lib
-from lint.options import EXEMPT, GATED, KEY_RANK, SECTION_FIELD
+from gates.options import EXEMPT, GATED, KEY_RANK, SECTION_FIELD
 from common.settings.options import canon_fold
 SECTIONS = ('options', 'show', 'commands')
 NOUN = {'options': 'knob', 'show': 'show row', 'commands': 'commands row'}

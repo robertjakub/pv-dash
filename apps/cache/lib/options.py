@@ -14,7 +14,7 @@ the control-grammar vocabulary, the resolved-config key renames and the
 set-grammar rendering of the effective values. The config script (the ini's
 replacement), `show config`, the knob -> control-command mapper, the
 argparse parser (--help, built from these rows — common/settings/options.py
-build_parser) and scripts/check_options.py all read this table."""
+build_parser) and scripts/gates/check_options.py all read this table."""
 import os
 
 from common.settings.options import load_options_module, registry_view, unpack_registry_view
@@ -28,7 +28,7 @@ def _load_options():
     the log-level choices ride lib/defaults.json, the constants audit's
     home; the modbus timeout's default arms from the protocol tree's
     socket_timeout). defaults.json is read directly so the module also
-    imports flat (scripts/check_options.py walks lib/ on sys.path)."""
+    imports flat (scripts/gates/check_options.py walks lib/ on sys.path)."""
     return load_options_module(globals(), os.path.dirname(os.path.realpath(__file__)),
                                socket_timeout=True)
 

@@ -60,7 +60,7 @@ live in common/runtime/audit.py and the rows repeat them.
 
 ## The gate
 
-`scripts/check_options.py` runs four rows per tool:
+`scripts/gates/check_options.py` runs four rows per tool:
 
 - **every non-secret flag knob's row carries its default** (or a
   `NO_ROW_DEFAULT` reason) — the static rung is explicit, never a

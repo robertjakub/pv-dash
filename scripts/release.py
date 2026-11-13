@@ -147,13 +147,13 @@ def update_lock(dry, keep):
 
 
 def tests(which, dry, version):
-    # the battery rides the runner: tests/battery.py owns the run dir,
+    # the battery rides the runner: tests/battery/battery.py owns the run dir,
     # the tally, the eta history and the failed-run backups, and its
     # rows stream live (a captured 27-minute silence serves nobody)
     if which == 'none':
         print('release: skipping the suites (--tests none)')
         return
-    cmd = ['python3', 'tests/battery.py']
+    cmd = ['python3', 'tests/battery/battery.py']
     if which == 'quick':
         cmd += ['--depth', 'full'] + SUITES_QUICK   # the recovery pair, still at the nightly depth
     else:

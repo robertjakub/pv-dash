@@ -52,7 +52,7 @@
       "properties": [
         {
           "name": "pv-suite:content",
-          "value": "the shared data the tools load — 6 device-profile JSONs (shared/profiles), the suite JSONs (shared/suite), the acl schemas (shared/schema); the lint/format tool lives in scripts/lint/profile.py)"
+          "value": "the shared data the tools load — 6 device-profile JSONs (shared/profiles), the suite JSONs (shared/suite), the acl schemas (shared/schema); the lint/format tool lives in scripts/gates/profile.py)"
         }
       ]
     },

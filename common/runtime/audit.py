@@ -16,7 +16,7 @@ tags.json spelling). The line is FLAT KV: every word after hash= is a
 per (application, writer, instance) triple (CACHE:daemon:15020,
 INV:cli:15991, each chain their own lines), so several writers — and
 several instances of one tool — can interleave in one file and every chain
-stays verifiable on its own — scripts/audit_verify.py walks a file (and its
+stays verifiable on its own — scripts/gates/audit_verify.py walks a file (and its
 rotated backups, oldest first), recomputes each chain and names the
 line where it breaks. The instance= word names the writer's daemon: the
 control port when the knob is unset (unique per host by construction),
@@ -338,7 +338,7 @@ def syslog_socket():
     return None
 
 # The rotation bounds (the one home — the registries' audit-files/audit-max-mb
-# rows and the tools' startup gates repeat them, scripts/check_options.py
+# rows and the tools' startup gates repeat them, scripts/gates/check_options.py
 # cross-checks that they never drift): the rotated backups kept and the size
 # that triggers a rotation in MB (0 = no size rotation).
 AUDIT_FILES_MIN = 1
@@ -349,7 +349,7 @@ AUDIT_MAX_MB_MAX = 1048576
 
 def entry_hash(prev, stamp, tag, body):
     """The chained entry hash: sha256(prev | stamp | tag | body), hex-truncated.
-    Shared by the writer and scripts/audit_verify.py — one implementation. The
+    Shared by the writer and scripts/gates/audit_verify.py — one implementation. The
     tag and body are the line's own rendered words (the KV line's uppercase
     tag= value and its type= and detail words)."""
     material = '%s|%s|%s|%s' % (prev, stamp, tag, body)
@@ -482,7 +482,7 @@ class AuditLog:
     """'<UTC stamp> AUDIT application=<TAG> tag=<writer> instance=<id>
     type=<type> hash=<chain hash> [<detail kv words>]' per line — the 12-hex
     hash chains the entry to this writer's previous one (entry_hash), making
-    any edit/reorder/middle-deletion evident to scripts/audit_verify.py.
+    any edit/reorder/middle-deletion evident to scripts/gates/audit_verify.py.
     application= names the tool (the uppercase tag from shared/suite/tags.json —
     CACHE / SCR / INV / DSH), tag= the writer role (the daemon's own
     'daemon', the ctl and cli clients' 'cli'), instance= the daemon's

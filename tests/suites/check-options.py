@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The one-knob-one-source gate as a suite: scripts/check_options.py — the
+"""The one-knob-one-source gate as a suite: scripts/gates/check_options.py — the
 option registry against the four surfaces (the argparse flags, the env twins,
 the NixOS module options, the README flag tables), the bundled config's set
 lines and the man pages, the control-grammar vocabulary — under the battery.
@@ -17,17 +17,19 @@ import subprocess
 import sys
 import time
 
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
-GATE = os.path.join(REPO, 'scripts', 'check_options.py')
+GATE = os.path.join(REPO, 'scripts', 'gates', 'check_options.py')
 
 try:
     r = subprocess.run([sys.executable, GATE], capture_output=True, text=True, cwd=REPO)
 except OSError as e:
-    check('the gate ran (scripts/check_options.py)', False, str(e))
+    check('the gate ran (scripts/gates/check_options.py)', False, str(e))
 else:
     rows = [l for l in (r.stdout + r.stderr).splitlines() if l.startswith(('PASS ', 'FAIL '))]
-    check('the gate ran (scripts/check_options.py)', r.returncode in (0, 1) and bool(rows),
+    check('the gate ran (scripts/gates/check_options.py)', r.returncode in (0, 1) and bool(rows),
           'rc %d%s' % (r.returncode, '' if rows else ' — no PASS/FAIL rows in the output'))
     for row in rows:
         check(row[5:], row.startswith('PASS '))

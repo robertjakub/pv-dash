@@ -31,7 +31,7 @@ def apply_socket_timeout(options, name='modbus-timeout'):
     `modbus timeout`) takes its static default from
     PROTOCOL['socket_timeout'] and the registries hand-copy no number.
     The lib/options.py loaders call this over their rows before the
-    defaults build; scripts/check_options.py pins the splice."""
+    defaults build; scripts/gates/check_options.py pins the splice."""
     for opt in options:
         if opt.name == name:
             opt.static_default = PROTOCOL['socket_timeout']

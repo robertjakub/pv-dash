@@ -8,11 +8,11 @@ chars, chained per (application, writer, instance) triple so interleaved
 writers — and several instances of one tool — verify independently. The
 validator speaks the current grammar only: a pre-KV line reads malformed.
 
-  python3 scripts/audit_verify.py [FILE|- ...]      # default: the family's XDG trails
-  python3 scripts/audit_verify.py -q ~/.local/state/modbus-cache/audit.log
-  python3 scripts/audit_verify.py -v ~/.local/state/modbus-cache/audit.log   # the per-entry walk
-  python3 scripts/audit_verify.py --verbose -       # --verbose, the same flag spelled long
-  journalctl -u modbus-cache | python3 scripts/audit_verify.py -
+  python3 scripts/gates/audit_verify.py [FILE|- ...]      # default: the family's XDG trails
+  python3 scripts/gates/audit_verify.py -q ~/.local/state/modbus-cache/audit.log
+  python3 scripts/gates/audit_verify.py -v ~/.local/state/modbus-cache/audit.log   # the per-entry walk
+  python3 scripts/gates/audit_verify.py --verbose -       # --verbose, the same flag spelled long
+  journalctl -u modbus-cache | python3 scripts/gates/audit_verify.py -
 
 -v/--verbose walks the trail per entry — one row each: the line number, the
 chain key, the stamp, the type, the hash and the verdict (`anchored` — the
@@ -33,7 +33,7 @@ import os
 import sys
 
 here = os.path.dirname(os.path.realpath(__file__))
-sys.path.insert(0, os.path.dirname(here))   # the repo root — the common/ package
+sys.path.insert(0, os.path.dirname(os.path.dirname(here)))   # the repo root — the common/ package
 
 from common.runtime.audit import entry_body, entry_hash, parse_entry_hash, default_path
 

@@ -15,7 +15,7 @@ import sys
 import time
 
 import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'harness'))
 from harness import *   # the boot: the gate, SCRATCH, BASE, the NOTE stamp — the shared check accumulator (PROFILE rebinds below: the fuzz argv leads with the budget)
 
 CACHE_DIR = os.path.join(REPO, 'apps', 'cache')

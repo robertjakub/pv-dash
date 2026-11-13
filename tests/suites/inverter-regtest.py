@@ -6,7 +6,7 @@ excess connection is refused at accept), --client-timeout (silent clients
 are shed), and the control surface around them (show connections, the live
 set max-clients/client-timeout round-trip, the status/inspect fields).
 
-  python3 tests/inverter-regtest.py
+  python3 tests/suites/inverter-regtest.py
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """
@@ -19,7 +19,7 @@ import sys
 import time
 
 import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'harness'))
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check/frame builders
 
 import os

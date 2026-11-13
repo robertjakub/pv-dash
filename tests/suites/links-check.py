@@ -6,7 +6,7 @@ every repo-rooted path token in a current doc names something that exists
 findings list re-emits through the harness check() so the tally reads it
 like any suite's.
 
-  python3 tests/links-check.py
+  python3 tests/suites/links-check.py
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """
@@ -16,7 +16,7 @@ import sys
 import time
 
 import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'harness'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
 GATE = os.path.join(REPO, 'scripts', 'gates', 'links.py')

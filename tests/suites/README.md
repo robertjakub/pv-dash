@@ -6,11 +6,12 @@ boot from it:
 
     import os, sys
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))), 'lib'))
+        os.path.abspath(__file__))), 'harness'))
     from harness import *
 
-(the seed exists because this dir holds no `lib/` of its own — the
-per-tool `lib` packages must never shadow `tests/lib`). The battery
+(the seed exists because this dir holds no copy of the module — and the
+`harness` name is the dir's own, so the per-tool `lib` packages can
+never shadow it). The battery
 resolves `tests/suites/<name>.py` straight off the profile strings, the
 zz_ pgrep copy copies the body, and the CI legs run
 `python3 tests/suites/<name>.py` — one spelling everywhere, renames

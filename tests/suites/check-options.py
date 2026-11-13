@@ -8,7 +8,7 @@ through the harness check(), one row each, so the tally reads them like any
 suite's (the gate's detail never prints at the column — a captured FAIL can
 never pose as a check row).
 
-  python3 tests/check-options.py
+  python3 tests/suites/check-options.py
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """
@@ -18,7 +18,7 @@ import sys
 import time
 
 import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'harness'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
 GATE = os.path.join(REPO, 'scripts', 'gates', 'check_options.py')

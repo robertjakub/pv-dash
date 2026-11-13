@@ -12,6 +12,18 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **The tests tree files the harness under its own name** — `tests/lib/`
+  is `tests/harness/` (the module was always `harness` — the suites seed
+  the dir onto sys.path and `from harness import *`, so the dir name
+  never entered module resolution; the contested `lib` name the filing
+  docs danced around is gone from tests/). The thirteen suites' boot
+  lines and the suites'/battery's/harness's READMEs follow the new home;
+  the suites' stale pre-filing docstring self-paths spell
+  `tests/suites/<name>.py` now. The scripts/-tree `battery_status.py`
+  execv hand-off is dropped before it ever landed: the live view spells
+  only `python3 tests/battery/battery_status.py`, and scripts/README
+  carries no battery section (scripts/ returns to its committed shape).
+
 - **The four cli clients fold into one `pvsuite-cli`** — the per-tool
   `modbus-cache-cli` / `modbus-scraper-cli` / `modbus-fake-cli` /
   `dashboard-cli` bins were four 60-line copies of the same SPEC

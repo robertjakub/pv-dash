@@ -7,7 +7,7 @@ line, a deleted line, reordered lines), passes legit trails (restarts chain
 seamlessly, rotation spans the backups), and reports legacy unsigned lines
 without failing them.
 
-  python3 tests/audit-chain.py
+  python3 tests/suites/audit-chain.py
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """
@@ -19,7 +19,7 @@ import tempfile
 import time
 
 import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'harness'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
 V = os.path.join(REPO, 'scripts', 'gates', 'audit_verify.py')

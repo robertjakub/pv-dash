@@ -4,7 +4,7 @@ JSON-line requests against the control server. The server must answer with a
 well-formed JSON frame (or close cleanly) and stay alive and serving
 afterwards.
 
-  python3 tests/dashboard-control-fuzz.py
+  python3 tests/suites/dashboard-control-fuzz.py
 
 Checks: ALL PASS (or a FAILURES list; exit 1). A dead daemon or a refused
 port fails its named check — the suite never tracebacks.
@@ -19,7 +19,7 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'harness'))
 from harness import *   # the boot: the gate, SCRATCH, PROFILE, BASE, the NOTE stamp — the shared check accumulator
 
 P = os.path.join(REPO, 'apps', 'dashboard', 'bin', 'dashboard.py')

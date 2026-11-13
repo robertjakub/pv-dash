@@ -7,4 +7,4 @@ KILL what outlives the grace window). The docs spelling is the nested
 path: `python3 tests/battery/battery.py …`, `python3
 tests/battery_status` under `tests/battery/` likewise — `tests/` root
 holds no loose scripts (the suites live in `../suites/`, the harness in
-`../lib/`).
+`../harness/`).

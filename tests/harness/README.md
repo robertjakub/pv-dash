@@ -1,4 +1,4 @@
-# tests/lib/ — the shared library
+# tests/harness/ — the shared harness
 
 `harness.py` is the one implementation every tests/ script rides: the
 PV_RUN_DIR gate (a standalone run refuses), the scratch under the

@@ -14,7 +14,7 @@ per gate:
   generators/sbom.py --check     the SBOM pair
   family_drift.py --check      the generated drift doc
 
-  python3 tests/lint-gates.py
+  python3 tests/suites/lint-gates.py
 
 Checks: ALL PASS (or a FAILURES list; exit 1).
 """
@@ -24,7 +24,7 @@ import sys
 import time
 
 import os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'harness'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
 GATES = (

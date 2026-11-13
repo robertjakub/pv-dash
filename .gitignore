@@ -6,6 +6,8 @@ result*
 __pycache__/
 *.pyc
 docker/env/*.env
+docker/demo/secrets/
+docker/prod/secrets/
 apps/scraper/metrics.json
 
 # the wave drafts — invented against the tree, deleted at landing

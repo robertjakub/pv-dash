@@ -85,9 +85,9 @@ they name the wire.
    (`apps/inverter/lib/options.json:216`) and the dashboard itself
    (`apps/dashboard/lib/options.json:89`). The shipped stacks carry both
    meanings of the one variable: the scraper's `AUTH_TOKEN:
-   file:/config/metrics.token` against the dashboard's
-   `file:/config/page.token` (`docker/demo/compose.yaml:126,177`,
-   `docker/prod/compose.yaml:98,141`). The modbus-auth rename dissolved
+   file:/run/pv-secrets/metrics-token` against the dashboard's
+   `file:/run/pv-secrets/page-token` (`docker/demo/compose.yaml:148,206`,
+   `docker/prod/compose.yaml:120,170`). The modbus-auth rename dissolved
    only the third variable (`AUTH` is gone everywhere); this split
    stands. Migrating a token between tools changes the variable *and*
    the meaning. Outcome: the scraper's /metrics bearer renames to
@@ -439,13 +439,13 @@ re-open — is the history half:
 ### CROSS-TOOL
 
 - **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
-  `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 31): F17
-  (the volume secrets), F14 (TLS — the item below), F15 (INFO — the
+  `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 32): F14
+  (TLS — the item below), F15 (INFO — the
   bearer token + the localhost bind are the controls, the scraper
   README carries the privacy note), F1 (accepted); re-run the audit
   after the TLS story (F14) lands, after the multi-target /
   control-plane evolutions, or any new listener or file format; at
-  least yearly otherwise. The closed findings F2–F13, F16, F18–F23
+  least yearly otherwise. The closed findings F2–F13, F16–F23
   with their fix and verification:
   [history/AUDIT.md](history/AUDIT.md).
 - **a connect ACL for the control plane** `[common]` `[cache]`

@@ -19,6 +19,7 @@ one `internal: true` network.
 
 ```bash
 cd docker/demo
+sh ../gen-secrets.sh secrets                      # the three secrets, 0600 (gitignored)
 docker compose up -d modbus-fake-inverter       # build + serve on the internal network
 docker compose up -d modbus-cache               # + the cache proxy (upstream: modbus-fake-inverter)
 docker compose up -d modbus-scraper             # + the exporter (upstream: modbus-cache)
@@ -27,6 +28,13 @@ docker compose up -d dashboard                  # + the dashboard, proxying the 
 docker compose exec --user pvsuite modbus-fake-inverter modbus-fake-cli   # a console session on the control server
 docker compose down
 ```
+
+The stack refuses to start without the secrets — they are compose
+secrets (`secrets:` `file:` sources) mounted read-only, and the
+entrypoint stages private 0600 copies for the tools. Generate them
+first (`sh ../gen-secrets.sh secrets` — three 0600 files under
+`secrets/`, gitignored); rotation is delete + re-run + recreate. The
+full story: [the secrets story](../README.md#the-secrets-story).
 
 **Exactly one port is published on the host** — the dashboard's HTTP
 interface, loopback-only (`127.0.0.1:8080:8080`): the front for the stack's
@@ -48,9 +56,10 @@ README's — [the env files](../README.md#the-env-files-one-per-tool),
 ## The demo stack's topology
 
 One `internal: true` network (`pv-modbus`), nothing published on the host,
-one shared `config` volume seeded by the entrypoints, and the two secrets
-generated into that volume: the bearer token gating the exporter and the
-suite key authenticating the Modbus hops (every connect proves it —
+one shared `config` volume seeded by the entrypoints, and the three
+secrets mounted as compose secrets (the operator's `secrets/` files —
+the bearer token gating the exporter, the page token and the suite key
+authenticating the Modbus hops; every connect proves the key —
 modbus-fake-inverter demands the handshake from the cache, the cache demands it
 from the scraper and proves it upstream). The arrows are the traffic;
 every listener binds inside the network only:
@@ -90,10 +99,10 @@ every listener binds inside the network only:
    │   │      └──────────────┘        (127.0.0.1 only)                   │      │
    │   └─────────────────────────────────────────────────────────────────┘      │
    │                                                                            │
-   │   shared "config" volume (/config): metrics.token,                         │
-   │   modbus-auth.token, the JSON specs, config.js - mounted by                │
-   │   the Modbus services + the dashboard; prometheus reads it                 │
-   │   read-only                                                                │
+   │    shared "config" volume (/config): the JSON specs, config.js -           │
+   │    mounted by the Modbus services + the dashboard; the secrets are         │
+   │    compose secrets (secrets/ -> /run/secrets -> /run/pv-secrets,           │
+   │    0600)                                                                   │
    │                                                                            │
    │   docker compose exec <service> ... - the way in                           │
    └────────────────────────────────────────────────────────────────────────────┘
@@ -101,7 +110,7 @@ every listener binds inside the network only:
 
 - **modbus-fake-inverter** — the device; its Modbus is the only "hardware" in the
   demo, and it demands the suite handshake on every connect (the shared
-  generated key — the internal network is the boundary, the handshake is
+  suite-key secret — the internal network is the boundary, the handshake is
   the proof).
 - **modbus-cache** — the proxy: polls the fake every 10 s (proving the
   suite key upstream), owns the single client slot, serves reads from
@@ -118,14 +127,19 @@ every listener binds inside the network only:
   and the served `config.js` come from the image (the `/config` copies for
   the live edits).
 - **the `config` volume** — mounted by the three Modbus services and the
-  dashboard (prometheus reads it read-only): the required file artifacts
-  live there (the JSON specs, `config.js`); `/config/metrics.token` and
-  `/config/modbus-auth.token` are the generated shared secrets.
+  dashboard: the required file artifacts live there (the JSON specs,
+  `config.js`); the secrets are NOT in the volume — the operator's
+  `secrets/` files, mounted as compose secrets (F17).
 - **the audit trails** — the tools audit to stdout in the demo, so `docker
   compose logs <service>` is the trail.
 
 The volume is a compose-managed named volume: `docker compose down` keeps
 it, `down -v` wipes it (reseeded with the required file artifacts on the
-next `up`). Seeding happens **once per file** — a bundled-artifact fix
-only reaches an existing volume after `down -v` (or a manual `/config`
-edit).
+next `up`) — **and `down -v` also wipes the `prometheus-data` volume**
+(the scrape history): the gentle re-seed for one stale artifact is
+`docker compose exec <service> rm /config/<file>` + restart. Seeding
+happens **once per file** — a bundled-artifact fix
+only reaches an existing volume after the re-sync (or a manual
+`/config` edit). The secrets are host files: they survive every `down`
+untouched; rotation is delete + re-run `gen-secrets.sh` + recreate
+([the secrets story](../README.md#the-secrets-story)).

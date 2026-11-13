@@ -19,8 +19,8 @@
 #       modbus-fake-inverter --modbus-profile deye-sg04lp3 --timezone local    # any flags via the CMD override
 #
 # The config volume: the entrypoint seeds /config with the required file
-# artifacts (for the fake: the generated suite key only — the volume is
-# there for symmetry with the other images and for future use).
+# artifacts (for the fake: none — the volume is there for symmetry with
+# the other images and for future use).
 # The bundled conf is NOT in the volume — the tool loads the image's
 # /pv-suite/inverter/modbus-fake-inverter.conf (the default --config target) and the
 # per-tool env file env/modbus-fake-inverter.env overrides it.
@@ -43,12 +43,6 @@ COPY --chown=pvsuite --from=cli pvsuite-cli.py pvsuite-cli.py
 COPY --chown=pvsuite bin/ inverter/bin/
 COPY --chown=pvsuite lib/ inverter/lib/
 COPY --chown=pvsuite examples/modbus-fake-inverter.conf inverter/modbus-fake-inverter.conf
-# the suite key's placeholder: the entrypoint materializes any *.token in
-# config-defaults as a random value on the first seed (the bundled content
-# is never copied) — the compose stack points the fake's server-side auth
-# at /config/modbus-auth.token (every client proves it right after connect)
-RUN mkdir -p config-defaults \
-    && echo placeholder > config-defaults/modbus-auth.token
 RUN chmod +x inverter/bin/*.py pvsuite-cli.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/inverter/bin/modbus-fake-inverter.py /usr/local/bin/modbus-fake-inverter \
     && ln -s /pv-suite/inverter/bin/modbus-fake-cli.py /usr/local/bin/modbus-fake-cli

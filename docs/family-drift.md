@@ -446,16 +446,17 @@ published port not backed by a registry default is a lie.
 | `docker/Dockerfile.prometheus` | `COPY`, `ENTRYPOINT`, `EXPOSE`, `FROM`, `HEALTHCHECK`, `VOLUME` | — |
 | `docker/README.md` | `AUTH_TOKEN`, `CHAOS`, `CONFIG`, `CONFIG_JS`, `COPY`, `EDITOR`, `ENTRYPOINT`, `GENERATED`, `HEALTHCHECK`, `HMAC`, `HOST`, `JSON`, `LICENSE`, `LOG_LEVEL` … | 15502, 5502, 8080, 9350 |
 | `docker/demo/README.md` | `DEMO`, `HOST`, `JSON`, `PROM_URL`, `README`, `TSDB`, `UPSTREAM` | 8080, 9090 |
-| `docker/demo/compose.yaml` | `AUTH_TOKEN`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `MODBUS_AUTH`, `MODBUS_AUTH_KEY`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `PROM_URL`, `PVA1`, `README`, `REQUIRED`, `SAME` | 8080 |
-| `docker/entrypoints/entrypoint-prometheus.sh` | `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `SECURITY`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
-| `docker/entrypoints/entrypoint.sh` | `JSON`, `README`, `REQUIRED`, `SECURITY` | — |
+| `docker/demo/compose.yaml` | `AUTH_TOKEN`, `BEFORE`, `DEMO`, `HMAC`, `JSON`, `LISTEN`, `MODBUS_AUTH`, `MODBUS_AUTH_KEY`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `OUTSIDE`, `PROM_URL`, `PVA1`, `README` … | 8080 |
+| `docker/entrypoints/entrypoint-prometheus.sh` | `POST`, `PROM_ADMIN_API`, `PROM_ARGS`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `README`, `SECURITY`, `TOKEN_DST`, `TOKEN_SRC`, `TSDB` | — |
+| `docker/entrypoints/entrypoint.sh` | `JSON`, `README`, `REQUIRED` | — |
 | `docker/env/dashboard.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CLIENT_TIMEOUT`, `CONFIG_JS`, `CONTROL_LOG_REPLIES`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP` … | — |
 | `docker/env/modbus-cache.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUDIT_REQUESTS`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP` … | — |
 | `docker/env/modbus-fake-inverter.env.example` | `ALLOW_WRITE`, `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `CHAOS`, `CIDR`, `CLIENT_TIMEOUT`, `CONNECT_ACL`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS` … | — |
 | `docker/env/modbus-scraper.env.example` | `AUDIT_DAILY`, `AUDIT_FILES`, `AUDIT_FORWARD`, `AUDIT_FORWARD_FORMAT`, `AUDIT_INSTANCE`, `AUDIT_LOG`, `AUDIT_MAX_MB`, `AUTH_TOKEN`, `CONTROL_OPS_TOKEN`, `CONTROL_OPS_VERBS`, `CONTROL_SOCKET_GROUP`, `CONTROL_TOKEN`, `CONTROL_TRUST_UIDS`, `DUMP_INTERVAL` … | — |
 | `docker/env/prometheus.env.example` | `POST`, `PROM_`, `PROM_ADMIN_API`, `PROM_LIFECYCLE`, `PROM_RETENTION`, `TSDB` | — |
+| `docker/gen-secrets.sh` | `README`, `SECURITY` | — |
 | `docker/prod/README.md` | `EDITOR`, `HOST`, `JSON`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `PORT`, `PROM_URL`, `README`, `SECURITY`, `UPSTREAM`, `YOUR` | 8080, 9350 |
-| `docker/prod/compose.yaml` | `AUTH`, `AUTH_TOKEN`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `MODBUS_AUTH`, `MODBUS_AUTH_KEY`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `ONLY`, `PORT` … | 8080, 9350 |
+| `docker/prod/compose.yaml` | `AUTH`, `AUTH_TOKEN`, `CONTAINER`, `EDIT`, `EXTERNAL`, `HMAC`, `HOST`, `LISTEN`, `MODBUS_AUTH`, `MODBUS_AUTH_KEY`, `MODBUS_UPSTREAM_AUTH`, `MODBUS_UPSTREAM_AUTH_KEY`, `ONLY`, `OUTSIDE` … | 8080, 9350 |
 | `docker/prometheus.yml` | `SECURITY` | — |
 
 **The port map 1:1** — the registries back every port the docker
@@ -541,7 +542,6 @@ files cite it — the promise ledger against the code.
 | F1 | Modbus TCP carries no authentication and no encryption | — |
 | F14 | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics trave | apps |
 | F15 | The metrics expose production values (generation, consumption, battery SoC) | — |
-| F17 | The `/config` volume holds live config in plaintext; the entrypoint seeds copies | — |
 
 The findings:
 

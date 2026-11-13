@@ -47,11 +47,6 @@ COPY --chown=pvsuite lib/ dashboard/lib/
 COPY --chown=pvsuite static/ dashboard/static/
 COPY --chown=pvsuite examples/dashboard.conf dashboard/
 COPY --chown=pvsuite examples/config.js config-defaults/
-# the page token's placeholder: the entrypoint materializes any *.token in
-# config-defaults as a random value on the first seed (the bundled content
-# is never copied) — the compose stacks point the page's bearer at
-# /config/page.token (AUTH_TOKEN=file:/config/page.token)
-RUN echo placeholder > config-defaults/page.token
 RUN chmod +x dashboard/bin/*.py pvsuite-cli.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/dashboard/bin/dashboard.py /usr/local/bin/dashboard \
     && ln -s /pv-suite/dashboard/bin/dashboard-cli.py /usr/local/bin/dashboard-cli
@@ -68,7 +63,8 @@ ENTRYPOINT ["/usr/local/bin/pv-entrypoint"]
 EXPOSE 8080
 # the container binds every interface (a published port needs it) — beyond
 # loopback the page's bearer token is mandatory (F21): the compose rides
-# the generated /config/page.token, a plain run passes AUTH_TOKEN
+# the operator's page secret (a compose secret the entrypoint stages,
+# /run/pv-secrets/page-token), a plain run passes AUTH_TOKEN
 CMD ["dashboard", "--listen", "0.0.0.0:8080"]
 
 # Liveness: the ctl answers over the server's unix control socket (the

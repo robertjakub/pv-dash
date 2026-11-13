@@ -11,10 +11,21 @@
 # Run one service: docker compose up -d modbus-fake-inverter
 # Run the stack:         docker compose up -d (the fake + the cache + the scraper + prometheus + the dashboard)
 #
+# BEFORE up: generate the stack's three secrets —
+#     sh ../gen-secrets.sh secrets
+# (the suite key + the two bearer tokens, 0600 files under demo/secrets/
+# — gitignored). The stack refuses to start without them: the files are
+# compose secrets (file: sources), mounted read-only at
+# /run/secrets/<name>, and the entrypoint stages a private 0600 copy for
+# the unprivileged user at /run/pv-secrets/<name> — the path the file:
+# env pins below speak. The secrets live OUTSIDE the config volume
+# (docs/SECURITY.md F17 closed): the volume carries only the non-secret
+# file artifacts. Rotation: delete the file, re-run gen-secrets.sh,
+# recreate the service.
+#
 # The services share the `config` volume mounted at /config: on start
-# the entrypoint seeds it with the REQUIRED file artifacts (the generated
-# metrics token, the generated page token, the generated suite key, the
-# JSON specs, the dashboard's
+# the entrypoint seeds it with the REQUIRED non-secret file artifacts
+# (the JSON specs, the dashboard's
 # config.js — never the bundled conf scripts: each tool loads the image's
 # own conf and the per-tool env file overrides it). Edits to /config
 # survive container recreation. `docker compose exec` sessions bypass the
@@ -29,27 +40,33 @@
 # attached to the same network by name (see README.md).
 #
 # The scraper/token story ships in the stack: the exporter serves with a
-# bearer token (AUTH_TOKEN=file:/config/metrics.token — a random
-# value the entrypoint generates on the first seed, 0600, owner pvsuite) and
-# the Prometheus service reads its copy of the same file from the config
-# volume. Read the token: docker compose exec modbus-scraper cat /config/metrics.token
+# bearer token (AUTH_TOKEN=file:/run/pv-secrets/metrics-token — the
+# operator's secret, 0600) and the Prometheus service reads the same
+# secret (its entrypoint copies it 0600 for the unprivileged prometheus
+# user). Read the token: cat secrets/metrics-token
 # The dashboard's page ships token'd the same way (F21):
-# docker compose exec dashboard cat /config/page.token
+# cat secrets/page-token
 #
 # The Modbus hops ship authenticated the same way: one shared suite key
-# (modbus-auth.token, generated into the volume on the first seed like the
-# tokens) proven by the PVA1/HMAC handshake on every connect —
-# modbus-fake-inverter demands it (its server side), the cache proves it
-# upstream and demands it from its own clients, the scraper proves it.
-# The environment: blocks pin the scheme + the file: reference;
-# environment beats env_file, so the per-tool env files cannot override
-# the stack's auth story — opening a hop is a compose edit (an explicit
-# operator act, the F7 shape).
+# (the operator's modbus-auth secret) proven by the PVA1/HMAC handshake on
+# every connect — modbus-fake-inverter demands it (its server side), the
+# cache proves it upstream and demands it from its own clients, the
+# scraper proves it. The environment: blocks pin the scheme + the file:
+# reference; environment beats env_file, so the per-tool env files cannot
+# override the stack's auth story — opening a hop is a compose edit (an
+# explicit operator act, the F7 shape).
 #
 # The overrides: per-tool env files — cp ../env/<tool>.env.example
 # ../env/<tool>.env and edit (bare env-twin names; required: false, so no
 # file = the image defaults). The SAME files serve plain
 # `docker run --env-file` runs. See ../README.md.
+secrets:
+  modbus-auth:
+    file: ./secrets/modbus-auth
+  metrics-token:
+    file: ./secrets/metrics-token
+  page-token:
+    file: ./secrets/page-token
 services:
   modbus-fake-inverter:
     build:
@@ -65,10 +82,12 @@ services:
       # the server side: every client proves the stack's suite key right
       # after connect — ERR and the client is dropped
       MODBUS_AUTH: suite
-      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_AUTH_KEY: file:/run/pv-secrets/modbus-auth
     env_file:
       - path: ../env/modbus-fake-inverter.env
         required: false
+    secrets:
+      - modbus-auth
     volumes:
       - config:/config
     networks:
@@ -89,13 +108,15 @@ services:
     environment:
       # the upstream side: the cache proves the same suite key to the fake
       MODBUS_UPSTREAM_AUTH: suite
-      MODBUS_UPSTREAM_AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_UPSTREAM_AUTH_KEY: file:/run/pv-secrets/modbus-auth
       # the server side: the scraper (any client) proves it to the cache
       MODBUS_AUTH: suite
-      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_AUTH_KEY: file:/run/pv-secrets/modbus-auth
     env_file:
       - path: ../env/modbus-cache.env
         required: false
+    secrets:
+      - modbus-auth
     volumes:
       - config:/config
     networks:
@@ -118,16 +139,21 @@ services:
       # the client side: the scraper proves the stack's suite key to the
       # cache on every connect (the poller keeps retrying on ERR)
       MODBUS_AUTH: suite
-      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
-      # the token the entrypoint generated into the volume (0600, pvsuite):
-      # the demo exporter never serves unauthenticated (the audit's F13) —
+      MODBUS_AUTH_KEY: file:/run/pv-secrets/modbus-auth
+      # the operator's bearer secret (0600, staged by the entrypoint):
+      # the exporter never serves unauthenticated (the audit's F13) —
       # environment beats env_file, so modbus-scraper.env cannot override
       # this; the value is a file: reference (the first line of the 0600
       # file)
-      AUTH_TOKEN: file:/config/metrics.token
+      AUTH_TOKEN: file:/run/pv-secrets/metrics-token
     env_file:
       - path: ../env/modbus-scraper.env
         required: false
+    secrets:
+      - modbus-auth
+      - metrics-token
+    volumes:
+      - config:/config
     networks:
       - modbus
     depends_on:
@@ -144,8 +170,9 @@ services:
     env_file:
       - path: ../env/prometheus.env
         required: false
+    secrets:
+      - metrics-token
     volumes:
-      - config:/config:ro
       - prometheus-data:/prometheus
     networks:
       - modbus
@@ -172,11 +199,13 @@ services:
       PROM_URL: http://prometheus:9090
       # the page's auth (the audit's F21): the container binds every
       # interface so the published port reaches it — beyond loopback a
-      # token is mandatory, the refusal is the F13 shape. The entrypoint
-      # materializes a random 0600 token into /config/page.token on the
-      # first seed; read it: docker compose exec dashboard cat /config/page.token
+      # token is mandatory, the refusal is the F13 shape. The operator's
+      # page secret (0600, staged by the entrypoint) carries it; read it:
+      # cat secrets/page-token
       LISTEN: 0.0.0.0:8080
-      AUTH_TOKEN: file:/config/page.token
+      AUTH_TOKEN: file:/run/pv-secrets/page-token
+    secrets:
+      - page-token
     volumes:
       - config:/config
     networks:

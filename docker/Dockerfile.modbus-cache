@@ -50,12 +50,6 @@ COPY --chown=pvsuite lib/ cache/lib/
 COPY --chown=pvsuite examples/modbus-cache.conf cache/
 COPY --chown=pvsuite --from=examples acl-write-registers.json cache/
 COPY --chown=pvsuite --from=examples modbus-cache-filter.json config-defaults/selection.json
-# the suite key's placeholder: the entrypoint materializes any *.token in
-# config-defaults as a random value on the first seed (the bundled content
-# is never copied) — the compose stacks point the cache's two auth sides
-# at /config/modbus-auth.token (its clients' handshake and, when the
-# device speaks suite, the upstream handshake)
-RUN echo placeholder > config-defaults/modbus-auth.token
 RUN chmod +x cache/bin/*.py pvsuite-cli.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/cache/bin/modbus-cache.py /usr/local/bin/modbus-cache \
     && ln -s /pv-suite/cache/bin/modbus-cache-cli.py /usr/local/bin/modbus-cache-cli

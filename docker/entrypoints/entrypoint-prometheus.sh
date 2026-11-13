@@ -1,14 +1,15 @@
 #!/bin/sh
-# The demo Prometheus's entrypoint: wait for the metrics bearer token in
-# the shared config volume (the modbus-scraper's entrypoint seeds it —
-# a random value, 0600, owner pvsuite), copy it for the prometheus user
-# (0600 — the token-file discipline, F12 in docs/SECURITY.md, the same rule the
-# file: references enforce), then exec
+# The demo Prometheus's entrypoint: read the metrics bearer token from
+# its compose secret (the operator-generated file mounted at
+# /run/secrets/metrics-token — docker/gen-secrets.sh generates it, the
+# secrets story in docker/README.md), copy it for the prometheus user
+# (0600 — the token-file discipline, F12 in docs/SECURITY.md, the same
+# rule the file: references enforce), then exec
 # prometheus unprivileged via su-exec. Runs as root only for that
 # handoff; prometheus never runs as root.
 set -eu
 
-TOKEN_SRC=/config/metrics.token
+TOKEN_SRC=/run/secrets/metrics-token
 TOKEN_DST=/etc/prometheus/metrics.token
 
 i=0
@@ -17,8 +18,9 @@ while [ ! -f "$TOKEN_SRC" ] && [ "$i" -lt 60 ]; do
     sleep 0.5
 done
 if [ ! -f "$TOKEN_SRC" ]; then
-    echo "pv-prometheus-entrypoint: no $TOKEN_SRC in the config volume — " \
-         "start the modbus-scraper service once so its entrypoint seeds the token" >&2
+    echo "pv-prometheus-entrypoint: no $TOKEN_SRC — the compose stack mounts" \
+         "the operator's secret (generate the stack's secrets with" \
+         "docker/gen-secrets.sh first, see docker/README.md)" >&2
     exit 1
 fi
 

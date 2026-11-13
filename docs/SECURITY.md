@@ -1,4 +1,4 @@
-# Security — the pv-suite tree (rev. 31)
+# Security — the pv-suite tree (rev. 32)
 
 This is the family's **one security document**: the posture, the trust
 boundaries, the implemented controls, the per-tool stories, the audit
@@ -57,7 +57,7 @@ format, and at least yearly otherwise (§ 11).
 | `/cache` | the Modbus caching proxy: the daemon + the cli client, the proxy/cache/upstream/control/metrics/persist/config libs, man/, the sample conf (the NixOS module lives in `nixos/modules/`) | the production-relevant surface: two listeners (Modbus TCP + control), `/metrics`, the state dump, the audit trail; the write path quadruple-gated (the parse gate, `allow-write` off, `write-acl` none, `write-registers` none); `acl/connect`/`acl/write`/`metrics/acl` IP gates (the inline grammar or the standalone ip-prefix acl file); the dump is config-equivalent trust at rest | F2–F5, F8, F18, F23 closed here; F1 accepted |
 | `/common` | the shared package: `runtime/audit.py` (the append-only trail + the chained hashes), `settings/config.py` (listen/profile resolution, token loading + the 0600 gate, the shared IP-gate half), `serve/connlimit.py` (the caps + the `acl_allows`/`acl_refused` hooks), `wire/cred.py` (peer-cred), `wire/wiresec.py` (the RBAC roles), `modbus/protocol.py`, `render/human.py`, `runtime/logutil.py`, `runtime/version.py` | trust amplifier: every tool inherits its guarantees; a regression is family-wide — the regtests + the audit-chain suite watch it | F10, F12 closed here |
 | `/dashboard` | the web front: the server + the cli client, the HTTP handler + the Prometheus proxy, the control server, config, static/ | the viewer surface: GET-only HTTP (the realpath-guarded static tree, the proxy under `--prom-prefix`) with the family connection gate and the bearer token mandatory beyond loopback (F21, the `?auth=` cookie bootstrap); the family control server (the F5 refusal, peer-cred, the signed wire, the DSH trail); the default bind loopback; its own `/metrics` rides the family stack | F20, F21 closed |
-| `/docker` | one alpine image per tool, the Prometheus image, the two entrypoints, the compose demo | the network is the boundary: one `internal: true` network, nothing published on the host; the images run unprivileged (`pvsuite`, `prometheus`); root exists only for the volume seeding and drops before exec; the bundled `*.token` defaults materialize as random 0600 values | F7 closed; F17 open |
+| `/docker` | one alpine image per tool, the Prometheus image, the two entrypoints, the two compose stacks | the network is the boundary: one `internal: true` network (demo), nothing published on the host beyond the loopback-mapped surfaces; the images run unprivileged (`pvsuite`, `prometheus`); root exists only for the volume seeding + the secret staging and drops before exec; the three secrets are operator-supplied compose secrets mounted read-only (`docker/gen-secrets.sh`), staged 0600 outside the config volume | F7, F17 closed |
 | `/inverter` | the fake: the daemon + the cli client, the simulator/machines/control/metrics libs, man/ | a test instrument on a trusted LAN: the Modbus surface capped (`max-clients`/`client-timeout`/`max-conn-per-ip`, live-settable) and connect-ACL'd (inline grammar only), the read-count gate, `/metrics` optional on the family stack; the family control listener (tokenless TCP by posture — F11); deliberately not security-first, documented as such | F11 closed; F1 accepted |
 | `/profiles` | the device profiles (JSON data: sun2000 + sun2000_full + demo-fc4 + three Deye variants), home `shared/profiles/` in the tree | data, not code: the loader validates every entry (type/width/scale, bounds), the search path is closed, the linter checks schema/overlaps/bounds — treat a profile file like config | none |
 | `/scraper` | the exporter: the daemon + the cli client, the server/scraper/poller/control/config libs, man/, the sample conf (the alert rules pack lives in `extras/alerts/`) | the read-only consumer: one HTTP GET route set (bearer-gated, capped, `metrics/acl`, the non-loopback refusal) + one outbound Modbus client (FC3/FC4 reads only); the family control server; the SIGHUP reload re-validates everything | F13, F16, F20 closed; F14 open |
@@ -76,12 +76,13 @@ hold no runtime trust of their own.
 | token files | every secret knob takes `file:<path>` | same | same | same | owner-only (0600) enforced at the shared loader (F12); the bare `-file` siblings are gone — `file:` is the one spelling |
 | upstream connection | outbound to the inverter/SDongle | outbound poll (the device or the cache), every 10 s by default | n/a (it *is* the device) | outbound HTTP to Prometheus (`--upstream`, default `http://localhost:9090`) | none (protocol-inherent) |
 | audit trail | CACHE / CLI / CTL — XDG state home or stdout, append-only, rotated, control-character-folded | SCR / CLI / CTL, same | INV / CLI / CTL, same | DSH / CLI / CTL, same | the per-writer hash chain, verified by `dev/gates/audit_verify.py` (F10); the opt-in forward mirrors every line to the local syslog or the off-box collector (the `udp://`/`tcp://` grammar, the RFC5424/CEF envelopes, the remote-only mode) |
-| compose demo stack | five services on one `internal: true` network, **nothing published on the host**, one shared `config` volume, the generated 0600 `metrics.token` | | | | the internal network is the boundary; the exporter bearer-gated in the demo (F7) |
+| compose demo stack | five services on one `internal: true` network, **nothing published on the host**, one shared `config` volume (the non-secret artifacts), the three operator secrets as compose secrets (0600, staged outside the volume) | | | | the internal network is the boundary; the exporter bearer-gated in the demo (F7) |
 
 Deployment (docker/): all three Modbus images run the tool as the
 unprivileged `pvsuite` user on alpine; the shared entrypoint runs as root
 **only** to seed the `/config` volume (bundled defaults copied in, existing
-files kept, `*.token` materialized as random 0600 values) and drops to
+files kept — non-secrets only, F17) and stage the compose secrets (0600
+`pvsuite` copies under `/run/pv-secrets/`) before dropping to
 `pvsuite` via `su-exec`; the Prometheus image follows the same pattern.
 
 The scraper is the read-only consumer: no write path, no state-changing
@@ -326,12 +327,11 @@ list decide who may drive the control socket (§ 4), and the Modbus
 | F1 | cache, scrape, inverter | HIGH (accepted, protocol-inherent) | Modbus TCP carries no authentication and no encryption — listener and upstream alike; a compromised inverter LAN segment can feed the scraper bogus register values (sanity-capped). | keep the listener off the WAN (the default binds 127.0.0.1), set the connect ACL on a LAN, keep `--allow-write` off (the write path defaults fully closed). |
 | F14 | scrape | LOW | No TLS on the HTTP endpoint (plain HTTP): the bearer token and the metrics travel in clear text. | terminate TLS in a reverse proxy when anything beyond localhost needs the endpoint. |
 | F15 | scrape | INFO | The metrics expose production values (generation, consumption, battery SoC) — a home-occupancy privacy consideration. | the bearer token (F13) + the localhost bind are the controls; treat the endpoint as internal. |
-| F17 | docker | INFO | The `/config` volume holds live config in plaintext; the entrypoint seeds copies once (existing files are never refreshed); the generated `metrics.token` lives in the same volume. | prefer token files outside the volume / `LoadCredential` / secret-backed mounts; document `docker compose down -v` as the re-sync. |
 
 ### 8.2 Closed
 
-Every closed finding — F2–F13, F16, F18–F23 — with its fix, its
-verification and the per-revision walk (rev. 1–31):
+Every closed finding — F2–F13, F16–F23 — with its fix, its
+verification and the per-revision walk (rev. 1–32):
 [history/AUDIT.md](history/AUDIT.md).
 
 ## 9. Verification
@@ -396,7 +396,10 @@ publishes nothing.
 
 The remaining open set is the documented trust decisions and deployment
 stories: F1 accepted (Modbus TCP itself — mitigate with segmentation and
-the write gates); F14/F17 operational (TLS at a proxy, the volume
-story); F15 informational. Re-run this audit after
+the write gates); F14 operational (TLS at a proxy); F15
+informational. F17 closed with rev. 32: the secrets left the config
+volume (the operator's compose secrets, staged 0600 per container; the
+volume holds non-secrets only and its seed-once + re-sync semantics are
+documented). Re-run this audit after
 the TLS story (F14) lands, after the multi-target / control-plane
 evolutions, or any new listener or file format; at least yearly otherwise.

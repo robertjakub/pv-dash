@@ -1,6 +1,7 @@
 # The demo Prometheus: scrapes the modbus-scraper exporter over the
-# internal compose network with the bearer token from the shared config
-# volume (the entrypoint copies it to /etc/prometheus/metrics.token,
+# internal compose network with the bearer token from its compose secret
+# (the operator-generated file mounted at /run/secrets/metrics-token;
+# the entrypoint copies it to /etc/prometheus/metrics.token,
 # 0600 — see entrypoint-prometheus.sh). The stack publishes nothing on
 # the host (docs/SECURITY.md F7): the UI is reachable from inside the
 # network only.

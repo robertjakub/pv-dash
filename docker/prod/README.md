@@ -22,12 +22,15 @@ demo stack runs; only the wiring differs:
   checkout can run both stacks
 
 The secrets ship decided — the stack is authenticated out of the box
-([the secrets story](../README.md#the-secrets-story)): the Modbus hops
-prove the generated suite key on every connect, the exporter serves
-with the generated bearer token, the dashboard's page is token'd (F21).
+([the secrets story](../README.md#the-secrets-story)): you generate the
+three secret files first (`sh ../gen-secrets.sh secrets`), compose
+mounts them, the Modbus hops prove the suite key on every connect, the
+exporter serves with the bearer token, the dashboard's page is token'd
+(F21).
 
 ```bash
 cd docker/prod
+sh ../gen-secrets.sh secrets                         # the three secrets, 0600
 cp ../env/modbus-cache.env.example ../env/modbus-cache-production.env
 $EDITOR ../env/modbus-cache-production.env           # UPSTREAM=192.168.1.100:5502 — the device
 docker compose up -d                                # cache + scraper + dashboard
@@ -70,9 +73,10 @@ the F7 shape).
 One compose network (`pv-suite`, **not** internal — the route out to
 the device), two published ports on the host, both loopback-only (the
 dashboard's UI + the exporter's `/metrics` for your collector), one
-shared `config` volume seeded by the entrypoints, and the two secrets
-generated into that volume: the bearer token gating the exporter and
-the suite key authenticating the Modbus hops. The device and the
+shared `config` volume seeded by the entrypoints, and the three
+secrets mounted as compose secrets (the operator's `secrets/` files —
+the bearer token gating the exporter, the page token and the suite key
+authenticating the Modbus hops). The device and the
 collector sit outside the network — the cache's client and the
 collector's pull are the two routes through:
 
@@ -85,7 +89,7 @@ collector's pull are the two routes through:
           modbus-cache-production.env    └──────┬───────┘
           (the required file, env/); its        │
           auth, if any, rides                   │
-          MODBUS_UPSTREAM_AUTH there                   │
+          MODBUS_UPSTREAM_AUTH there            │
                                                 │
           FC3/4 reads, 10s poll - the           │
           suite handshake (or the               │
@@ -120,10 +124,10 @@ collector's pull are the two routes through:
    │      your external collector -      └──────────────┘               │
    │      it pulls /metrics with the                                    │
    │                                                                    │
-   │    shared "config" volume (/config): metrics.token,                │
-   │    modbus-auth.token, the JSON specs, config.js -                  │
-   │    mounted by the Modbus services + the dashboard;                 │
-   │    prometheus reads it read-only                                   │
+   │    shared "config" volume (/config): the JSON specs, config.js -   │
+   │    mounted by the Modbus services + the dashboard; the secrets     │
+   │    are compose secrets (secrets/ -> /run/secrets ->                │
+   │    /run/pv-secrets, 0600)                                          │
    │                                                                    │
    │    docker compose exec <service> ... - the way in                  │
    └────────────────────────────────────────────────────────────────────┘
@@ -155,8 +159,8 @@ collector's pull are the two routes through:
   along (docs/SECURITY.md F16).
 - **the `config` volume** — mounted by the three Modbus services and
   the dashboard: the required file artifacts live there (the JSON
-  specs, `config.js`); `/config/metrics.token` and
-  `/config/modbus-auth.token` are the generated shared secrets.
+  specs, `config.js`); the secrets are NOT in the volume — the
+  operator's `secrets/` files, mounted as compose secrets (F17).
 - **the audit trails** — the tools audit to stdout in the stacks, so
   `docker compose logs <service>` is the trail.
 
@@ -164,4 +168,6 @@ The volume is a compose-managed named volume: `docker compose down`
 keeps it, `down -v` wipes it (reseeded with the required file
 artifacts on the next `up`). Seeding happens **once per file** — a
 bundled-artifact fix only reaches an existing volume after `down -v`
-(or a manual `/config` edit).
+(or a manual `/config` edit). The secrets are host files: they survive
+every `down` untouched; rotation is delete + re-run `gen-secrets.sh` +
+recreate ([the secrets story](../README.md#the-secrets-story)).

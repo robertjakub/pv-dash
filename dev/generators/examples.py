@@ -105,7 +105,7 @@ ENV_TOOLS = (
      {'upstream': 'modbus-cache:15502',
       'metrics-spec': '/config/metrics.json',
       'listen': '0.0.0.0:9350',
-      'auth-token': 'file:/config/metrics.token'},
+      'auth-token': 'file:/run/pv-secrets/metrics-token'},
      {'upstream': UPSTREAM_ENV,
       'metrics-spec': ENV_VOLUME,
       'listen': CMD_PIN,
@@ -115,8 +115,9 @@ ENV_TOOLS = (
       'modbus-auth-key': ('both compose stacks pin this to the stack\'s suite '
                    'key (the scraper proves it to the cache — '
                    'environment beats env_file)'),
-      'auth-token': ('the compose stacks pin AUTH_TOKEN to the generated '
-                     '/config/metrics.token (environment beats env_file) '
+      'auth-token': ('the compose stacks pin AUTH_TOKEN to the operator\'s '
+                     'secret (file:/run/pv-secrets/metrics-token — '
+                     'environment beats env_file) '
                      '— this line is the plain-docker spelling')},
      ),
     ('inverter', 'modbus-fake-inverter', 'modbus-fake-inverter',
@@ -146,9 +147,9 @@ ENV_TOOLS = (
       'config-js': '/config/config.js'},
      {'listen': CMD_PIN,
       'config-js': ENV_VOLUME,
-      'auth-token': ('the compose stacks ride the generated '
-                     '/config/page.token — this line is the '
-                     'plain-docker spelling')},
+      'auth-token': ('the compose stacks ride the operator\'s page '
+                     'secret (file:/run/pv-secrets/page-token) — this '
+                     'line is the plain-docker spelling')},
      ),
 )
 

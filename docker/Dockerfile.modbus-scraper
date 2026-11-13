@@ -21,18 +21,18 @@
 #
 # The config volume: the entrypoint seeds /config with the REQUIRED file
 # artifacts on start (files the volume lacks are copied in, existing ones
-# stay) — for the scraper those are /config/metrics.json (METRICS_SPEC) and
-# the generated /config/metrics.token: edit the spec there, it survives
+# stay) — for the scraper that is /config/metrics.json (METRICS_SPEC):
+# edit the spec there, it survives
 # recreation. The bundled conf is NOT in the volume — the tool loads the
 # image's /pv-suite/scraper/modbus-scraper.conf (the default --config target) and
 # the per-tool env file (env/modbus-scraper.env — the demo and
 # plain-docker spelling; the prod copy carries -production) overrides its
 # knobs (see ../docker/README.md; a flag beats the env: `docker run ...
-# modbus-scraper --upstream 10.0.0.2:15502` on top). The compose stacks add
-# AUTH_TOKEN=file:/config/metrics.token (a random token the entrypoint
-# generates on the first seed, 0600, pvsuite, shared with the stack's
-# Prometheus) and AUTH/MODBUS_AUTH_KEY=file:/config/modbus-auth.token: the
-# stack's Modbus hops ship authenticated (see README.md).
+# modbus-scraper --upstream 10.0.0.2:15502` on top). The compose stacks
+# add AUTH_TOKEN=file:/run/pv-secrets/metrics-token (the operator's
+# bearer, a compose secret the entrypoint stages — the secrets story in
+# ../docker/README.md) and AUTH/MODBUS_AUTH_KEY=file:/run/pv-secrets/modbus-auth:
+# the stack's Modbus hops ship authenticated (see README.md).
 FROM alpine:3.20
 
 RUN apk add --no-cache python3 bash su-exec \
@@ -53,14 +53,6 @@ COPY --chown=pvsuite bin/ scraper/bin/
 COPY --chown=pvsuite lib/ scraper/lib/
 COPY --chown=pvsuite examples/modbus-scraper.conf examples/metrics.json scraper/
 COPY --chown=pvsuite examples/metrics.json config-defaults/
-# the token placeholders: the entrypoint materializes any *.token in
-# config-defaults as a random value on the first seed (the placeholder
-# content is never copied) — metrics.token is the compose stacks' shared
-# exporter bearer (the scraper + Prometheus), modbus-auth.token the suite
-# key the stacks point the scraper's client-side auth at
-# (/config/modbus-auth.token, the handshake it proves to the cache)
-RUN echo placeholder > config-defaults/modbus-auth.token \
-    && echo placeholder > config-defaults/metrics.token
 RUN chmod +x scraper/bin/*.py pvsuite-cli.py /usr/local/bin/pv-entrypoint \
     && ln -s /pv-suite/scraper/bin/modbus-scraper.py /usr/local/bin/modbus-scraper \
     && ln -s /pv-suite/scraper/bin/modbus-scraper-cli.py /usr/local/bin/modbus-scraper-cli

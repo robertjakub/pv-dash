@@ -3,6 +3,13 @@
 > **Experimental — work in progress.** The whole pv-suite is still under
 > active development: interfaces, file formats and behavior can still change
 > at any time.
+>
+> **Verification needs a host with docker.** This tree's dev machine runs
+> no daemon: the Dockerfiles, the entrypoints and the two compose stacks
+> are static-checked (the generators' `--check` gates) and reviewed, never
+> built or run where they are edited — verify changes here (build the
+> images, bring both stacks up, watch the healthchecks) on a docker host;
+> the suites cannot catch a broken compose.
 
 The suite is stdlib-only, so the containers are trivial: `alpine` + `apk add
 python3`, no pip, no venv, ~50 MB images. One Dockerfile per tool, named
@@ -22,8 +29,9 @@ The images are identical in both — the split is the wiring, not the
 artifacts. The pattern:
 
 - an unprivileged **`pvsuite`** user (`adduser -D`, `COPY --chown`); the
-  entrypoint runs as root only to seed the config volume and drops to
-  `pvsuite` via `su-exec` — the tool never runs as root
+  entrypoint runs as root only to seed the config volume, stage the
+  compose secrets (0600 `pvsuite` copies under `/run/pv-secrets/`) and
+  drops to `pvsuite` via `su-exec` — the tool never runs as root
 - the tools symlinked onto `PATH` (the inverter image: `modbus-fake-inverter`,
   `modbus-fake-cli`; the cache image: `modbus-cache`,
   `modbus-cache-cli`; the scraper image: `modbus-scraper`,
@@ -46,14 +54,14 @@ artifacts. The pattern:
   resolution finds them relative to the checkout layout
 - the **config volume** (`/config`, `VOLUME` + `ENTRYPOINT
   pv-entrypoint`): the entrypoint seeds it with the **required file
-  artifacts only** — the generated `metrics.token`, the generated
-  `modbus-auth.token`, the generated `page.token`, the JSON specs
-  (`selection.json`, `metrics.json`)
+  artifacts only** — the JSON specs (`selection.json`, `metrics.json`)
   and the served `config.js`; the bundled conf scripts are NOT copied
-  there (each tool loads the image's own conf as the default layer). See
+  there (each tool loads the image's own conf as the default layer).
+  The secrets never touch the volume — the stacks mount them as
+  compose secrets ([the secrets story](#the-secrets-story)). See
   [env or the config volume?](#env-or-the-config-volume) for the split:
   the env twins (and the per-tool env files) cover the knobs, the volume
-  holds the file-shaped artifacts.
+  holds the file-shaped non-secrets.
 - the build context = the subproject; the entrypoint, the shared
   [`common/`](../common/README.md) package and the shared data (the
   profiles among it) ride in as named build
@@ -69,6 +77,7 @@ your Prometheus is external and pulls the exporter's `/metrics`:
 
 ```bash
 cd docker/prod
+sh ../gen-secrets.sh secrets                         # the three secrets, 0600
 cp ../env/modbus-cache.env.example ../env/modbus-cache-production.env
 $EDITOR ../env/modbus-cache-production.env           # UPSTREAM=192.168.1.100:5502 — the device
 docker compose up -d                                # cache + scraper + dashboard
@@ -76,6 +85,10 @@ docker compose up -d                                # cache + scraper + dashboar
 
 Three operator decisions, each called out in the compose file's comments:
 
+- **the stack's secrets** — `sh ../gen-secrets.sh secrets` generates the
+  three (the suite key + the two bearer tokens) into `prod/secrets/`
+  (gitignored); the stack refuses to start without them — they are
+  compose secrets ([the secrets story](#the-secrets-story)).
 - **the device address** — `env/modbus-cache-production.env` is
   **required** here (no `required: false`): the stack refuses to start
   without it, because the image's default `UPSTREAM`
@@ -93,8 +106,8 @@ Three operator decisions, each called out in the compose file's comments:
   points its `/prom` proxy at your collector.
 
 Everything else ships decided — two loopback ports published (the
-dashboard's 8080 + the exporter's 9350), the secrets generated (see
-[the secrets story](#the-secrets-story)). The full shape, the topology
+dashboard's 8080 + the exporter's 9350), the secrets operator-supplied
+(see [the secrets story](#the-secrets-story)). The full shape, the topology
 diagram and the volume notes: [prod/README.md](prod/README.md).
 
 ## The demo stack (demo/)
@@ -174,21 +187,18 @@ default `--config` target) as the default layer, and the env files
 override it knob by knob — the env file is the edit surface. The
 `/config` volume stays for the things that are files by nature, not knobs:
 
-- **the generated `metrics.token`** — one shared secret, produced once by
-  the entrypoint (0600, owner pvsuite), read by the exporter and the
-  stack's Prometheus; it must survive recreation unchanged and be the same
-  value in two containers — and a secret in an env file would sit
-  unencrypted in the project directory, ripe for committing (the F12
-  discipline prefers owner-only files; the knobs accept `file:`
-  references for exactly this)
-- **the generated `modbus-auth.token`** — the same story for the Modbus
-  plane: the suite handshake's shared key, the same value on both sides
-  of each hop
 - **`selection.json` and `metrics.json`** — JSON specs, not knobs: the
   `SELECTION`/`METRICS_SPEC` env twins only point at the files; edit them
   in the volume (they seed once, edits survive recreation)
 - **`config.js`** — the dashboard's served front-end file (`CONFIG_JS`
   points at it), same story
+
+The secrets are NOT in the volume — they lived there once (the
+entrypoint generated the tokens on the first seed) and the audit's F17
+moved them out: a named volume holds plaintext for every container and
+outlives them, which is no home for a credential. The stacks mount the
+operator's secret files as compose secrets instead —
+[the secrets story](#the-secrets-story) carries the recipe.
 
 Prefer the conf file after all? Point the tool at the volume —
 `CONFIG=/config/modbus-cache.conf` (env) or a `--config` flag — and edit
@@ -200,42 +210,65 @@ carrying a legacy seeded conf (`modbus_cache.conf`, `scraper.conf`,
 
 **The stacks ship authenticated, both planes** (the audit's F13 closed
 for the stacks; the F11 trusted-LAN posture stays the standalone
-default):
-
-- **the Modbus hops** — the suite handshake (the PVA1/HMAC-SHA256 crypt
-  handshake, `MODBUS_AUTH=suite`): one shared key, generated into the volume as
-  `/config/modbus-auth.token` on the first seed (random, 0600, owner
-  pvsuite — the same mechanism as the tokens; whichever Modbus container
-  seeds first generates, the rest keep). In the demo the fake demands it
-  (server), the cache proves it upstream and demands it from its own
-  clients; in prod the cache demands it (server) and the scraper proves
-  it — the upstream side stays the device's credential (the operator's
-  `MODBUS_UPSTREAM_AUTH*` in `env/modbus-cache-production.env`, or none
-  for a device without auth). The `environment:` blocks pin scheme +
-  `file:` reference;
-  opening a hop is a compose edit (an explicit operator act, the F7
-  shape). Standalone runs stay auth-less — pass `-e MODBUS_AUTH=suite -e
-  MODBUS_AUTH_KEY=file:/config/modbus-auth.token` on a shared named volume to
-  mirror the stacks by hand.
-- **the metrics hop** — the exporter never serves unauthenticated: the
-  compose sets `AUTH_TOKEN=file:/config/metrics.token` (the `file:`
-  reference form), the entrypoint generates that file into the volume on
-  the first seed (random, 0600, owner pvsuite — bundled `*.token`
-  defaults are placeholders that are never copied; the token survives
-  container recreation with the volume). The Prometheus service reads
-  its own copy of the same file (`Dockerfile.prometheus` +
-  `entrypoint-prometheus.sh`: root copies `/config/metrics.token` to
-  `/etc/prometheus/metrics.token`, 0600, then drops to the unprivileged
-  `prometheus` user via su-exec) and scrapes with
-  `authorization: credentials_file` (`prometheus.yml`).
-- **the dashboard's page** — token'd the same way (F21): the entrypoint
-  materializes a random 0600 `/config/page.token` on the first seed.
-
-Read the tokens from the inside:
+default). **The secrets are the operator's** — generated once per stack
+by `docker/gen-secrets.sh`, mounted as compose secrets, never in the
+config volume (the audit's F17 closed: the volume holds the non-secret
+artifacts only; whoever can read a compose volume is root-equivalent,
+but a credential should not sit in a long-lived plaintext store for
+every mounted container to see):
 
 ```bash
-docker compose exec modbus-scraper cat /config/metrics.token
-TOKEN=$(docker compose exec modbus-scraper cat /config/metrics.token)
+sh docker/gen-secrets.sh docker/demo/secrets    # the demo stack's three
+sh docker/gen-secrets.sh docker/prod/secrets    # the prod stack's three
+```
+
+Three files per stack, 0600 (32 random bytes, hex): **`modbus-auth`**
+(the suite key), **`metrics-token`** (the exporter's bearer),
+**`page-token`** (the dashboard's page bearer). The dirs are
+gitignored. `docker compose up` refuses to start while one is missing
+(the `secrets:` `file:` sources are required), and a tool handed an
+unreadable file refuses in its usual fail-fast way (F12).
+
+- **the mount + the staging** — compose mounts each service's secrets
+  read-only at `/run/secrets/<name>`; non-swarm compose keeps the host
+  file's owner, so the entrypoint (root only for setup, as ever) stages
+  a private copy: `/run/pv-secrets/<name>`, 0600, owner pvsuite — the
+  path the `file:` env pins speak
+  (`MODBUS_AUTH_KEY=file:/run/pv-secrets/modbus-auth`,
+  `AUTH_TOKEN=file:/run/pv-secrets/metrics-token|page-token`). The
+  staging is ephemeral — it dies with the container and the host files
+  never change owner.
+- **the Modbus hops** — the suite handshake (the PVA1/HMAC-SHA256 crypt
+  handshake, `MODBUS_AUTH=suite`): one shared key, the operator's
+  `modbus-auth` secret, the same value on both sides of each hop. In the
+  demo the fake demands it (server), the cache proves it upstream and
+  demands it from its own clients; in prod the cache demands it (server)
+  and the scraper proves it — the upstream side stays the device's
+  credential (the operator's `MODBUS_UPSTREAM_AUTH*` in
+  `env/modbus-cache-production.env`, or none for a device without
+  auth). The `environment:` blocks pin scheme + `file:` reference;
+  opening a hop is a compose edit (an explicit operator act, the F7
+  shape). Standalone runs stay auth-less — pass `-e MODBUS_AUTH=suite
+  -e MODBUS_AUTH_KEY=file:<your key file>` to mirror the stacks by hand.
+- **the metrics hop** — the exporter never serves unauthenticated: the
+  compose sets `AUTH_TOKEN=file:/run/pv-secrets/metrics-token` (the
+  `file:` reference form). The Prometheus service reads the same secret
+  (`Dockerfile.prometheus` + `entrypoint-prometheus.sh`: root copies
+  `/run/secrets/metrics-token` to `/etc/prometheus/metrics.token`,
+  0600, then drops to the unprivileged `prometheus` user via su-exec)
+  and scrapes with `authorization: credentials_file` (`prometheus.yml`).
+- **the dashboard's page** — token'd the same way (F21): the operator's
+  `page-token` secret, staged 0600 for the server.
+- **rotation** — delete the secret file, re-run `gen-secrets.sh`,
+  recreate the services (`docker compose up -d --force-recreate`); the
+  collector's copy (`authorization.credentials_file`) follows the same
+  step. A running container keeps its staged copy until recreated.
+
+Read the tokens from the host (the secrets are host files), then probe:
+
+```bash
+cat docker/demo/secrets/metrics-token
+TOKEN=$(cat docker/demo/secrets/metrics-token)
 docker compose exec modbus-scraper wget -qO- --header "Authorization: Bearer $TOKEN" \
     http://127.0.0.1:9350/metrics
 ```
@@ -245,6 +278,29 @@ Give Prometheus for another stack the same value as
 `authorization.credentials_file` (an owner-only file, F12) — or attach the
 collector container to the stack's network and scrape
 `modbus-scraper:9350` like the demo's in-stack service does.
+
+Plain `docker run` (no compose): bind-mount the secret and pass the
+`file:` reference —
+`docker run -v "$PWD/secrets:/secrets:ro" -e AUTH_TOKEN=file:/secrets/metrics-token ...`
+— with the one honest line: the bind mount keeps the host owner, so the
+file must be readable by the container's `pvsuite` uid (make it 0444, or
+chown it to uid 1000); the compose path (the entrypoint's staging) is
+the tidy spelling.
+
+**The config volume's trust model + the re-sync** (the other half of
+F17): the volume holds live config in plaintext — the JSON specs and
+`config.js`, non-secrets; anyone who can read the volume is
+root-equivalent anyway. Seeding happens **once per file** — existing
+files are never refreshed from the image (edits survive recreation; a
+bundled-artifact fix only reaches an existing volume after a re-sync).
+The re-syncs: the gentle one — delete the one stale file and restart
+(`docker compose exec <service> rm /config/<file> && docker compose
+restart <service>`) — or the full one, `docker compose down -v`, which
+**in the demo also wipes `prometheus-data`** (the scrape history): the
+per-file rm is the default advice. The NixOS deployment
+([nixos/README.md](../nixos/README.md)) is the LoadCredential-shaped
+sibling: systemd hands the units owner-only secret files and no volume
+is involved.
 
 The poll chain is **device → modbus-cache → scraper → your collector**:
 the cache owns the device's single Modbus client and the exporter polls
@@ -272,8 +328,8 @@ docker run --rm -p 127.0.0.1:5502:5502 modbus-fake-inverter \
 
 The bundled conf (`/pv-suite/inverter/modbus-fake-inverter.conf`, the default
 `--config` target) loads from the image; its `/config` volume carries no
-conf — just the generated suite key (the compose stacks point the
-server-side auth at it) — and stays open for future use.
+required artifacts — nothing seeds there for the fake (the compose stacks
+mount its server-side auth as a secret) — and stays open for future use.
 
 ### modbus-cache (`Dockerfile.modbus-cache`)
 
@@ -306,7 +362,7 @@ named volume under all three tools keeps every config in one place.
 The Prometheus exporter — see the [scraper](../apps/scraper/README.md). The
 bundled conf (`/pv-suite/scraper/modbus-scraper.conf`, the default `--config`
 target) loads from the image; the volume carries `/config/metrics.json`
-(`METRICS_SPEC`) and the generated `/config/metrics.token` — edit the spec
+(`METRICS_SPEC`) — edit the spec
 there, it survives recreation; override the conf's knobs with
 `env/modbus-scraper.env` (or flags):
 
@@ -344,8 +400,9 @@ docker build -t prometheus -f Dockerfile.prometheus \
     --build-context alerts=../extras/alerts .
 ```
 
-Compose-only by design: it mounts the shared `config` volume (read-only)
-for the token, needs `modbus-scraper` on the network, and its entrypoint
+Compose-only by design: it mounts the stack's `metrics-token` compose
+secret (the token it scrapes with), needs `modbus-scraper` on the
+network, and its entrypoint
 (`entrypoint-prometheus.sh`) drops root before the exec — see
 [the secrets story](#the-secrets-story). The UI serves on the compose
 network only — the dashboard's proxy is the way in from the host.
@@ -371,8 +428,9 @@ The static single-page app with its stdlib Prometheus proxy — see the
 (`/pv-suite/dashboard/dashboard.conf`, the default `--config` target: port
 8080) loads from the image; the CMD binds `0.0.0.0` (a published port
 needs it) and **the page's bearer token is mandatory beyond loopback
-(F21)** — the compose carries the generated `page.token` (the entrypoint
-seeds it 0600 into the config volume); a plain run passes `AUTH_TOKEN`.
+(F21)** — the compose carries the operator's `page-token` secret (a
+compose secret the entrypoint stages 0600); a plain run passes
+`AUTH_TOKEN`.
 The volume carries `/config/config.js` (`CONFIG_JS`) — edit it there, it
 survives recreation:
 

@@ -20,6 +20,28 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   them), the book's Manuals page and the root + per-tool READMEs'
   links re-point, the links gate's generated-layer exclusion follows.
 
+### Security
+
+- **The compose stacks' secrets leave the config volume** (the audit's
+  F17 closed, docs/SECURITY.md rev. 32) — the three secrets (the
+  Modbus suite key `modbus-auth`, the exporter's `metrics-token`, the
+  dashboard's `page-token`) are operator-supplied now: generate the
+  stack's files with the new `docker/gen-secrets.sh` (three 0600
+  hex-words under `docker/{demo,prod}/secrets/`, gitignored), compose
+  mounts them read-only as secrets at `/run/secrets/<name>`, and the
+  entrypoint stages private 0600 `pvsuite` copies at
+  `/run/pv-secrets/<name>` — the path the stacks' `file:` env pins
+  speak (the bind mounts keep the host owner, so the staging keeps the
+  F12 discipline without touching it). The bundled `*.token`
+  placeholders and the entrypoint's token materialization retired (the
+  images carry non-secret artifacts only); the demo Prometheus reads
+  the secret mount instead of the config volume; the `file:` knobs
+  themselves are unchanged. The volume's seed-once semantics and the
+  two re-syncs (the gentle per-file rm, `docker compose down -v` — in
+  the demo wiping `prometheus-data` too) are documented as the trust
+  model; the NixOS deployment stays the LoadCredential-shaped
+  alternative.
+
 ## 0.5.1 — 2026-11-13
 ### Changed
 

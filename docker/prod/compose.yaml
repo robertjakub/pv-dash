@@ -12,7 +12,10 @@
 #     demo's `internal: true` would cut the route out)
 #
 # The operator's decisions, before `docker compose up -d`:
-#   1. cp ../env/modbus-cache.env.example
+#   1. generate the stack's secrets: sh ../gen-secrets.sh secrets
+#      (three 0600 files under prod/secrets/ — gitignored; the stack
+#      refuses to start without them — compose secrets, file: sources)
+#   2. cp ../env/modbus-cache.env.example
 #      ../env/modbus-cache-production.env and set UPSTREAM — the file
 #      is REQUIRED here (no required: false): the stack refuses to
 #      start without it, because the image default
@@ -25,30 +28,40 @@
 #      env file is its edit surface (the stack's own hops are pre-wired
 #      below and cannot be overridden from the env file — environment
 #      beats env_file)
-#   2. your collector's way in (see the scraper's ports: comment)
-#   3. edit the dashboard's PROM_URL below — your collector's base URL
+#   3. your collector's way in (see the scraper's ports: comment)
+#   4. edit the dashboard's PROM_URL below — your collector's base URL
 #
 # The auth story ships in the stack, both planes:
-#   - the Modbus hops: one shared suite key (modbus-auth.token, generated
-#     into the volume on the first seed like the tokens) proven by the
-#     PVA1/HMAC handshake on every connect — the cache proves it upstream
+#   - the Modbus hops: one shared suite key (the operator's modbus-auth
+#     secret, docker/gen-secrets.sh) proven by the PVA1/HMAC handshake on
+#     every connect — the cache proves it upstream
 #     ONLY if the env file says so (the device decides), and demands it
 #     from its own clients; the scraper proves it. Opening the cache's
 #     server side is a compose edit (delete the AUTH block below — an
 #     explicit operator act, the F7 shape)
 #   - the metrics hop: the exporter serves with a bearer token
-#     (AUTH_TOKEN=file:/config/metrics.token — a random value the
-#     entrypoint generates on the first seed, 0600, owner pvsuite); your
+#     (AUTH_TOKEN=file:/run/pv-secrets/metrics-token — the operator's
+#     secret, a compose secret staged 0600 by the entrypoint); your
 #     collector reads its copy (an owner-only credentials_file, F12).
-#     Read the token:
-#     docker compose exec modbus-scraper cat /config/metrics.token
+#     Read the token: cat secrets/metrics-token
 #   - the dashboard's page ships token'd the same way (F21):
-#     docker compose exec dashboard cat /config/page.token
+#     cat secrets/page-token
 #
-# The tokens ride the shared `config` volume; they survive container
+# The secrets ride OUTSIDE the config volume (docs/SECURITY.md F17
+# closed): compose mounts the operator's files read-only at
+# /run/secrets/<name>, the entrypoint stages them 0600 pvsuite at
+# /run/pv-secrets/<name> (ephemeral, per container). The config volume
+# carries only the non-secret file artifacts; they survive container
 # recreation. `docker compose exec` sessions bypass the entrypoint and
 # run as root; add --user pvsuite to land as pvsuite. Edits to /config
 # survive recreation. See ../README.md and README.md (the topology).
+secrets:
+  modbus-auth:
+    file: ./secrets/modbus-auth
+  metrics-token:
+    file: ./secrets/metrics-token
+  page-token:
+    file: ./secrets/page-token
 services:
   modbus-cache:
     build:
@@ -68,7 +81,7 @@ services:
       # act); the upstream side (MODBUS_UPSTREAM_AUTH*) stays the env file's —
       # the device's credential, see the header
       MODBUS_AUTH: suite
-      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
+      MODBUS_AUTH_KEY: file:/run/pv-secrets/modbus-auth
     env_file:
       # REQUIRED (no required: false): UPSTREAM is the operator's decision
       # — set it to the device's Modbus TCP HOST:PORT before up. The other
@@ -76,6 +89,8 @@ services:
       # name keeps the prod copy apart from the demo stack's
       # modbus-cache.env
       - ../env/modbus-cache-production.env
+    secrets:
+      - modbus-auth
     volumes:
       - config:/config
     networks:
@@ -96,19 +111,22 @@ services:
       # the client side: the scraper proves the stack's suite key to the
       # cache on every connect (the poller keeps retrying on ERR)
       MODBUS_AUTH: suite
-      MODBUS_AUTH_KEY: file:/config/modbus-auth.token
-      # the token the entrypoint generated into the volume (0600, pvsuite):
+      MODBUS_AUTH_KEY: file:/run/pv-secrets/modbus-auth
+      # the operator's bearer secret (0600, staged by the entrypoint):
       # the exporter never serves unauthenticated (the audit's F13) —
       # environment beats env_file, so modbus-scraper-production.env
       # cannot override this;
       # the value is a file: reference (the first line of the 0600 file)
-      AUTH_TOKEN: file:/config/metrics.token
+      AUTH_TOKEN: file:/run/pv-secrets/metrics-token
     env_file:
       # optional (required: false): no file = the image defaults stand —
       # the prod copy's name (the demo stack reads
       # ../env/modbus-scraper.env)
       - path: ../env/modbus-scraper-production.env
         required: false
+    secrets:
+      - modbus-auth
+      - metrics-token
     volumes:
       - config:/config
     networks:
@@ -118,7 +136,7 @@ services:
     restart: unless-stopped
     ports:
       # the exporter's /metrics, loopback-only, for your EXTERNAL
-      # collector (bearer token: cat the token file above; the collector
+      # collector (bearer token: cat the secret file above; the collector
       # scrapes with authorization.credentials_file — an owner-only copy,
       # F12). A CONTAINER collector instead: delete this mapping and run
       # it attached to the `pv-suite` network (it scrapes
@@ -145,11 +163,13 @@ services:
       PROM_URL: http://prometheus:9090
       # the page's auth (the audit's F21): the container binds every
       # interface so the published port reaches it — beyond loopback a
-      # token is mandatory, the refusal is the F13 shape. The entrypoint
-      # materializes a random 0600 token into /config/page.token on the
-      # first seed; read it: docker compose exec dashboard cat /config/page.token
+      # token is mandatory, the refusal is the F13 shape. The operator's
+      # page secret (0600, staged by the entrypoint) carries it; read it:
+      # cat secrets/page-token
       LISTEN: 0.0.0.0:8080
-      AUTH_TOKEN: file:/config/page.token
+      AUTH_TOKEN: file:/run/pv-secrets/page-token
+    secrets:
+      - page-token
     volumes:
       - config:/config
     networks:

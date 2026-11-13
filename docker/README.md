@@ -251,7 +251,7 @@ is down behind the cache while the cache keeps serving last-known values).
 ### modbus-fake-inverter (`Dockerfile.modbus-fake-inverter`)
 
 The demo device for development and testing — see the
-[fake inverter](../inverter/README.md):
+[fake inverter](../apps/inverter/README.md):
 
 ```bash
 cd docker
@@ -272,7 +272,7 @@ server-side auth at it) — and stays open for future use.
 ### modbus-cache (`Dockerfile.modbus-cache`)
 
 The caching proxy multiplexing the inverter's single Modbus client — see the
-[cache](../cache/README.md). The bundled conf
+[cache](../apps/cache/README.md). The bundled conf
 (`/pv-suite/cache/modbus-cache.conf`, the default `--config` target) loads
 from the image; the volume carries `/config/selection.json` (`SELECTION`)
 — edit it there, it survives recreation; override the conf's knobs with
@@ -297,7 +297,7 @@ named volume under all three tools keeps every config in one place.
 
 ### modbus-scraper (`Dockerfile.modbus-scraper`)
 
-The Prometheus exporter — see the [scraper](../scraper/README.md). The
+The Prometheus exporter — see the [scraper](../apps/scraper/README.md). The
 bundled conf (`/pv-suite/scraper/modbus-scraper.conf`, the default `--config`
 target) loads from the image; the volume carries `/config/metrics.json`
 (`METRICS_SPEC`) and the generated `/config/metrics.token` — edit the spec
@@ -361,7 +361,7 @@ or `-e` on a plain `docker run`):
 ### dashboard (`Dockerfile.dashboard`)
 
 The static single-page app with its stdlib Prometheus proxy — see the
-[dashboard](../dashboard/README.md). The bundled `dashboard.conf`
+[dashboard](../apps/dashboard/README.md). The bundled `dashboard.conf`
 (`/pv-suite/dashboard/dashboard.conf`, the default `--config` target: port
 8080) loads from the image; the CMD binds `0.0.0.0` (a published port
 needs it) and **the page's bearer token is mandatory beyond loopback

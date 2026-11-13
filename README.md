@@ -65,7 +65,7 @@ pv-suite/
 │   ├── lib/      # the scripts' common lib (the loaders, the tree-walk, emit)
 │   ├── lint/     # the linters: acl/options/readmes/texts
 │   └── generators/  # the four generators: man/manual/examples/sbom
-├── docker/       # one alpine image per Modbus tool; the compose stacks:
+├── docker/       # one alpine image per tool; the compose stacks:
 │                 #   demo/ + prod/ ([docs](docker/README.md))
 ├── extras/       # the operator-side packs: alerts/, examples/, graylog/ ([docs](extras/README.md))
 ├── flake.nix     # the suite entry point
@@ -117,7 +117,7 @@ tracebacks** in the logs.
 
 ## Docker
 
-The containers — one alpine image per Modbus tool, plus the two compose
+The containers — one alpine image per tool, plus the two compose
 stacks: `docker/demo` (the fake inverter end to end, internal-network
 only, nothing published on the host) and `docker/prod` (the production
 shape: the three services against real hardware, no fake, your own

@@ -54,7 +54,7 @@ scripts.
 - **`list_options.py`** — the knobs' one-line listing, one flat table
   with the tool as the first column (the live names, the flags, the
   env twins — the merged-knob census view; the hierarchy-node rows
-  stay hidden unless `--nodes`, `--sort` orders by knob name,
+  stay hidden; `--sort` orders by knob name,
   `--hide` drops whole sections / `--show` keeps only them, comma
   separated, `--tool` names the tools comma separated with `all`
   the default). The census's one home — the registries are the truth,
@@ -222,8 +222,8 @@ python3 scripts/family_drift.py --check    # stale doc fails
   - `family_drift.py --check` joins release.py's gates: a stale
     drift doc (or a regenerating sweep that would change it) fails
     the release the way the suites do.
-  - the seed ledger (`family_drift.py --seeds` →
-    docs/family-drift-seeds.json): every uncovered promise carries a
+  - the seed ledger (docs/family-drift-seeds.json, the drift sweep's
+    data): every uncovered promise carries a
     stable ID + the suggested suite; `--check`'s growth gate fails
     when a NEW knob/command/canon phrase ships uncovered — the list
     may only shrink (the wave's proof).

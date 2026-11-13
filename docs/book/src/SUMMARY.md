@@ -6,6 +6,7 @@
 - [modbus-scraper](scraper.md)
 - [modbus-fake-inverter](fake.md)
 - [the dashboard](dashboard.md)
+- [modbus-replay](replay.md)
 - [The manuals](manuals.md)
 - [common/ — the shared core](common.md)
 - [Nix / NixOS](nixos.md)

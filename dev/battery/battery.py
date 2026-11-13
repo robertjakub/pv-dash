@@ -128,14 +128,15 @@ NAME = re.sub(r'\s+', ' ', NAME).strip()[:64].strip()
 
 PROFILE = ARGS[0] if ARGS else 'commit'
 PROFILES = {
-    'commit':    ('check-options links-check lint-gates cache-stress cache-fuzz cache-control-fuzz audit-chain control-fuzz dashboard-control-fuzz inverter-regtest scrape-fuzz', 100, 1, 15545, 15977),
+    'commit':    ('check-options links-check lint-gates cache-stress cache-fuzz cache-control-fuzz audit-chain control-fuzz dashboard-control-fuzz inverter-regtest replay-regtest scrape-fuzz', 100, 1, 15545, 15977),
     'common':    ('check-options links-check lint-gates audit-chain control-fuzz cache-control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', 100, 1, 15545, 15977),
     'cache':     ('check-options links-check lint-gates cache-regtest cache-fuzz cache-control-fuzz audit-chain', 100, 0, None, None),
     'inverter':  ('check-options links-check lint-gates inverter-regtest control-fuzz audit-chain', 100, 0, None, None),
     'scraper':   ('check-options links-check lint-gates scrape-regtest scrape-fuzz audit-chain', 100, 0, None, None),
     'dashboard': ('check-options links-check lint-gates dashboard-control-fuzz audit-chain', 100, 0, None, None),
-    'quick':     ('check-options links-check lint-gates cache-regtest inverter-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', 300, 0, None, None),
-    'full':      ('check-options links-check lint-gates cache-regtest inverter-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', '', 0, None, None),
+    'replay':    ('check-options links-check lint-gates replay-regtest', 100, 0, None, None),
+    'quick':     ('check-options links-check lint-gates cache-regtest inverter-regtest replay-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', 300, 0, None, None),
+    'full':      ('check-options links-check lint-gates cache-regtest inverter-regtest replay-regtest scrape-regtest audit-chain cache-stress cache-control-fuzz control-fuzz dashboard-control-fuzz cache-fuzz scrape-fuzz', '', 0, None, None),
 }
 if PROFILE in PROFILES:
     SUITES = PROFILES[PROFILE][0].split()
@@ -345,7 +346,7 @@ else:
 # the daemon port extraction: only the flag-anchored numbers (--listen
 # 127.0.0.1:16591, --control-port 16592) count as ports — the paths and
 # the pids carry digits too and must not read as one.
-FAMILY_PGREP = '[m]odbus-cache.py|[m]odbus-scraper.py|[m]odbus-fake-inverter.py|bin/[d]ashboard.py'
+FAMILY_PGREP = '[m]odbus-cache.py|[m]odbus-scraper.py|[m]odbus-fake-inverter.py|bin/[d]ashboard.py|[m]odbus-replay.py'
 
 
 def family_daemons():
@@ -427,7 +428,8 @@ def kill_daemons():
                     break
         return
     for pat in ('[m]odbus-cache.py', '[m]odbus-scraper.py',
-                '[m]odbus-fake-inverter.py', 'bin/[d]ashboard.py'):
+                '[m]odbus-fake-inverter.py', 'bin/[d]ashboard.py',
+                '[m]odbus-replay.py'):
         subprocess.run(['pkill', '-9', '-f', pat], capture_output=True)
 
 

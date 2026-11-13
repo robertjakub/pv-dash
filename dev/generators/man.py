@@ -22,6 +22,7 @@ TOOLS = (
     ('modbus-scraper-cli',   'apps/scraper/bin/modbus-scraper-cli.py',     'apps/scraper/man/modbus-scraper-cli.1'),
     ('dashboard',            'apps/dashboard/bin/dashboard.py',    'apps/dashboard/man/dashboard.1'),
     ('dashboard-cli',        'apps/dashboard/bin/dashboard-cli.py', 'apps/dashboard/man/dashboard-cli.1'),
+    ('modbus-replay',        'apps/modbus-replay/bin/modbus-replay.py', 'apps/modbus-replay/man/modbus-replay.1'),
 )
 
 

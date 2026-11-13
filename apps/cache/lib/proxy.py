@@ -10,12 +10,14 @@ from common.modbus import (DeviceError, ModbusError, block_stat, describe_fc,
                            describe_write, exception_frame, frame, pack_bits,
                            serve_modbus, unit_in_range, unpack_bits, write_kv,
                            write_shape_error, write_target)
+from common.modbus.trace import KIND_RAW_C2D, KIND_REQ, KIND_RSP
 from common.runtime.audit import audit_quote
 from common.serve.connlimit import ConnGate
 from .config import (IPGate, acl_admits, acl_file_warn, acl_gate_summary, acl_value_text,
                      load_profile_write_gate, load_write_gate_file, compile_write_acl,
                      load_registers_file, load_selection, parse_acl)
 from .cache import build_blocks, span
+from .tracefeed import TraceHub, UPSTREAM_CONN_BASE
 from .statics import (MAX_COUNT, MAX_PDU, MAX_BITS, READ_FUNCS, BIT_READ_FUNCS, WRITE_FUNCS,
                       GATEWAY_FAILED, ILLEGAL_FUNCTION,
                       ILLEGAL_VALUE, ILLEGAL_ADDRESS, DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX,
@@ -59,7 +61,7 @@ def _write_desc(func, pdu, unit):
 
 class Proxy:
     def __init__(self, upstream, cache, read_delay=0.0, merge_gap=0, interval=10.0, profile=None, config=None,
-                 audit=None):
+                 audit=None, trace=None):
         self.upstream = upstream
         self.cache = cache
         self.read_delay = read_delay
@@ -68,6 +70,7 @@ class Proxy:
         self.profile = profile
         self.config = config or {}
         self.audit = audit   # the CACHE audit trail (common.audit), None = off
+        self.trace = trace or TraceHub()   # the record feed's hub (lib/tracefeed) — a bare off-hub when main did not build one
         self.allow_write = bool(self.config.get('allow_write', False))
         self.write_registers = self.config.get('write_registers')   # the knob: None = any, () = none, 'profile' = the profile's acl, 'file:<path>' = the standalone acl file
         self.write_gate_rules = None   # the profile/file gate's parsed rules (the write/registers/table show report), None = not in profile/file mode
@@ -114,6 +117,15 @@ class Proxy:
         self.listen_sock = None
         self.listen_addr = None
         self.stopping = False
+        # the trace feed's per-face conn ids: the client face counts its
+        # sessions from 1 (one id per session thread), the upstream face
+        # rides UPSTREAM_CONN_BASE + the connection serial — two spaces,
+        # never colliding (the feed's pairing key is (session, conn, txn)
+        # and the client's txn survives the forward verbatim)
+        self._conn_lock = threading.Lock()
+        self._conn_n = 0
+        self._local = threading.local()
+        self.upstream.tracer = self.trace.emit   # the upstream face's records ride the same hub
 
     def poll_loop(self):
         next_requests_audit = time.monotonic() + self.requests_audit_s
@@ -209,6 +221,11 @@ class Proxy:
         self.cache.update_map(ranges, names, ttls)
         self.generation += 1
         self.blocks = build_blocks(ranges, self.config['modbus_merge_gap'])
+        # the trace knobs follow the re-resolved config (a SIGHUP clears the
+        # override set — the hub rebinds only on a value change, restoring
+        # the standing values is not a set)
+        self.trace.apply_config(self.config.get('trace_socket') or 'none',
+                                self.config.get('trace_sources') or 'all')
         logger.info('SIGHUP: reloaded %d range(s) from %s (upstream %s:%d unit %d, interval %gs, cache ttl %gs, merge gap %d)',
                     len(ranges), self.config['modbus_profile'], self.upstream.host, self.upstream.port,
                     self.upstream.unit, self.interval, self.cache.cache_ttl, self.merge_gap)
@@ -459,16 +476,37 @@ class Proxy:
         return self.config.get('modbus_auth_key') if self.config.get('auth') == 'suite' else None
 
     def on_session(self):
-        pass
+        """The session's trace conn id: one per client connection, handed to
+        the frame loop through the thread-local (the feed's pairing key)."""
+        with self._conn_lock:
+            self._conn_n += 1
+            self._local.id = self._conn_n
 
     def on_frame(self):
         pass
 
     def malformed(self, addr, err):
-        pass   # a bad MBAP length: the frame is not parseable enough to answer — the PDU-level
-               # malformations get the in-band exception inside respond()
+        """A bad MBAP head: the bytes are read_frame's already (the face
+        protocol hands the error, not the wire) — the trace carries the
+        byte-less marker so the conversation shows the attempt; the session
+        ends (the opener's ladder)."""
+        self.trace.emit('client', KIND_RAW_C2D, getattr(self._local, 'id', 0),
+                        '%s:%d' % addr[:2], 'malformed MBAP — bytes withheld', b'')
+
+    def _rsp(self, note, resp):
+        """The client-face rsp record: the answer the cache SERVED, the
+        provenance in the note (ruling: peer stays the conversation
+        partner — the client — on both records; the device's true bytes
+        ride the upstream voice's own conversation)."""
+        self.trace.emit('client', KIND_RSP, getattr(self._local, 'id', 0),
+                        getattr(self._local, 'peer', ''), note, resp)
+        return resp
 
     def frame(self, client, txn, proto, unit, pdu, addr):
+        peer = '%s:%d' % addr[:2]
+        self._local.peer = peer
+        self.trace.emit('client', KIND_REQ, getattr(self._local, 'id', 0), peer, '',
+                        frame(txn, unit, pdu, proto=proto))
         client.sendall(self.respond(txn, proto, unit, pdu, addr))
 
     def on_disconnect(self, key, entry):
@@ -478,12 +516,14 @@ class Proxy:
 
     def respond(self, txn, proto, unit, pdu, addr):
         if proto != 0 or not pdu:
-            return exception_frame(txn, proto, unit, pdu[0] if pdu else 3, ILLEGAL_VALUE)
+            return self._rsp('refused: malformed request',
+                             exception_frame(txn, proto, unit, pdu[0] if pdu else 3, ILLEGAL_VALUE))
         func = pdu[0]
         if not unit_in_range(unit):
             # the family's unit-id range (protocol.json): 0 is the broadcast
             # id, 248-255 reserved — the gateway answers in-band, no upstream
-            return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
+            return self._rsp('refused: unit id out of range',
+                             exception_frame(txn, proto, unit, func, ILLEGAL_VALUE))
         if func in WRITE_FUNCS:
             target = write_target(pdu)
             if target is None:
@@ -492,14 +532,16 @@ class Proxy:
                 self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', 'fc=%d unit=%d reason=too-short' % (func, unit))
-                return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
+                return self._rsp('refused: write frame too short',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_VALUE))
             if not self.allow_write:
                 desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (write support disabled, enable with --allow-write)', desc)
                 self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s reason=write-disabled' % write_kv(pdu, unit))
-                return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
+                return self._rsp('refused: write support disabled',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION))
             if not self._allowed(self.write_acl, addr[0]):
                 desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (client %s not on the write ACL)', desc, addr[0])
@@ -507,7 +549,8 @@ class Proxy:
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s reason=not-on-write-acl client=%s'
                                      % (write_kv(pdu, unit), addr[0]))
-                return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
+                return self._rsp('refused: client not on the write acl',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION))
             if not self._write_allowed(target):
                 desc = _write_desc(func, pdu, unit)
                 logger.info('write: refused %s (registers outside the write allow-list %s)',
@@ -515,7 +558,8 @@ class Proxy:
                 self.write_refused += 1
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s reason=outside-allow-list' % write_kv(pdu, unit))
-                return exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION)
+                return self._rsp('refused: outside the write allow-list',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_FUNCTION))
             shape_err = write_shape_error(pdu)
             if shape_err:
                 desc = _write_desc(func, pdu, unit)
@@ -524,25 +568,31 @@ class Proxy:
                 if self.audit:
                     self.audit.event('WRITE-REFUSED', '%s reason=malformed-frame error=%s'
                                      % (write_kv(pdu, unit), audit_quote(shape_err)))
-                return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
+                return self._rsp('refused: malformed write frame',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_VALUE))
         if func in READ_FUNCS:
             if len(pdu) < 5:
-                return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
+                return self._rsp('refused: short read frame',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_VALUE))
             addr_, count = struct.unpack('>HH', pdu[1:5])
             cap = MAX_BITS if func in BIT_READ_FUNCS else MAX_COUNT
             if not 1 <= count <= cap or addr_ + count > 65536:
-                return exception_frame(txn, proto, unit, func, ILLEGAL_VALUE)
+                return self._rsp('refused: read count out of range',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_VALUE))
             if func == 3 and addr_ >= DIAG_BASE:
                 if addr_ + count <= DIAG_BASE + DIAG_COUNT:
-                    return self._diag(txn, proto, unit, addr_, count)
-                return exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS)
+                    return self._rsp('diag registers', self._diag(txn, proto, unit, addr_, count))
+                return self._rsp('refused: outside the diagnostics block',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS))
             if func == 3 and addr_ < DIAG_BASE and addr_ + count > DIAG_BASE:
-                return exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS)
+                return self._rsp('refused: outside the diagnostics block',
+                                 exception_frame(txn, proto, unit, func, ILLEGAL_ADDRESS))
             code = self.cache.failed_leaf(func, addr_, count)
             if code is not None:
                 logger.info('read: %s %d:%d served from last poll: the device rejects them (modbus exception %d)',
                             _space_name(func), addr_, count, code)
-                return exception_frame(txn, proto, unit, func, code)
+                return self._rsp('served from last poll (the device rejects: exception %d)' % code,
+                                 exception_frame(txn, proto, unit, func, code))
             if self.cache.covers(func, addr_, count):
                 self.cache_hits += 1
                 logger.debug('read: fc%d %s %d:%d served from cache', func, _space_name(func), addr_, count)
@@ -552,9 +602,10 @@ class Proxy:
                     body = struct.pack('>BB', func, len(packed)) + packed
                 else:
                     body = struct.pack('>BB', func, count * 2) + struct.pack('>%dH' % count, *words)
-                return frame(txn, unit, body, proto=proto)
+                return self._rsp('served from cache', frame(txn, unit, body, proto=proto))
             self.cache_misses += 1
-        return self.forward(txn, proto, unit, pdu)
+        resp = self.forward(txn, proto, unit, pdu)
+        return self._rsp(getattr(self._local, 'fwd_note', '') or 'forwarded — device reply', resp)
 
     def _diag(self, txn, proto, unit, addr, count):
         """Answer a diagnostics read from live poller state (no device contact)."""
@@ -637,9 +688,11 @@ class Proxy:
                         self.poll_wake.set()
                         logger.info('write: invalidated %d cached word(s) at %s %d:%d, repolling',
                                     dropped, _space_name(1 if pdu[0] in (5, 15) else 3), waddr, wcount)
+            self._local.fwd_note = 'forwarded — device reply'
             return resp
         except (ModbusError, OSError) as e:
             self.upstream.close()
+            self._local.fwd_note = 'forwarded — upstream failed'
             if desc:
                 logger.warning('write failed: %s (%s)', desc, e)
                 if self.audit:

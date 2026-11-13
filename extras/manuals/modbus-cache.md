@@ -220,6 +220,15 @@ the state dump: the path, the cache words, the restore-on-start
 | `dump-interval` | `set dump interval` | settable | `s\|off` | `--dump-interval` / `DUMP_INTERVAL` | seconds between the automatic state dumps (the live setting overrides) |
 | `restore-on-start` | `set dump restore-on-start` | settable (restart) | `on\|off` | `--restore-on-start` / `RESTORE_ON_START` | the dump loads on start (off: on demand with request restore) |
 
+### trace
+
+the wire trace: the record feed socket and the voices it carries
+
+| knob | set / clear | kind | value | flag / env | description |
+|---|---|---|---|---|---|
+| `trace-socket` | `set trace socket` | settable | `default\|none\|PATH` | `--trace-socket` / `TRACE_SOCKET` | the record feed's unix socket: default, a path, or none (off; the built-in default) |
+| `trace-sources` | `set trace sources` | settable | `all\|client\|upstream` | `--trace-sources` / `TRACE_SOURCES` | the wire voices the record feed carries: all, client or upstream |
+
 ### limits
 
 the connection caps: the simultaneous-client and per-IP limits

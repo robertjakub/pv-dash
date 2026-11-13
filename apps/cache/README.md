@@ -117,6 +117,9 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | `--dump-with-cache` | off | dump the cached words too (the default dump = settings only) |
 | `--dump-interval` | `0` | seconds between the automatic state dumps, `0` = on request; live-settable |
 | `--restore-on-start` | off | load the state dump when the daemon starts |
+| **Trace feed** | | |
+| `--trace-socket` | `none` | the record feed's unix socket: `default` = the derived `/tmp/modbus-cache-<listen-port>-trace.socket`, a path, or `none` = off; every wire record fans out to the connected `modbus-replay-dump --socket` (the same PVMB protocol modbus-replay's feed speaks); binds `0600`; live-settable (`set trace-socket`) |
+| `--trace-sources` | `all` | the wire voices the feed carries: `all`, `client` (the served answers + their provenance) or `upstream` (the poller's polls + the forwards) — whole voices on/off, never sampling; live-settable |
 | **Metrics** | | |
 | `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint — live-settable (`set metrics enable on/off`); **refuses to start beyond loopback without `--metrics-token`** (F13) |
 | `--metrics-listen` | `127.0.0.1:9351` | the metrics bind address (`0.0.0.0:PORT` = every interface, token mandatory beyond loopback) |

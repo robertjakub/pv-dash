@@ -305,6 +305,22 @@ load the state dump when the daemon starts (needs \-\-dump\-path) — a
 restart serves last\-known values instead of cold misses; without it the
 dump loads on demand
 .TP
+.BI \-\-trace\-socket " trace-socket"
+the record feed's unix stream socket: every wire record the cache emits
+fans out to the connected dump tools (modbus\-replay\-dump \-\-socket
+subscribes — the same PVMB protocol modbus\-replay's own feed speaks;
+read\-only push, best effort: a slow subscriber is dropped, never waited
+on); `default` = the derived
+/tmp/modbus\-cache\-<listen\-port>\-trace.socket, anything else = that
+path, none/empty = no feed (the built\-in default); the socket binds
+0600
+.TP
+.BI \-\-trace\-sources " trace-sources"
+which wire voices the record feed carries: all (everything — the
+default), client (the client face only) or upstream (the upstream face
+only); whole voices on/off, never sampling — a dropped voice is stated
+by the knob, a dropped frame would be a lie
+.TP
 .B \-\-config
 config file — the set grammar: every line a `set <name> <value>`,
 comments start with # ($CONFIG, then modbus\-cache.conf next to this

@@ -207,6 +207,23 @@ class ControlServer(_ControlServer):
             # the seal is opt-in: without dump/key the dump stays plaintext — say so, once, where the choice is made
             return val if p.dump_key else '%s (not sealed — set dump/key to encrypt at rest)' % val
 
+        if key == 'trace-socket':
+            try:
+                shown = p.trace.set_socket(val)   # a bad value or an unbindable path: the old feed stands
+            except SystemExit as e:
+                raise ValueError(str(e))
+            except OSError as e:
+                raise ValueError('cannot bind the feed socket: %s' % e)
+            p.config['trace_socket'] = p.trace.socket_val()
+            return shown
+        if key == 'trace-sources':
+            try:
+                shown = p.trace.set_sources(val)
+            except SystemExit as e:
+                raise ValueError(str(e))
+            p.config['trace_sources'] = p.trace.sources_val()
+            return shown
+
         handled, shown = self.apply_family_key(key, val)   # the family's shared knobs (the control plane,
         if handled:                                        # the audit family, the log level, local-time)
             return shown
@@ -453,7 +470,8 @@ class ControlServer(_ControlServer):
                    connect_acl=p.connect_acl, write_acl=p.write_acl, metrics_acl=p.metrics_acl,
                    modbus_timeout=p.upstream.timeout,
                    upstream='%s:%d' % (p.upstream.host, p.upstream.port),
-                   host=p.upstream.host, port=p.upstream.port, unit=p.upstream.unit)
+                   host=p.upstream.host, port=p.upstream.port, unit=p.upstream.unit,
+                   trace_socket=p.trace.socket_val(), trace_sources=p.trace.sources_val())
         return cfg
 
     def record_cfg(self, updates):
@@ -478,6 +496,10 @@ class ControlServer(_ControlServer):
         p = self.proxy
         if key == 'dump-interval':   # the proxy's home — the family handler's attr is not
             return 'off' if not p.dump_interval else secs(p.dump_interval)
+        if key == 'trace-socket':
+            return p.trace.describe_socket()
+        if key == 'trace-sources':
+            return p.trace.describe_sources()
         handled, value = self.get_family_key(key)   # the family's shared knobs (the control plane,
         if handled:                                 # the audit family, the log level, local-time, dump/path)
             return value
@@ -594,6 +616,8 @@ class ControlServer(_ControlServer):
                                 ', requests accounting every %s' % secs(p.requests_audit_s) if p.audit and p.requests_audit_s else ''),
             'dump      %s' % ('off' if not p.dump_path else '%s, every %s (plus the dump command and the shutdown)'
                               % (p.dump_path, 'off' if not p.dump_interval else secs(p.dump_interval))),
+            'trace     %s, sources %s, %d record(s)' % (p.trace.describe_socket(), p.trace.describe_sources(),
+                                                        p.trace.records()),
             'uptime    %s' % secs(now - p.started),
         ]
         return 'ok inspect\n' + '\n'.join(rows)
@@ -732,6 +756,8 @@ class ControlServer(_ControlServer):
             'dump-path': p.dump_path or 'off',
             'dump-with-cache': 'on' if p.dump_with_cache else 'off',
             'restore-on-start': 'on' if getattr(p, 'restore_on_start', False) else 'off',
+            'trace-socket': p.trace.socket_val(),
+            'trace-sources': p.trace.sources_val(),
         }
         return self.dump_settings_tail(raw)
 

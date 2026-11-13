@@ -31,10 +31,11 @@ from common.runtime.daemon import apply_restart_state, default_config_path, fold
     install_signal_handlers as install_family_signals
 from common.settings.options import build_parser
 from common.runtime.version import version_string
-from lib.config import CONTROL_SOCKET_TEMPLATE, load_registers_file, load_selection, resolve_config, acl_value_text, acl_gate_summary
+from lib.config import CONTROL_SOCKET_TEMPLATE, TRACE_SOCKET_TEMPLATE, load_registers_file, load_selection, resolve_config, acl_value_text, acl_gate_summary
 from lib.options import DEFAULT_OPS_VERBS, KNOWN_VERBS, OPTIONS
 from lib.metrics import MetricsServer, describe_metrics
 from lib import persist
+from lib.tracefeed import TraceHub
 from lib.upstream import Upstream
 from lib.cache import Cache
 from lib.proxy import Proxy
@@ -173,8 +174,15 @@ def main():
     upstream = Upstream(cfg['host'], cfg['port'], cfg['modbus_unit'], cfg['modbus_timeout'],
                         auth=cfg['modbus_auth_upstream'], auth_key=cfg['modbus_auth_upstream_key'])
     cache = Cache(ranges, cfg['cache_ttl'], range_names, range_ttls)
+    # the record feed's hub: the derived socket needs the listen port (the
+    # restart-marked listen never moves under a running daemon), the posture
+    # is what the dump tool's banner shows
+    trace = TraceHub(cfg['trace_socket'], cfg['trace_sources'],
+                     default_path=lambda: TRACE_SOCKET_TEMPLATE % listen_port,
+                     posture=lambda: 'modbus-cache serving %s upstream %s:%d'
+                             % (cfg['listen'], cfg['host'], cfg['port']))
     proxy = Proxy(upstream, cache, cfg['modbus_read_delay'], cfg['modbus_merge_gap'], cfg['modbus_interval'],
-                  cfg['modbus_profile'], cfg)
+                  cfg['modbus_profile'], cfg, trace=trace)
     proxy.metrics_desc = metrics_desc
     proxy.metrics_srv = MetricsServer(proxy, metrics_listen, token=metrics_token,
                                       max_clients=cfg['metrics_max_clients'],
@@ -226,6 +234,7 @@ def main():
                     'off' if control_target is None else
                     ('127.0.0.1:%d' % control_target if isinstance(control_target, int) else control_target))
         return
+    proxy.trace.startup()   # the record feed binds here — silent when off (the start default)
     tag = load_audit_tags('cache')
     audit = build_audit(cfg, tag, 'modbus-cache', logger,
                         derive=str(control_target) if isinstance(control_target, int) and control_target
@@ -302,6 +311,8 @@ def main():
                     'dump-path': cfg['dump_path'] or 'off',
                     'dump-with-cache': 'on' if cfg['dump_with_cache'] else 'off',
                     'restore-on-start': 'on' if cfg['restore_on_start'] else 'off',
+                    'trace-socket': cfg['trace_socket'],
+                    'trace-sources': cfg['trace_sources'],
                     'listen': cfg['listen'],
                     'log-access': 'on' if cfg['log_access'] else 'off'}
         # the secret rows (control-token, control-ops-token, metrics-token)
@@ -376,6 +387,7 @@ def main():
         logger.error('cannot bind %s:%d: %s', listen_host, listen_port, e)
         raise SystemExit(1)
     finally:
+        proxy.trace.close()
         upstream.close()
         if audit:
             audit.close()

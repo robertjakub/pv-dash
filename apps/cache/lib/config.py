@@ -26,6 +26,11 @@ logger = logging.getLogger('modbus-cache')
 CONTROL_SOCKET_TEMPLATE = '/tmp/modbus-cache-%d.socket'
 DEFAULT_CONTROL_SOCKET = CONTROL_SOCKET_TEMPLATE % DEFAULT_LISTEN_PORT
 
+# the record feed's socket template — the -trace suffix is MANDATORY: the
+# control plane owns /tmp/modbus-cache-<port>.socket and the feed's bind
+# unlinks first, so the un-suffixed spelling would unlink the control wire
+TRACE_SOCKET_TEMPLATE = '/tmp/modbus-cache-%d-trace.socket'
+
 # the registry rows by knob name — the resolver's row-driven validation
 # (row_value: the words, the conv, the choices, the min/max bounds)
 OPT = {o.name: o for o in OPTIONS}
@@ -288,6 +293,31 @@ def parse_selection(text):
     return t
 
 
+def parse_trace_socket(text, label='trace-socket'):
+    """The record feed's socket value: 'none' (or empty — off, the knob's
+    built-in default), 'default' (the derived
+    /tmp/modbus-cache-<listen-port>-trace.socket) or the unix socket path.
+    Returns the re-appliable word ('none' | 'default') or the path;
+    SystemExit on an empty default at a call site without a port."""
+    t = (text or '').strip()
+    if t.lower() in ('', 'none', 'off', '0'):
+        return 'none'
+    if t.lower() == 'default':
+        return 'default'
+    return t
+
+
+def parse_trace_sources(text, label='trace-sources'):
+    """The wire voices the record feed carries: 'all' (every voice — the
+    default), 'client' (the client face only) or 'upstream' (the upstream
+    face only: the poller, the forwards, the auth marker). Whole voices
+    on/off, never sampling. SystemExit on anything else."""
+    t = (text or '').strip().lower()
+    if t in ('all', 'client', 'upstream'):
+        return t
+    raise SystemExit('invalid %s %r: use all, client or upstream' % (label, text))
+
+
 def validate_config(cfg):
     """Fail fast on nonsensical settings.
 
@@ -499,6 +529,10 @@ def resolve_config(args, script_dir=None):
                                              'CONTROL_SOCKET_GROUP', 'control_socket_group', DEFAULTS['control_socket_group']),
         'control_log_replies': resolve_bool(getattr(args, 'control_log_replies', False) or None,
                                             None, 'control_log_replies', False),
+        'trace_socket': parse_trace_socket(resolve(getattr(args, 'trace_socket', None), 'TRACE_SOCKET',
+                                                   'trace_socket', DEFAULTS['trace_socket'], str)),
+        'trace_sources': parse_trace_sources(resolve(getattr(args, 'trace_sources', None), 'TRACE_SOURCES',
+                                                     'trace_sources', DEFAULTS['trace_sources'], str)),
     }
     validate_config(cfg)
     return cfg

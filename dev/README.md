@@ -232,7 +232,7 @@ python3 dev/family_drift.py            # regenerate the drift doc
 python3 dev/family_drift.py --check    # stale doc fails
 ```
 
-## TODO (the scripts' own — separate from docs/TODO.md)
+## TODO (the dev tree's own — separate from docs/TODO.md)
 
 - **cleanup**
   - the prose-mangling class guard: the editor.py replace paths

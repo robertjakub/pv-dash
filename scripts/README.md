@@ -114,6 +114,15 @@ prose gates apart from the runners:
   Bare run lints `shared/profiles/*.json`.
 - **`validate_json.py`** — the JSON documents against a JSON Schema
   (stdlib only): the loader-valid ⊂ schema-valid contract.
+- **[`lint/links.py`](lint/links.py)** — the hand-written docs' link
+  gate: every relative markdown link and mdbook include target
+  resolves, and every repo-rooted path token in a current doc names
+  something that exists (the history records keep their landed
+  spellings — the token check skips `docs/history/` and the per-tool
+  TODOs; the links check runs everywhere). Bare run reports,
+  `--check` is the gate spelling — and a battery suite itself:
+  [tests/link-check.py](../tests/suites/link-check.py) rides every
+  profile beside check-options.
 - **`audit_verify.py`** — the audit trail's chained-hash verifier
   (the F10 chain: every line carries its hash right after the event
   name).

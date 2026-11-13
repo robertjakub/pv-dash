@@ -18,10 +18,10 @@ and as a full pass whenever a wave landed doc ripples across tools.
 - **the control plane** — every tool serves the same wire
   (`common/wire/control.py`): the signed frames, the peer-cred trusted
   peers, the RBAC roles, the ctl/cli consoles speaking the one command
-  spine (`common/control.py`).
+  spine (`common/wire/control.py`).
 - **the config plane** — the resolver ladder flag > env > config
   script > the registry row's default, one registry per tool
-  (`<tool>/lib/options.json`), the knobs settable live or
+  (`apps/<tool>/lib/options.json`), the knobs settable live or
   restart-marked, the secrets startup-only.
 
 ## The docs, filed by grain
@@ -74,12 +74,13 @@ release.
    ```bash
    python3 scripts/family_drift.py --check
    python3 scripts/check_options.py
+   python3 scripts/lint/links.py --check
    python3 scripts/lint/options.py --check
    python3 scripts/lint/texts.py
    python3 scripts/generators/manual.py --check
    python3 scripts/generators/examples.py --check
    python3 scripts/generators/sbom.py --check
-   python3 scripts/generators/man.py && mandoc -Tlint <tool>/man/*.1
+   python3 scripts/generators/man.py && mandoc -Tlint apps/<tool>/man/*.1
    ```
 
    A red gate means the generated layer is stale — regenerate (and fix

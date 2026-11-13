@@ -1,9 +1,9 @@
-"""The suite version, one line per tool: 0.5.0, or 0.5.0-<short git> when
+"""The suite version, one line per tool: 0.5.1, or 0.5.1-<short git> when
 run from a checkout (the tags update VERSION; the packages carry it)."""
 import os
 import subprocess
 
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 
 
 def version_string():

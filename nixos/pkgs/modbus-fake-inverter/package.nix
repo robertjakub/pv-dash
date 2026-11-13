@@ -7,7 +7,7 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "modbus-fake-inverter";
-  version = "0.5.0";
+  version = "0.5.1";
 
   src = lib.cleanSource ../../../apps/inverter;
 

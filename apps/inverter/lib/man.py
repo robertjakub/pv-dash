@@ -7,7 +7,7 @@ ctl/cli's --man) prints the same page."""
 from common.render.manpage import EXIT_STATUS_CLI, EXIT_STATUS_DAEMON, options_section, page
 
 DATE = '2026-11-05'
-VERSION = 'pv-suite 0.5.0'
+VERSION = 'pv-suite 0.5.1'
 MANUAL = 'User Commands'
 
 

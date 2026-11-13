@@ -103,8 +103,8 @@ the unprivileged `pvsuite` user with the tools on `PATH`
 [`docker/README.md`](../../docker/README.md)). The image loads its own
 bundled conf (`/pv-suite/inverter/modbus-fake-inverter.conf`, the built-in
 `--config` target) — the env file and the CMD flags override it. The
-version reports as `0.5.0` inside the image (no git metadata; a checkout
-shows `0.5.0-<short git>`).
+version reports as `0.5.1` inside the image (no git metadata; a checkout
+shows `0.5.1-<short git>`).
 
 ## Configuration
 
@@ -359,7 +359,7 @@ collector — the native line and CEF carry no hostname, so pooled trails
 name their instances apart; the chain groups by the triple:
 
 ```
-2026-11-03T20:10:06Z AUDIT application=INV tag=daemon instance=15991 type=start hash=3f9a21c04de7 version=0.5.0 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000 description='…'
+2026-11-03T20:10:06Z AUDIT application=INV tag=daemon instance=15991 type=start hash=3f9a21c04de7 version=0.5.1 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000 description='…'
 2026-11-03T20:10:07Z AUDIT application=INV tag=daemon instance=15991 type=command hash=9c41e2b7a058 peer=127.0.0.1:54425 cmd='set soc 40' result=ok
 2026-11-03T20:10:07Z AUDIT application=INV tag=daemon instance=15991 type=command hash=3d82f6c05e19 peer=127.0.0.1:54426 role=ops cmd='show connections' wire=h4b91de207a86 result=ok
 2026-11-03T20:10:08Z AUDIT application=INV tag=daemon instance=15991 type=reset hash=77b0c4e19d23 signal=SIGUSR1 pins=1 coils=0 overlay=0

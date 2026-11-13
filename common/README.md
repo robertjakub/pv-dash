@@ -22,7 +22,7 @@ the ACL map, the defaults ladder:
 | `daemon.py` | the daemon-bin scaffolding the family's entry scripts shared as near-copies: the log setup, the default config path, the SIGHUP/SIGTERM watcher threads, the restart-marked state fold, the ops-verb policy check and the dump-posture log line |
 | `audit.py` | the append-only audit trail (`AuditLog`): `<stamp> AUDIT application=<TAG> tag=<writer> instance=<id> type=<type> hash=<hash> [<detail kv words>]` — flat KV, no wrapper word (the tags from `shared/suite/tags.json`), the chained per-writer hashes (the application/writer/instance triple), the KV detail rules (an empty value drops the word, a space value rides quoted — `audit_quote`, the reserved outer keys never land in the detail), size/daily rotation, `-` = stdout |
 | `logutil.py` | `UtcFormatter` — UTC log timestamps |
-| `version.py` | the suite version string: `0.5.0`, or `0.5.0-<short git>` in a checkout |
+| `version.py` | the suite version string: `0.5.1`, or `0.5.1-<short git>` in a checkout |
 
 ## `settings/` — the settings plane: one knob, one source
 

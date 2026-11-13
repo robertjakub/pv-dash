@@ -1,6 +1,6 @@
 # SBOM — the software bill of materials
 
-> Suite version **0.5.0** (the tree; `version_string()` appends `-<short
+> Suite version **0.5.1** (the tree; `version_string()` appends `-<short
 > git>` in a checkout). Machine-readable copy:
 > [`sbom.cdx.json`](sbom.cdx.json) (CycloneDX 1.5). **Generated** by
 > [`dev/generators/sbom.py`](../../dev/generators/sbom.py) — the import scan

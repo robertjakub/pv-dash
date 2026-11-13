@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The registry editors' shared curses primitives (editor.py): the
+"""The registry editor's shared curses primitives (editor/editor.py): the
 ESC/^C key decoding, the drawing helpers and the input line — the
 dialogs stay per-script, these never care what is on the screen. Stdlib only."""
 import curses

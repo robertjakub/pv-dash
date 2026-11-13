@@ -243,7 +243,7 @@ this pack.
 
 Wire-in: the demo image bakes the pack (`docker/prometheus.yml` sets
 `rule_files:`); a NixOS Prometheus points `services.prometheus.ruleFiles`
-at the packaged copy (`share/modbus-scraper/alerts.yml`, see
+at the packaged copy (`share/alerts/scraper.yml`, see
 [nixos/README.md](../../nixos/README.md)); an external collector copies the file and
 lists it under its own `rule_files:`. Thresholds assume the default 10 s
 poll interval — tune them to yours.

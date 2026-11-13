@@ -167,7 +167,7 @@ from here" contract, honored family-wide).
 The alert rules pack (the F16 closure): the pack ships at `alerts/` —
 the family's one Prometheus rules home, one file per watched exporter;
 six alerts in two groups. This side is the poll story
-(`alerts/scraper.yml`, installed as `share/modbus-scraper/alerts.yml`):
+(`alerts/scraper.yml`, installed as `share/alerts/scraper.yml`):
 `ScraperPollDown` (scraper_up 0 for 2m), `ScraperFreshnessGap` (the last
 good poll more than 120s behind) and `ScraperExceptionSpike`
 (scraper_modbus_errors_total bursting); the cache contributes its side

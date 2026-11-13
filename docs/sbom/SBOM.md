@@ -50,7 +50,7 @@ Every name in that list is stdlib (`argparse`, `ast`, `collections`,
 - **Python** — any CPython 3 with the standard library; the suite does not
   pin a minor (the Nix and Docker builds each pin their own).
   - **Nix**: the interpreter comes from the pinned **nixpkgs**
-    (`nixos-unstable` @ `f4a03c008967841f2a0b3cb7c436fc6fc31671f6`,
+    (`nixos-unstable` @ `d4f25a3e562008648d45bcf2d70bcc7422cad84e`,
     [`flake.lock`](../../flake.lock)); the packages are built as stdenv
     wrappers — no Python libraries are fetched.
   - **Docker**: base image `alpine:3.20`, `apk add --no-cache python3 bash su-exec` —

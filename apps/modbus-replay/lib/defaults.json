@@ -9,6 +9,10 @@
     "format": "pv-suite-modbus-trace",
     "version": 1
   },
+  "trace_binary": {
+    "magic": "PVMB",
+    "version": 1
+  },
   "replay_miss_code": 11,
   "replay_value_code": 3,
   "replay_illegal_code": 1

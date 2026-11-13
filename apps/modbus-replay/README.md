@@ -26,11 +26,12 @@ port, the trace file and the log. One daemon, one mode per run:
 **Capture mode is a pipe with a shadow copy.** Every accepted client is
 paired with an upstream connection to the device; bytes flow as they
 arrive, never held. A tap reassembles the MBAP frames from the piped
-bytes (both directions) and appends one JSON record per frame to the
-trace file — timestamps, direction, the raw frame, the decoded fields.
-A frame the framing cannot parse still reaches the device and rides the
-trace raw. Without `--capture` the proxy runs pass-through (the decoded
-frames log at DEBUG only) — a quiet wire inspector.
+bytes (both directions) and appends one record per frame to the trace
+file — timestamps, direction, the raw frame bytes. A frame the framing
+cannot parse still reaches the device and rides the trace raw — the
+auth handshakes ride exactly there (below). Without `--capture` the
+proxy runs pass-through (the decoded frames log at DEBUG only) — a
+quiet wire inspector.
 
 ```
   <client>───Modbus───> <replay>───Modbus───> <inverter>
@@ -38,15 +39,65 @@ frames log at DEBUG only) — a quiet wire inspector.
    (or any master)        │   └── the pipe: bytes flow as they arrive,
                           │       never held
                           ▼
-                    [trace file]  <── the tap: one JSON record per
-                                     frame, both directions, decoded
+                    [trace file]  <── the tap: one record per
+                                     frame, both directions
 ```
 
-The trace is JSON lines, 0600 at rest (the wire carries values — and a
-Waveshare capture carries the connection password raw; the trace belongs
-with the secrets):
+### The trace format
 
+The trace is 0600 at rest (the wire carries values — and a Waveshare
+capture carries the connection password raw; the trace belongs with the
+secrets). Two shapes, feature the same — `--dump-type` picks what
+capture writes, every reader speaks both:
+
+- **binary** (the default) — a `PVMB` file: one header block per run,
+  then one length-framed, CRC-checked block per record. About half the
+  bytes of the JSON spelling, no parser on the read path, and a torn
+  tail costs one record instead of the file.
+- **json** (the v1 spelling) — JSON lines: one record per frame, the
+  decoded fields (`txn`, `fc`, `addr`, …) riding beside the raw hex —
+  the `head`/`grep`/`jq` spelling.
+
+The binary layout, big-endian throughout (MBAP's own order; `crc32` is
+zlib's):
+
+```text
+header block (one per run — the anchor):
+  0   4   magic  b'PVMB'
+  4   1   version (1)
+  5   1   reserved (0)
+  6   8   started (u64 epoch seconds)
+  14  2   upstream_len (u16)
+  16  N   upstream (utf-8 — the recorded posture string)
+  +4  4   crc32 over bytes 0 .. 16+N
+
+record block (one per frame):
+  0   4   body_len (u32) — the body's length; the skip unit
+  4   8   ts (f64 epoch — the wall clock, the trace's own domain)
+  12  1   kind (0=req, 1=rsp, 2=raw c2d, 3=raw d2c)
+  13  4   conn (u32 — the proxy leg pair)
+  17  1   peer_len (u8) + N peer (utf-8 'ip:port')
+  ..  1   note_len (u8) + N note
+  ..  2   raw_len (u16) + N raw (the MBAP frame, verbatim)
+  ..  4   crc32 over the body (ts .. raw)
 ```
+
+The record walk: the header at offset 0 anchors it; a mid-file `PVMB`
+block is a later run's header — the session boundary (the trace
+**appends across runs**, a multi-run file is a longer history; the
+conn ids restart each run). A block that runs past EOF is a torn tail:
+the walk keeps what parsed and notes the loss — a killed capture leaves
+a readable trace. A mid-file CRC failure resync-scans for the next
+header; the records between the tear and the re-anchor are lost with
+the tear. The JSON walk reads the same story line-wise: a torn line
+skips (noted), a later header line is the boundary. A foreign file or
+a future version refuses with a clean one-liner.
+
+The json spelling's records (the decoded echo is its readability sugar —
+the binary carries the frame once and re-derives on read; the converter
+never copies the echo):
+
+```json
 {"format":"pv-suite-modbus-trace","version":1,"started":"…","tool":"modbus-replay","mode":"capture","upstream":"inverter-lan:502"}
 {"ts":1794588996.048,"dir":"req","conn":1,"peer":"127.0.0.1:64824","raw":"004d…","txn":77,"unit":1,"fc":3,"addr":32064,"count":2}
 {"ts":1794588996.048,"dir":"rsp","conn":1,"peer":"inverter-lan:502","raw":"004d…","txn":77,"unit":1,"fc":3,"bytes":4}
@@ -54,9 +105,30 @@ with the secrets):
 
 `dir` speaks the client's view (`req` = client to device, `rsp` = the
 device's answer, `raw` = the framing lost); exception responses record
-their code (`"exc": 2`). The trace **appends across runs** — each run
-stamps its header line, a multi-run file is a longer history — and
-flushes per frame, so a killed capture leaves a readable trace.
+their code (`"exc": 2`).
+
+The auth handshakes do not ride MBAP — the suite auth's PVA1 proof is
+a raw 52-byte frame (magic + nonce + HMAC-SHA256), the Waveshare
+password raw ASCII, the verdicts raw `OK`/`ERR`. The tap peels and
+names them before the first clean frame — the conversations render the
+handshake whole (`PVA1 handshake proof`, `Waveshare password`,
+`auth verdict`) and the device's first real frame survives the verdict
+glue — and the bytes ride the trace verbatim as raw records either
+way: one more reason the trace is 0600 (a leaked trace can replay a
+PVA1 proof at any server holding the key).
+
+The sizes, the same FC3 poll pair (count 2):
+
+| pair | json | binary | win |
+|------|------|--------|-----|
+| thin (12B + 14B frames) | ~270 B | ~107 B | ~2.5× |
+| fat read reply (246B frame) | ~540 B | ~285 B | ~1.9× |
+
+A worked example ships with the suite —
+[extras/examples/modbus-replay-trace.pvmb](../../extras/examples/modbus-replay-trace.pvmb)
+(two sessions, both handshakes, the polls, the refused write,
+deterministic bytes; rendered by
+`modbus-replay-dump extras/examples/modbus-replay-trace.pvmb`).
 
 **Replay mode serves the trace.** At start the daemon indexes every
 recorded response under its request's identity — unit + function code +
@@ -90,17 +162,49 @@ debugging sees the recorded world, which is the point (compare the
 client's behavior against the trace's truth, not against a simulation
 of it).
 
+### The record feed and the dump tool
+
+Every record the trace writer encodes also fans out to the **record
+feed** — `--dump-socket` binds a unix stream socket at the family's
+derived path (`/tmp/modbus-replay-<listen-port>.socket`,
+`/tmp/modbus-replay-15503.socket` at the default listen; bound by
+default, the word `none` turns it off). The feed is read-only push in
+the binary record encoding verbatim — no verbs, no tokens, nothing a
+command could ride (the no-control-plane ruling stands); a slow
+subscriber is dropped, the FILE keeps every record. Capture mode
+pushes the real wire's records; **replay mode pushes the session it
+serves** — the requests, the recorded answers with the applied
+latencies, the misses as the frames they are.
+
+The reader face is its own bin,
+[`bin/modbus-replay-dump.py`](bin/modbus-replay-dump.py) (its own man
+page): the three static views of a trace file (the summary, the answer
+index — per unique query, the recorded reply the replay will serve
+with the recorded latency and the ask count — and the conversations,
+the per-connection query→answer diagram), the converter
+(`--to json|binary -o OUT` — either shape reads, the other writes, the
+raw bytes the one truth: a binary→json→binary round trip lands
+byte-identical) and the live view (`--socket` — the feed renders
+realtime, a request prints `pending`, its response completes the
+exchange; `^C` ends it clean).
+
 ## Usage
 
 ```bash
 # capture: the cache's polls to the real device, the wire to a trace
-python3 apps/modbus-replay/bin/modbus-replay.py --upstream inverter-lan:502 --capture sun2000-morning.jsonl
+python3 apps/modbus-replay/bin/modbus-replay.py --upstream inverter-lan:502 --capture sun2000-morning.pvmb
 # pass-through inspector (no trace): the decoded frames at DEBUG
 python3 apps/modbus-replay/bin/modbus-replay.py --upstream :502 --log-level DEBUG
 # replay: the scraper debugs against the morning's trace, hardware-free
-python3 apps/modbus-replay/bin/modbus-replay.py --replay sun2000-morning.jsonl
+python3 apps/modbus-replay/bin/modbus-replay.py --replay sun2000-morning.pvmb
 # the recorded device latencies, 10x faster than captured
-python3 apps/modbus-replay/bin/modbus-replay.py --replay sun2000-morning.jsonl --replay-speed 10
+python3 apps/modbus-replay/bin/modbus-replay.py --replay sun2000-morning.pvmb --replay-speed 10
+# the reader face: the summary, the answer index, the conversations
+python3 apps/modbus-replay/bin/modbus-replay-dump.py sun2000-morning.pvmb
+# convert between the shapes (the raw bytes are the one truth)
+python3 apps/modbus-replay/bin/modbus-replay-dump.py sun2000-morning.pvmb --to json -o sun2000-morning.jsonl
+# live: the conversations render off the running daemon's record feed
+python3 apps/modbus-replay/bin/modbus-replay-dump.py --socket
 ```
 
 Exit codes: `0` = ran (SIGTERM/SIGINT: the graceful shutdown); `1` =
@@ -122,7 +226,9 @@ control plane either: every knob is a startup knob). The flags:
 |---|---|---|
 | `--listen` | `127.0.0.1:15503` | the Modbus TCP serve address `HOST:PORT` (`$LISTEN`) |
 | `--upstream` | — | capture mode: the device's Modbus TCP endpoint `HOST:PORT` (`:PORT` = 127.0.0.1:PORT, `[v6]:PORT` works) (`$UPSTREAM`) |
-| `--capture` | off | the trace file the wire dumps to (JSON lines, 0600; appends across runs) — without it the proxy runs pass-through (`$CAPTURE`) |
+| `--capture` | off | the trace file the wire dumps to (0600; the binary PVMB blocks by default, the v1 JSON lines per `--dump-type`; appends across runs) — without it the proxy runs pass-through (the record feed still carries the frames) (`$CAPTURE`) |
+| `--dump-type` | `binary` | the trace's shape capture writes: `binary` (the PVMB blocks — every reader speaks both) or `json` (the v1 lines for a capture that wants `head`/`grep`/`jq`) (`$DUMP_TYPE`) |
+| `--dump-socket` | `/tmp/modbus-replay-<listen-port>.socket` | the record feed's unix socket: the records push to the connected `modbus-replay-dump --socket` viewers (read-only, best effort); `none` binds no feed (`$DUMP_SOCKET`) |
 | `--replay` | — | replay mode: the trace file to serve (exactly one of `--upstream`/`--replay` per run) (`$REPLAY`) |
 | `--replay-speed` | `0` | the recorded device latencies divided by N (`1` = as captured, N = N× faster; `0` = answer immediately) (`$REPLAY_SPEED`) |
 | `--replay-miss` | `exception` | what an unmatched request answers: `exception` (exception 11) or `zero` (the zero-filled shape) (`$REPLAY_MISS`) |
@@ -150,16 +256,20 @@ and the debug surface is the log and the trace file. The signals:
 > connect ACL, no client caps; only `--client-timeout` kicks the
 > silent). A bind past loopback is refused nothing but warned loudly —
 > a five-line `!!` WARNING banner at start. There is no control plane
-> to authenticate — nothing to token. The trace file holds the wire's
-> values and names (and a Waveshare capture carries the connection
-> password raw): traces write 0600 and belong with the secrets. The
+> to authenticate — nothing to token (the record feed is read-only
+> push on a unix socket: no verbs, no tokens, nothing a command could
+> ride). The trace file holds the wire's values and names (a Waveshare
+> capture carries the connection password raw, a suite-auth capture the
+> PVA1 proof — a leaked trace can replay it): traces write 0600 and
+> belong with the secrets. The
 > full family story is [docs/SECURITY.md](../../docs/SECURITY.md).
 
 ## Testing
 
 The suite is [`dev/suites/replay-regtest.py`](../../dev/suites/replay-regtest.py)
-— capture against the fake inverter, the trace's shape, the byte-identical
-replay, the miss policies, the refusals:
+— capture against the fake inverter, both trace shapes, the walk's
+torn-tail/resync story, the dump bin's views and converter, the record
+feed, the byte-identical replay, the miss policies, the refusals:
 
 ```bash
 dev/battery/battery.py replay    # the replay profile: the regtest (the suites refuse
@@ -174,19 +284,22 @@ the logs.
 ```
 apps/modbus-replay/
 ├── bin/
-│   └── modbus-replay.py    # CLI entry, the ladder, validation, wiring
+│   ├── modbus-replay.py        # CLI entry, the ladder, validation, wiring
+│   └── modbus-replay-dump.py   # the reader face: the views, the converter, the feed
 ├── lib/
-│   ├── options.json        # the knob registry: the flags, the env twins
-│   ├── options.py          # its loader (the canon fold, the protocol tree's timeout)
-│   ├── config.py           # the resolution ladder (flag > env > default — no config file)
-│   ├── statics.py          # static configuration loader (lib/defaults.json)
-│   ├── trace.py            # the trace format: the writer, the MBAP tap, the replay index
-│   ├── capture.py          # the capture proxy (the pipe + the tap)
-│   ├── replay.py           # the replay server (the common face protocol over the index)
-│   ├── man.py              # the generated man page's prose (common/render/manpage.py renders)
-│   └── defaults.json       # the statics: the trace format identity, the miss codes
+│   ├── options.json            # the knob registry: the flags, the env twins
+│   ├── options.py              # its loader (the canon fold, the protocol tree's timeout)
+│   ├── config.py               # the resolution ladder (flag > env > default — no config file)
+│   ├── statics.py              # static configuration loader (lib/defaults.json)
+│   ├── trace.py                # the trace format: the writers (both shapes), the MBAP tap,
+│   │                           #   the record feed, the replay index
+│   ├── capture.py              # the capture proxy (the pipe + the tap)
+│   ├── replay.py               # the replay server (the common face protocol over the index)
+│   ├── man.py                  # the generated man pages' prose (common/render/manpage.py renders)
+│   └── defaults.json           # the statics: the trace formats' identity, the miss codes
 └── man/
-    └── modbus-replay.1     # the generated man page
+    ├── modbus-replay.1         # the generated man page
+    └── modbus-replay-dump.1    # the reader face's page
 ```
 
 ## License

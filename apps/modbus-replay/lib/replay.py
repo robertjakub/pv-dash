@@ -23,7 +23,8 @@ from common.modbus.protocol import exception_frame, frame, PROTOCOL
 from common.modbus.server import serve_modbus
 from common.serve.connlimit import ConnGate, limits_words
 from .statics import EXC_GATEWAY, EXC_ILLEGAL, EXC_VALUE, MAX_PDU
-from .trace import READ_FCS, SINGLE_WRITE_FCS, MULTI_WRITE_FCS
+from .trace import (KIND_REQ, KIND_RSP, READ_FCS, SINGLE_WRITE_FCS,
+                    MULTI_WRITE_FCS, encode_record)
 
 logger = logging.getLogger('modbus-replay')
 
@@ -60,16 +61,18 @@ class ReplayServer:
     frame dispatch that answers from the trace."""
 
     def __init__(self, index, replay_speed=0.0, replay_miss='exception',
-                 client_timeout=0.0):
+                 client_timeout=0.0, feed=None):
         self.index = index
         self.replay_speed = replay_speed
         self.replay_miss = replay_miss
+        self.feed = feed            # the record feed: the served session pushes live
         self.conn_gate = ConnGate(0, 0)           # the ladder's name (the face protocol) — uncapped
         self.max_clients = 0                       # the ladder's cap slot — no cap by design
         self.client_timeout = client_timeout
         self.client_count = 0
         self.client_lock = threading.Lock()
         self.clients = {}
+        self.feed_conns = {}       # the client address -> the feed's conn id
         self.stopping = False
         self.max_pdu = MAX_PDU
         self.log = logger
@@ -111,6 +114,8 @@ class ReplayServer:
 
     def stop(self):
         self.stopping = True
+        if self.feed is not None:
+            self.feed.close()
         if self.listen_sock:
             try:
                 self.listen_sock.close()
@@ -123,6 +128,28 @@ class ReplayServer:
                 % (self.sessions, self.answered, self.misses,
                    self.missed_exceptions, self.missed_zero))
 
+    def _feed_conn(self, addr):
+        """The feed's conn id for one client (the address, stable across
+        its session) — the dump tool's conversations group by it."""
+        with self.client_lock:
+            return self.feed_conns.setdefault(addr, len(self.feed_conns) + 1)
+
+    def _feed_pair(self, addr, txn, unit, pdu, rsp_pdu):
+        """The served exchange into the record feed: the request as it
+        arrived, the answer as it went out (the applied latency lives
+        in the stamps' gap; a miss's frame is the response it is)."""
+        if self.feed is None:
+            return
+        conn = self._feed_conn(addr)
+        peer = '%s:%d' % addr[:2]
+        req_raw = frame(txn, unit, pdu)
+        self.feed.broadcast(encode_record(round(time.time(), 6), KIND_REQ,
+                                          conn, peer, None, req_raw))
+        if rsp_pdu is not None:
+            self.feed.broadcast(encode_record(round(time.time(), 6), KIND_RSP,
+                                              conn, peer, None,
+                                              frame(txn, unit, rsp_pdu)))
+
     def frame(self, client, txn, proto, unit, pdu, addr):
         """The dispatch: the trace's answer for this request, or the miss
         policy's — under the client's own transaction id either way."""
@@ -133,6 +160,7 @@ class ReplayServer:
         rsp_pdu, latency = hit
         if self.replay_speed > 0 and latency > 0:
             time.sleep(latency / self.replay_speed)
+        self._feed_pair(addr, txn, unit, pdu, rsp_pdu)
         client.sendall(frame(txn, unit, rsp_pdu))
         with self.client_lock:
             self.answered += 1
@@ -149,10 +177,13 @@ class ReplayServer:
             with self.client_lock:
                 self.missed_zero += 1
             if shaped is not None:
+                self._feed_pair(addr, txn, unit, pdu, shaped)
                 client.sendall(frame(txn, unit, shaped))
                 logger.info('replay miss for %s (%s:%d) — zero-shaped reply',
                             _req_words(unit, pdu), *addr[:2])
                 return
+            self._feed_pair(addr, txn, unit, pdu,
+                            exception_frame(txn, 0, unit, pdu[0] if pdu else 0, code)[7:])
             client.sendall(exception_frame(txn, 0, unit, pdu[0] if pdu else 0, code))
             logger.info('replay miss for %s (%s:%d) — no zero shape, exception %d',
                         _req_words(unit, pdu), *addr[:2], code)
@@ -160,6 +191,8 @@ class ReplayServer:
         with self.client_lock:
             self.missed_exceptions += 1
         fc = pdu[0] if pdu else 0
+        self._feed_pair(addr, txn, unit, pdu,
+                        exception_frame(txn, 0, unit, fc, EXC_GATEWAY)[7:])
         client.sendall(exception_frame(txn, 0, unit, fc, EXC_GATEWAY))
         logger.info('replay miss for %s (%s:%d) — exception %d',
                     _req_words(unit, pdu), *addr[:2], EXC_GATEWAY)

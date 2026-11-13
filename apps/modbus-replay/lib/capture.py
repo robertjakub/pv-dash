@@ -52,9 +52,11 @@ class CaptureProxy:
 
     def listening(self, host, port):
         caps = ' '.join(limits_words(0, self.client_timeout, 0))
+        trace = ('trace %s' % self.writer.path) if (self.writer and self.writer.path) \
+            else ('the feed only, no trace file' if self.writer
+                  else 'pass-through, no trace')
         logger.info('capture proxy on %s:%d -> %s:%d (%s%s)', host, port,
-                    self.upstream_host, self.upstream_port,
-                    ('trace %s' % self.writer.path) if self.writer else 'pass-through, no trace',
+                    self.upstream_host, self.upstream_port, trace,
                     (', ' + caps) if caps else '')
 
     def stop(self):
@@ -76,6 +78,8 @@ class CaptureProxy:
                 self.listen_sock.close()
             except OSError:
                 pass
+        if self.writer:
+            self.writer.close()   # the feed's subscribers + the file's flush
 
     def summary(self):
         return ('%d connection(s) piped, %d/%d frame(s) sent/recv, '
@@ -135,7 +139,7 @@ class CaptureProxy:
         done = threading.Event()
 
         def pump(sock_in, sock_out, flow, peer_name):
-            tap = FrameTap()
+            tap = FrameTap(flow)
             try:
                 while not self.stopping:
                     chunk = sock_in.recv(CHUNK)
@@ -144,11 +148,13 @@ class CaptureProxy:
                     sock_out.sendall(chunk)
                     with self.count_lock:
                         self.bytes_piped[flow] += len(chunk)
-                    for frame, parsed in tap.feed(chunk):
-                        self._tap_record(flow, conn_id, peer_name, frame, parsed)
+                    for frame, parsed, note in tap.feed(chunk):
+                        self._tap_record(flow, conn_id, peer_name, frame, parsed, note)
             except (OSError, ValueError):
                 pass   # the transport died or the peer reset — the pair ends
             finally:
+                for frame, parsed, note in tap.flush():
+                    self._tap_record(flow, conn_id, peer_name, frame, parsed, note)
                 done.set()
                 try:
                     sock_out.shutdown(socket.SHUT_WR)
@@ -177,7 +183,7 @@ class CaptureProxy:
             except OSError:
                 pass
 
-    def _tap_record(self, flow, conn_id, peer, frame, parsed):
+    def _tap_record(self, flow, conn_id, peer, frame, parsed, note=None):
         """One reassembled frame (or one undecodable flush) from the tap:
         into the trace writer and the DEBUG log. The screen labels are
         the client's view — c2d is what the client SENT, d2c what it
@@ -186,9 +192,9 @@ class CaptureProxy:
         if parsed is None:
             self.undecoded += 1
             if self.writer:
-                self.writer.record(flow, conn_id, peer, frame,
-                                   note='framing lost — raw bytes only')
-            logger.debug('conn %d %s %d byte(s) of unframed wire', conn_id, label, len(frame))
+                self.writer.record(flow, conn_id, peer, frame, note=note)
+            logger.debug('conn %d %s %d byte(s) of unframed wire (%s)',
+                         conn_id, label, len(frame), note or 'raw')
             return
         with self.count_lock:
             self.frames[flow] += 1

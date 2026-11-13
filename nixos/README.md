@@ -135,16 +135,15 @@ services.modbus-scraper = {
 
 The packages also ship the **alert rules pack** (`extras/alerts/` in the repo —
 the F16 closure, the audit vocabulary's detection half, one file per
-watched exporter): the scraper's copy sits at
-`share/alerts/scraper.yml`, the cache's at
-`share/alerts/cache.yml` — the repo's own names. A Prometheus on the same
+watched exporter): each watched exporter's package installs its half flat at
+`share/alerts.yml`. A Prometheus on the same
 host points its `ruleFiles` at the packaged copies and the poll story
 alerts itself:
 
 ```nix
 services.prometheus.ruleFiles =
-  [ "${inputs.pv-dash.packages.${pkgs.system}.modbus-scraper}/share/alerts/scraper.yml"
-    "${inputs.pv-dash.packages.${pkgs.system}.modbus-cache}/share/alerts/cache.yml" ];
+  [ "${inputs.pv-dash.packages.${pkgs.system}.modbus-scraper}/share/alerts.yml"
+    "${inputs.pv-dash.packages.${pkgs.system}.modbus-cache}/share/alerts.yml" ];
 ```
 
 List only the copies of the tools you run — a cache-only install still

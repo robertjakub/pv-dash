@@ -149,9 +149,8 @@ collector's pull are the two routes through:
   demo's `Dockerfile.prometheus` is the reference wiring
   ([the images](../README.md#prometheus-dockerfileprometheus)). The
   **alert rules pack** ships at `extras/alerts/` in the repo, one file per
-  watched exporter — the packaged copy sits at
-  `share/alerts/scraper.yml` (the cache package carries
-  `share/alerts/cache.yml`) — list them under your
+  watched exporter — each watched exporter's package installs its half
+  flat at `share/alerts.yml` — list them under your
   Prometheus's `rule_files:` and the audit vocabulary's alerts ride
   along (docs/SECURITY.md F16).
 - **the `config` volume** — mounted by the three Modbus services and

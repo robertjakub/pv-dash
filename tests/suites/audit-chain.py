@@ -22,7 +22,7 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'lib'))
 from harness import *   # the boot: the gate, the NOTE stamp — the shared check accumulator
 
-V = os.path.join(REPO, 'scripts', 'audit_verify.py')
+V = os.path.join(REPO, 'scripts', 'gates', 'audit_verify.py')
 sys.path.insert(0, REPO)
 from common.runtime.audit import AuditLog, entry_hash, GENESIS, audit_quote, audit_escape   # noqa: E402
 

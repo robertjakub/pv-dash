@@ -109,7 +109,9 @@ class CaptureProxy:
             try:
                 upstream = socket.create_connection(
                     (self.upstream_host, self.upstream_port), timeout=self.modbus_timeout)
-                upstream.settimeout(self.modbus_timeout or None)
+                upstream.settimeout(None)   # the pipe never times a leg: a device
+                # that stops answering surfaces through the client's own modbus
+                # timeout, and --client-timeout kicks the silent client leg
             except OSError as e:
                 logger.info('upstream %s:%d refused the pair (%s) — closing %s:%d',
                             self.upstream_host, self.upstream_port, e, *addr[:2])
@@ -117,8 +119,6 @@ class CaptureProxy:
                 continue
             if self.client_timeout:
                 client.settimeout(self.client_timeout)
-            else:
-                client.settimeout(self.modbus_timeout or None)
             with self.count_lock:
                 self.conns += 1
                 conn_id = self.conns

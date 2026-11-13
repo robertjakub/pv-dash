@@ -360,6 +360,58 @@ check('the json record carries the decoded fields',
       str(jreqs[0]) if jreqs else '-')
 
 print()
+print('== capture: the pair survives the poll gap ==')
+
+# the regression: the capture face once armed both legs with the
+# modbus-timeout as a recv timeout — every pair died modbus-timeout into
+# the client's first silence, so a scraper polling every 10s re-dialed
+# every poll (the flapping: one reachable, one unreachable, the conn #
+# climb). The pipe never times a leg: the idle kick belongs to
+# --client-timeout alone, and a device that stops answering surfaces
+# through the client's own timeout.
+
+def live_exchange(s, pdu, txn):
+    s.sendall(struct.pack('>HHHB', txn, 0, len(pdu) + 1, 1) + pdu)
+    head = recvn(s, 7)
+    txn_, proto, length, unit_ = struct.unpack('>HHHB', head)
+    body = recvn(s, length - 1)
+    return head + body
+
+p_gap = daemon(['--listen', '127.0.0.1:%d' % PORT_CAP, '--upstream', '127.0.0.1:%d' % PORT_FAKE,
+                '--modbus-timeout', '1',
+                '--capture', TRACE + '.gap.pvmb'], LOG % 'gap')
+check('the gap capture came up (modbus-timeout 1s)', wait_port(PORT_CAP))
+try:
+    s_gap = socket.create_connection(('127.0.0.1', PORT_CAP), timeout=10)
+    s_gap.settimeout(10)
+    first = live_exchange(s_gap, fc3_req, TXN['fc3'])
+    check('the gap pair: the first exchange answered', first == frames['fc3'], first.hex())
+    time.sleep(2.5)   # well past the 1s modbus-timeout — the old bug killed here
+    second = live_exchange(s_gap, fc3_req, TXN['fc3b'])
+    check('the gap pair survived the 2.5s idle on one connection',
+          second == struct.pack('>H', TXN['fc3b']) + frames['fc3'][2:], second.hex())
+    s_gap.close()
+except (OSError, ConnectionError) as e:
+    check('the gap pair survived the 2.5s idle on one connection', False, str(e))
+p_gap.send_signal(signal.SIGTERM)
+p_gap.wait(timeout=10)
+
+p_kick = daemon(['--listen', '127.0.0.1:%d' % PORT_CAP, '--upstream', '127.0.0.1:%d' % PORT_FAKE,
+                 '--client-timeout', '1',
+                 '--capture', TRACE + '.kick.pvmb'], LOG % 'kick')
+check('the kick capture came up (client-timeout 1s)', wait_port(PORT_CAP))
+try:
+    s_kick = socket.create_connection(('127.0.0.1', PORT_CAP), timeout=10)
+    s_kick.settimeout(5)
+    kicked = s_kick.recv(1)   # the client stays silent: the server closes it, no reply
+    check('the kick: --client-timeout ended the silent pair', kicked == b'', kicked.hex())
+    s_kick.close()
+except (OSError, ConnectionError) as e:
+    check('the kick: --client-timeout ended the silent pair', False, str(e))
+p_kick.send_signal(signal.SIGTERM)
+p_kick.wait(timeout=10)
+
+print()
 print('== the converter: between the shapes ==')
 
 r = subprocess.run([sys.executable, DUMP, TRACE, '--to', 'json', '-o', TRACE_JSON + '.conv'],

@@ -44,7 +44,8 @@ artifacts. The pattern:
 - the **config volume** (`/config`, `VOLUME` + `ENTRYPOINT
   pv-entrypoint`): the entrypoint seeds it with the **required file
   artifacts only** — the generated `metrics.token`, the generated
-  `modbus-auth.token`, the JSON specs (`selection.json`, `metrics.json`)
+  `modbus-auth.token`, the generated `page.token`, the JSON specs
+  (`selection.json`, `metrics.json`)
   and the served `config.js`; the bundled conf scripts are NOT copied
   there (each tool loads the image's own conf as the default layer). See
   [env or the config volume?](#env-or-the-config-volume) for the split:

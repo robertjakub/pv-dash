@@ -12,6 +12,19 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
+- **The apps/ tree carries no `*.token` examples** — the dashboard's
+  `examples/page.token` placeholder is deleted (the only one under
+  apps/: the cache, the scraper and the fake-inverter Dockerfiles
+  already create theirs at build time), and the dashboard Dockerfile
+  follows the family shape (`RUN echo placeholder >
+  config-defaults/page.token` instead of copying the file out of
+  apps/). No behavior change: the entrypoint materializes any
+  `*.token` in config-defaults as a random 0600 value on the first
+  seed (the bundled content never reaches the volume), so
+  `/config/page.token` — the compose stacks' `AUTH_TOKEN` target —
+  seeds exactly as before. The docker README's seeded-artifacts list
+  gained the missing `page.token`.
+
 - **The docker env examples carry the full tool names** —
   `docker/env/cache.env.example` → `docker/env/modbus-cache.env.example`,
   `docker/env/scraper.env.example` → `docker/env/modbus-scraper.env.example`:

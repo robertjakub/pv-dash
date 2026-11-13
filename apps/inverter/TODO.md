@@ -1,6 +1,6 @@
 # TODO (inverter — the Done/history records)
 
-The open items live in the family-wide [TODO](../docs/TODO.md) (tagged
+The open items live in the family-wide [TODO](../../docs/TODO.md) (tagged
 `[inverter]`); this file keeps the tool's shipped history.
 
 ## Done (the highlights; the git history has the details)
@@ -213,7 +213,7 @@ battery` toggle and the SIGHUP `BATTERY` reload block with it), the
 The docs restructure wave: the README re-laid on the family's one skeleton
 and shortened (608 → ~330 lines) — the state machines' prose tightened,
 the flags table's wall-cells trimmed; the Nix section moved to
-[docs/NIXOS.md (now nixos/README.md)](../nixos/README.md) (the no-module note included); the
+[docs/NIXOS.md (now nixos/README.md)](../../nixos/README.md) (the no-module note included); the
 Testing section ADDED (the fake is the suites' workhorse and its README
 never said so).
 

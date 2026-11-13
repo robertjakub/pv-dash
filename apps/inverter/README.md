@@ -6,13 +6,13 @@
 
 A dependency-free (Python stdlib only) Modbus TCP server that plays an
 inverter — with a battery, a smart meter and the modbus-cache diagnostics
-block — so the [modbus-scraper](../apps/scraper/README.md), the
-[modbus-cache](../apps/cache/README.md) and the whole [pv-suite](../README.md)
+block — so the [modbus-scraper](../scraper/README.md), the
+[modbus-cache](../cache/README.md) and the whole [pv-suite](../../README.md)
 stack can be exercised without hardware. Through **inverter profiles** it
 can emulate different devices: the shipped default profile is the
 `sun2000` (Huawei SUN2000) map, and Deye hybrid profiles are included as
 well — see
-[shared/profiles/README.md](../shared/profiles/README.md).
+[shared/profiles/README.md](../../shared/profiles/README.md).
 
 It ships three tools:
 
@@ -79,7 +79,7 @@ The fake doesn't hardcode any device layout: the simulator computes
 **named physical values** (`pv-power`, `grid-power`, `battery-soc`, …)
 and the **inverter profile** maps each name onto a register address and
 encoding. The format, the semantics and the shipped devices are documented
-once in [shared/profiles/README.md](../shared/profiles/README.md). `show registers`
+once in [shared/profiles/README.md](../../shared/profiles/README.md). `show registers`
 prints the loaded profile as a table, `set modbus profile <name|path>` swaps it
 live, `--modbus-profile` / `MODBUS_PROFILE` pick it at start; `clear modbus
 profile` returns to the configured map.
@@ -100,7 +100,7 @@ settings. Exit codes: `0` = valid; `1` = invalid; `2` = CLI misuse.
 The fake ships as an alpine container — stdlib-only, no pip, running as
 the unprivileged `pvsuite` user with the tools on `PATH`
 (`Dockerfile.fake-inverter` + `compose.yaml`; see
-[`docker/README.md`](../docker/README.md)). The image loads its own
+[`docker/README.md`](../../docker/README.md)). The image loads its own
 bundled conf (`/pv-suite/inverter/modbus-fake-inverter.conf`, the built-in
 `--config` target) — the env file and the CMD flags override it. The
 version reports as `0.4.3` inside the image (no git metadata; a checkout
@@ -128,7 +128,7 @@ the config names one and the start refuses. The flags:
 | `--grid-voltage-wander` / `--grid-frequency-wander` | `0.1` / `0.2` | the voltage machine's wander fraction (±10 % by default; 0 = the flat grid) / the frequency machine's clamp in Hz (±0.2 by default) |
 | `--time` / `--time-scale` / `--timezone` | real clock / `1` / `utc` | freeze simulated time `HH:MM` / the N× time-lapse factor / the machines' clock |
 | `--max-clients` / `--client-timeout` / `--max-conn-per-ip` | `64` / `300` / `0` | the Modbus caps (refuse past the count / kick the silent / per-IP cap; `0` = no limit; `$MAX_CLIENTS` / `$CLIENT_TIMEOUT` / `$MAX_CONN_PER_IP`) |
-| `--connect-acl` | any | the Modbus clients allowed to connect: `any`, `none`, or a comma-separated IP/CIDR list — the family ACL map lives in [docs/common/ACL.md](../docs/common/ACL.md) |
+| `--connect-acl` | any | the Modbus clients allowed to connect: `any`, `none`, or a comma-separated IP/CIDR list — the family ACL map lives in [docs/specs/ACL.md](../../docs/specs/ACL.md) |
 | `--allow-write` | off | accept Modbus writes (FC05/06/15/16): a write lands in the write overlay, logged and audited; off = every write refused with exception 01 |
 | `--modbus-auth` / `--modbus-auth-key` | `none` | the auth scheme the fake's Modbus clients must speak: `suite` = the crypt handshake (the scraper takes the matching `--modbus-auth suite --modbus-auth-key …`); the key is a secret, `file:<path>` welcome |
 | `--metrics-server` / `--metrics-listen` | off / `127.0.0.1:9352` | the fake's own Prometheus `/metrics` (live-settable `set metrics-server on/off`; refuses to start beyond loopback without `--metrics-token` — the F13 shape) |
@@ -145,7 +145,7 @@ the config names one and the start refuses. The flags:
 | `--config` / `--log-level` / `--man` | `modbus-fake-inverter.conf` / `INFO` / off | the config script (the set grammar, above) / the log surface / print the generated man page |
 
 `SIGHUP` re-applies the **environment layer** (all-or-nothing — flags are
-startup-only): `CHAOS` (0..1), `MAX_KWP`, `PROFILE`, `STRICT`,
+startup-only): `CHAOS` (0..1), `MAX_KWP`, `MODBUS_PROFILE`, `STRICT`,
 `TIME`, `TIME_SCALE`, `LOG_LEVEL` — booleans accept
 `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`. The same twins ride the
 start in the ladder — `CHAOS=0.9` at creation is honored, SIGHUP retunes
@@ -376,12 +376,12 @@ file is flushed per event.
 > network.** It is deliberately *not* security-first design (the audit's
 > F11). The full story — the caps, the optional `--modbus-auth suite`
 > handshake, the supply-chain claim — is
-> [docs/SECURITY.md](../docs/SECURITY.md).
+> [docs/SECURITY.md](../../docs/SECURITY.md).
 
 ## Testing
 
 The fake is the suites' workhorse — it is exercised from the suite-root
-[`tests/`](../tests/):
+[`tests/`](../../tests/):
 
 ```bash
 tests/battery.py inverter        # the inverter profile: the fake's regtest, the
@@ -395,7 +395,7 @@ logs.
 ## Source layout
 
 ```
-inverter/
+apps/inverter/
 ├── bin/
 │   ├── modbus-fake-inverter.py    # CLI entry, logging, wiring
 │   └── modbus-fake-cli.py         # console-style interactive control session
@@ -406,14 +406,14 @@ inverter/
     ├── simulator.py    # day curves, runtime overrides, named values, cloud machines
     ├── battery.py      # the battery state machine (SoC state, decision, integration)
     ├── inverter.py     # Modbus TCP server: FC1-FC4 reads, writes behind the write gate, chaos
+    ├── chaos.py        # seeded hostile-reply dice layer
     ├── control.py      # JSON-lines control server (set/clear/show, scenarios)
     ├── metrics.py      # the fake's own Prometheus /metrics endpoint
-    ├── audit.py        # the append-only audit trail (the KV lines, application=INV)
-    ├── chaos.py        # seeded hostile-reply dice layer
+    ├── config.py       # settings resolution + validation
     ├── signals.py      # SIGHUP/SIGUSR1/SIGTERM handling
+    ├── man.py          # the generated man pages' prose (common/render/manpage.py renders)
     ├── statics.py      # static configuration loader (lib/defaults.json)
-    ├── defaults.json   # the statics: solar times, cloud machines, battery limits
-    └── paths.py        # default control-socket path
+    └── defaults.json   # the statics: solar times, cloud machines, battery limits
 ```
 
 ## License

@@ -39,10 +39,13 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   reader face is its own bin, `bin/modbus-replay-dump.py` (its own man
   page): the summary, the answer index (per unique query: the recorded
   reply, the latency, the ask count), the conversations (the
-  per-connection query→answer diagram), the converter
+  per-connection query→answer diagram, both ends named, every packet
+  line carrying its source host:port and its #conn:txn pairing key), the
+  converter
   (`--to json|binary -o OUT` — the raw bytes the one truth, a
   binary→json→binary round trip byte-identical) and the live view
-  (`--socket`). The sidecar deliberately stands
+  (`--socket`, the value dumps gated behind `--values` — off by
+  default). The sidecar deliberately stands
   outside the family's deployment and gate shapes: no control plane (no
   ctl/cli pair, no tokens — the man ladder grew the `sidecar` page
   class; the feed is read-only push, not a listener that answers), no

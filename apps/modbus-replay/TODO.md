@@ -3,6 +3,63 @@
 The open items live in the family-wide [docs/TODO.md](../../docs/TODO.md);
 this file keeps the tool's done/history records, newest first.
 
+## 2026-11-13 — the dump's views name each packet's source
+
+The trace records always carried the packet's own `peer` (the client
+on the c2d/req records, the device on the d2c/rsp records), but the
+reader face rendered it only in the conversations head (`client ...`)
+— the answer's source never showed, the per-packet lines said only
+`req`/`rsp`/`raw`. Now: every packet line in the conversations and the
+live view carries its source host:port ahead of the direction word
+(`127.0.0.1:54321  req  FC3 ...`), the conversations
+head names BOTH ends of the pipe (`conn 1  client 127.0.0.1:54321
+device inverter-lan:502` — the device from the block's d2c records,
+falling back to the run header's upstream posture), and the live
+view's block head labels the end its opening record actually speaks
+for (`device ...` when a d2c record opens the block — it used to label
+the device a client). The answer index stays peer-free on purpose (it
+folds every connection's asks into one line — the winner's peer would
+be an accident of ordering). No format change: `peer` rode both shapes
+from day one, the converter passes it through verbatim. The live view
+also gained the `--values` knob: the value dumps (the address-prefixed
+words, the bit strings) ride only with it — OFF by default, a busy
+feed stays one line a frame (the file views dump the values always;
+`--values` on a file view refuses with a one-liner). The suite checks
+the sources on the shipped example, the captured trace (both ends in
+the head, the answer's src on the rsp line), the live view (the srcs,
+the values hidden by default and back under `--values`) and the file
+refusal.
+
+The pairing question ("two clients on the relay — is the conversation
+the correct one?") got the honest audit plus the hardening: two
+clients never cross-paired BY CONSTRUCTION (each accepted client gets
+its own upstream connection and its own conn id; a response can only
+arrive on the socket pair that carried its request; the index keys by
+(session, conn) — the dump groups by the same key). The soft spot was
+PIPELINING within one connection: the index kept only the most recent
+open request per conn, so a client with two outstanding requests
+(Modbus/TCP allows it, the MBAP txn id exists for it) mispaired — the
+first response orphaned in the conversations, the replay answers still
+correct (the index keys by query identity). Now the pairing is
+txn-aware: a response pairs with its request by the MBAP transaction
+id within their connection, the most recent still-open request
+standing in for a device that echoes a foreign id. The suite gained
+the two-client section: two sockets interleaved (fc3/fc4/fc3-32003/fc6
+across the conns), the pipelining probe (two requests sent before
+either answer is read), the independent walk asserting every response
+rode its request's conn + txn, and the dump's conversations keeping
+the clients in their own blocks with zero orphans.
+
+The pairing key then went on-screen: every packet line in the
+conversations and the live view carries its `#conn:txn` token after the
+source (`127.0.0.1:54321  2/7711  req  FC3 ...` — the txn re-derived
+from the raw frame's MBAP head, `-` for the raw records: the
+handshakes, the framing lost). The pair shows both halves' keys, so a
+device that echoes a foreign txn id exposes itself right on the line
+(`2/7711 req ... -> ... 2/99 rsp`); the answer index stays key-free
+(the replay renumbers the txns, the winner's would be an accident of
+ordering).
+
 ## 2026-11-13 — the capture face never times a leg (the flapping-scraper bugfix)
 
 The capture proxy armed BOTH pump legs with the modbus-timeout as a

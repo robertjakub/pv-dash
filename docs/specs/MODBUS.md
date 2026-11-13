@@ -125,13 +125,15 @@ at start — the key knobs are startup-only, the wire refuses set/clear),
 never rendered back, loadable via `file:<path>` from an owner-only
 `0600` file.
 
-### The Waveshare connection password (`waveshare` — cache upstream only)
+### The Waveshare connection password (`waveshare` — the client legs)
 
 Implemented once in `common/modbus/protocol.py` (`waveshare_handshake_client`,
 beside the suite pair). A Waveshare RS485-to-TCP gateway guards its serial
-side with an optional connection password, and the cache's upstream leg
-speaks it (`--modbus-auth-upstream waveshare`): after the TCP connect and before
-any Modbus frame, the cache sends the shared modbus-auth-upstream-key as the
+side with an optional connection password, and the client legs speak it:
+the cache's upstream leg (`--modbus-auth-upstream waveshare`) and the
+scraper's device leg (`--modbus-auth waveshare` — the scraper connects
+straight to a Waveshare gadget): after the TCP connect and before
+any Modbus frame, the client sends its shared auth key as the
 password itself — **raw ASCII bytes, no framing, no length prefix** — and
 waits for the gateway's verdict:
 
@@ -150,8 +152,9 @@ Failure handling is the suite discipline verbatim: the handshake runs on
 every (re)connect, inside the exchange — a failed proof counts as an
 exchange error (`errors`, `last_error`), the connector fails like any
 other device failure, the socket drops and the next poll interval retries.
-No retry count, no backoff at the Modbus layer. The scheme exists only on
-the cache's upstream leg — the gateway firmware is the other side, and no
+No retry count, no backoff at the Modbus layer. The scheme exists only
+on the client legs (the cache's upstream, the scraper's device leg) —
+the gateway firmware is the other side, and no
 pv-suite tool ever demands a Waveshare password from its own clients.
 
 ---
@@ -180,7 +183,7 @@ code, tool by tool ("—" = the tool has no surface for it).
 | MBAP overruns (length < 7 / over the PDU cap) | ✅ shared `read_frame`, frame refused | ✅ same | ✅ same — logged, connection closed |
 | Exception replies (`func\|0x80` + code) | ✅ passes device codes through; emits 01/02/03/04 itself | ✅ surfaces them on `ctl` | ✅ emits 01/02/03/04 |
 | The suite handshake (PVA1, HMAC-SHA256 — rides the MBAP leg) | ✅ client + server (`auth_handshake_client`/`auth_handshake_server`) | ✅ client | ✅ server |
-| The waveshare handshake (upstream auth) | ✅ client, upstream leg (`waveshare_handshake_client`) | — | — |
+| The waveshare handshake (the gateway connection password) | ✅ client, upstream leg (`waveshare_handshake_client`) | ✅ client, device leg | — |
 | Transport | Modbus TCP only | Modbus TCP only | Modbus TCP only — RTU/ASCII out of scope |
 
 **The function codes:**
@@ -469,7 +472,7 @@ either way).
 
 | Knob | Flag | Env | Console spelling | Tools |
 |---|---|---|---|---|
-| `modbus-auth` | `--modbus-auth suite\|none` | `MODBUS_AUTH` | `modbus auth` | all three |
+| `modbus-auth` | `--modbus-auth suite\|waveshare\|none` | `MODBUS_AUTH` | `modbus auth` | all three (waveshare: the scraper's client leg only) |
 | `modbus-auth-key` *(secret)* | `--modbus-auth-key` | `MODBUS_AUTH_KEY` | `modbus auth key` | all three |
 | `modbus-auth-upstream` | `--modbus-auth-upstream suite\|waveshare\|none` | `MODBUS_UPSTREAM_AUTH` | `modbus auth-upstream` | cache |
 | `modbus-auth-upstream-key` *(secret)* | `--modbus-auth-upstream-key` | `MODBUS_UPSTREAM_AUTH_KEY` | `modbus auth upstream-key` | cache |
@@ -483,9 +486,10 @@ either way).
 | `write-acl` | `--write-acl` | `WRITE_ACL` | `acl write` | cache |
 
 Validation: `parse_auth_type` accepts the leg's schemes — `suite`
-everywhere, the cache's upstream leg also `waveshare` — or `none`/empty
+everywhere, the client legs (the cache's upstream, the scraper's device
+leg) also `waveshare` — or `none`/empty
 for none; anything else exits with `use 'suite', or none/empty for no
-auth` (the upstream leg names both: `use 'suite' / 'waveshare', …`)
+auth` (a waveshare leg names both: `use 'suite' / 'waveshare', …`)
 (`common/settings/config.py`). `check_auth_key` enforces the scheme's floor:
 ≥ 16 characters for `suite`, non-empty ASCII for `waveshare` (the
 password travels as raw bytes), and a key set while no scheme is chosen

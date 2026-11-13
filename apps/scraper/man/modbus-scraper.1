@@ -26,7 +26,11 @@ shared key (\fB--modbus-auth-key\fR, min 16 characters) with a crypt handshake
 right after every connect \(em 52 bytes: magic, fresh nonce,
 HMAC\-SHA256 proof; the peer answers \fBOK\fR and plain Modbus follows,
 or \fBERR\fR and the connection fails (the poller keeps retrying).
-Empty auth = no auth at all.
+With \fB--modbus-auth waveshare\fR the key goes out as a Waveshare
+RS485\-to\-TCP gateway's connection password (raw ASCII, right after
+every connect) and the gateway's \fBOK\fR opens the plain Modbus
+session \(em anything else fails the connect like any other device
+fault. Empty auth = no auth at all.
 .PP
 The exposition endpoint is the tool's serving surface: the connection caps
 (\fB--metrics-max-clients\fR total, \fB--metrics-max-conn-per-ip\fR per peer,
@@ -61,15 +65,20 @@ Modbus unit id
 added to register addresses
 .TP
 .BI \-\-modbus\-auth " modbus-auth"
-the Modbus auth scheme: `suite` demands the crypt handshake (magic +
-nonce + HMAC proof of the shared key) right after every connect — the
-peer answers OK, or ERR and the session drops; none/empty = no auth at
-all
+the auth scheme toward the device: `suite` proves the shared
+modbus\-auth\-key with a crypt handshake right after every connect (the
+peer answers OK, or ERR and the connection fails — the poller keeps
+retrying); `waveshare` sends the shared modbus\-auth\-key as the
+Waveshare TCP connection password right after every connect (the gateway
+answers OK, or anything else/nothing and the connection fails — the
+poller keeps retrying); none/empty = no auth at all
 .TP
 .BI \-\-modbus\-auth\-key " modbus-auth-key"
-the shared key the suite handshake proves (min 16 characters); the value
-may be `file:<path>` — the first line of an owner\-only 0600 file (a
-systemd LoadCredential rides as file:/run/credentials/...)
+the key the scraper presents to the device — the suite handshake's
+shared key (min 16 characters) or the Waveshare TCP connection password
+(non\-empty ASCII, the gateway's own rule); the value may be
+`file:<path>` — the first line of an owner\-only 0600 file (a systemd
+LoadCredential rides as file:/run/credentials/...)
 .TP
 .BI \-\-modbus\-timeout " modbus-timeout"
 Modbus connect/read timeout in seconds

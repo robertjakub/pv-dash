@@ -81,7 +81,7 @@ design); the top non-man pairs:
 | 0.85 | `apps/cache/bin/modbus-cache.py:49` `parse_args` <-> `apps/dashboard/bin/dashboard.py:277` `parse_args` |
 | 0.83 | `apps/inverter/lib/control.py:96` `__init__` <-> `apps/dashboard/lib/control.py:73` `__init__` |
 | 0.82 | `apps/cache/bin/modbus-cache.py:355` `watch_dump` <-> `common/wire/control.py:1380` `run_dump_interval` |
-| 0.78 | `apps/cache/lib/control.py:824` `uplink_report` <-> `apps/scraper/lib/control.py:474` `uplink_report` |
+| 0.78 | `apps/cache/lib/control.py:824` `uplink_report` <-> `apps/scraper/lib/control.py:481` `uplink_report` |
 | 0.78 | `apps/inverter/lib/control.py:466` `acl_table_report` <-> `apps/dashboard/lib/control.py:296` `acl_table_report` |
 
 ## The surface sweep — the listeners, the wire and the loops
@@ -238,7 +238,7 @@ texts the rows ref; the drift and must-ref gates live in
 | show | 7 | 7 | 6 | 5 | 4 |
 | commands | 16 | 16 | 16 | 13 | 13 |
 
-The exempt (intentionally per-tool) names: **39** —
+The exempt (intentionally per-tool) names: **40** —
 each with its reason in `dev/gates/options.py`.
 
 ## The wire-text sweep — the log/audit canon

@@ -24,7 +24,7 @@ import time
 from common.render.human import secs
 from common.runtime.version import version_string
 from common.wire.control import ControlServer as _ControlServer, num, numi, on_off
-from common.settings.config import acl_table, acl_value_text, parse_auth_type, \
+from common.settings.config import acl_table, acl_value_text, auth_key_floor_error, parse_auth_type, \
     parse_listen, parse_upstream, resolve_profile_file
 from common.modbus import AUTH_MIN_KEY
 from common.render.texts import T
@@ -233,15 +233,22 @@ class ControlServer(_ControlServer):
             return '%d' % v
         if key == 'modbus-auth':
             try:
-                v = parse_auth_type(val, 'modbus-auth')
+                v = parse_auth_type(val, 'modbus-auth', schemes=('suite', 'waveshare'))
             except SystemExit as e:
                 raise ValueError(str(e))
-            if v and not s.client.auth_key:
-                raise ValueError(T('wire.suite_auth_needs_key') % AUTH_MIN_KEY)
+            standing = s.client.auth_key
+            if v and not standing:
+                raise ValueError('the %s auth needs a key: pass modbus-auth-key by flag/env/config and restart%s'
+                                 % (v, ' (min %d characters)' % AUTH_MIN_KEY if v == 'suite' else ''))
+            if v and standing is not None:
+                err = auth_key_floor_error(v, standing)
+                if err:
+                    raise ValueError('the %s auth rejects the standing key (modbus-auth-key %s) — '
+                                     'pass modbus-auth-key by flag/env/config and restart' % (v, err))
             with s.lock:
                 s.cfg['auth'] = v
             s.client.auth = v
-            s.client.close()   # the next poll reconnects — and handshakes when suite is on
+            s.client.close()   # the next poll reconnects — and handshakes under the new scheme
             return v or 'none'
         if key == 'metrics-max-clients':   # the F13 cap: the one httpd's client gate
             v = numi(val, 'max-clients', 'clients')

@@ -106,7 +106,8 @@ def validate_config(cfg):
                        'interval; the loop simply runs back-to-back', cfg['modbus_timeout'], cfg['modbus_interval'])
     check_hostname(cfg['host'], 'upstream host')
     if cfg['auth'] and not cfg['modbus_auth_key']:
-        fail('auth', "the suite auth needs a key: set --modbus-auth-key/$MODBUS_AUTH_KEY too (min 16 characters)")
+        fail('auth', "the %s auth needs a key: set --modbus-auth-key/$MODBUS_AUTH_KEY too%s"
+             % (cfg['auth'], ' (min 16 characters)' if cfg['auth'] == 'suite' else ' (non-empty ASCII — the gateway password travels as raw bytes)'))
     listen_host, _listen_port = parse_listen(cfg['listen'])
     check_hostname(listen_host, 'listen')
     if not is_loopback_host(listen_host) and not cfg['auth_token']:
@@ -222,6 +223,9 @@ def resolve_config(args, script_dir=None):
     upstream = resolve(getattr(args, 'upstream', None), 'UPSTREAM', 'upstream',
                        DEFAULTS['upstream'], str)
     host, modbus_port = parse_upstream(upstream or DEFAULTS['upstream'])
+    modbus_auth = parse_auth_type(
+        resolve(getattr(args, 'modbus_auth', None), 'MODBUS_AUTH', 'modbus-auth',
+                DEFAULTS['modbus_auth'], str), 'modbus-auth', schemes=('suite', 'waveshare'))
     cfg = {
         'modbus_profile': profile_path,
         'metrics_spec': metrics_spec,
@@ -232,10 +236,10 @@ def resolve_config(args, script_dir=None):
                                'modbus_unit', DEFAULTS['modbus_unit'], int, row=OPT['modbus-unit']),
         'modbus_offset': resolve(args.modbus_offset, 'MODBUS_OFFSET', 'modbus_offset',
                                  DEFAULTS['modbus_offset'], int, row=OPT['modbus-offset']),
-        'auth': parse_auth_type(resolve(getattr(args, 'modbus_auth', None), 'MODBUS_AUTH', 'modbus-auth', DEFAULTS['modbus_auth'], str), 'modbus-auth'),
+        'auth': modbus_auth,
         'modbus_auth_key': check_auth_key(
             parse_secret((resolve(getattr(args, 'modbus_auth_key', None), 'MODBUS_AUTH_KEY', 'modbus_auth_key', '', str)
-                          or '').strip() or None, 'modbus-auth-key'), 'modbus-auth-key'),
+                          or '').strip() or None, 'modbus-auth-key'), 'modbus-auth-key', kind=modbus_auth),
         'modbus_timeout': resolve(args.modbus_timeout, 'MODBUS_TIMEOUT', 'modbus_timeout',
                                   DEFAULTS['modbus_timeout'], float, row=OPT['modbus-timeout']),
         'modbus_read_delay': resolve(args.modbus_read_delay, 'MODBUS_READ_DELAY', 'modbus_read_delay',

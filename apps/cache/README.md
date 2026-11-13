@@ -363,7 +363,8 @@ The two legs are configured separately, with separate keys:
 - **`--modbus-auth-upstream` / `--modbus-auth-upstream-key`** — the auth the cache
   *presents* to the upstream inverter: `suite` handshakes after every
   (re)connect, `waveshare` presents the key as a **Waveshare RS485-to-TCP
-  gateway's** connection password. The upstream-only scheme of the pair:
+  gateway's** connection password. The upstream-only scheme of the pair
+  (the scraper's device leg speaks it too, toward a Waveshare gadget):
   the cache's own clients always speak `suite` or nothing.
 
 Both keys are restart-marked secrets (a `set` records pending until

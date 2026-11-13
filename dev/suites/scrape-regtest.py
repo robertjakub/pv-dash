@@ -2493,6 +2493,193 @@ try:
     check('suite auth: the plain-server failures pile up too', m.get('scraper_modbus_errors_total', 0) > 0,
           str(m.get('scraper_modbus_errors_total')))
 
+    # 7c. the waveshare device auth: the scraper connects straight to a
+    #     Waveshare RS485-to-TCP gateway — the shared key goes out as the
+    #     gateway's connection password (raw ASCII after every connect),
+    #     OK opens the session, anything else fails the connect
+    class WavesharePeer:
+        """A stand-in gateway: the first bytes on a connection must be the
+        password (raw), the verdict is OK or NO+drop, then canned MBAP
+        FC3/FC4 answers (echoing txn/unit, count*2 words)."""
+
+        def __init__(self, port, password):
+            self.password = password.encode('ascii')
+            self.ok_attempts = 0
+            self.bad_attempts = 0
+            self.lock = threading.Lock()
+            self.srv = socket.socket()
+            self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.srv.bind(('127.0.0.1', port))
+            self.srv.listen(16)
+            threading.Thread(target=self._accept_loop, daemon=True).start()
+
+        def _accept_loop(self):
+            while True:
+                try:
+                    conn, _ = self.srv.accept()
+                except OSError:
+                    return
+                threading.Thread(target=self._serve, args=(conn,), daemon=True).start()
+
+        def _serve(self, conn):
+            try:
+                conn.settimeout(5)
+                got = b''
+                while len(got) < len(self.password):
+                    chunk = conn.recv(len(self.password) - len(got))
+                    if not chunk:
+                        return
+                    got += chunk
+                if got != self.password:
+                    with self.lock:
+                        self.bad_attempts += 1
+                    conn.sendall(b'NO')
+                    return
+                with self.lock:
+                    self.ok_attempts += 1
+                conn.sendall(b'OK')
+                while True:
+                    head = b''
+                    while len(head) < 7:
+                        chunk = conn.recv(7 - len(head))
+                        if not chunk:
+                            return
+                        head += chunk
+                    t, p, l, u = struct.unpack('>HHHB', head)
+                    pdu = b''
+                    while len(pdu) < l - 1:
+                        chunk = conn.recv(l - 1 - len(pdu))
+                        if not chunk:
+                            return
+                        pdu += chunk
+                    fc, addr, count = struct.unpack('>BHH', pdu[:5])
+                    if fc in (3, 4):
+                        conn.sendall(struct.pack('>HHHB', t, 0, 3 + count * 2, u)
+                                     + bytes([fc, count * 2]) + b'\x12\x34' * count)
+                    else:
+                        conn.sendall(struct.pack('>HHHB', t, 0, 3, u) + bytes([fc + 0x80, 1]))
+            except OSError:
+                pass
+            finally:
+                try:
+                    conn.close()
+                except OSError:
+                    pass
+
+    WS_GW, WS_M, WS_M_BAD, WS_CTL = 15912 + BASE, 19472 + BASE, 19473 + BASE, 19474 + BASE
+    GW_KEY = 'gw-pass1'
+    ws = WavesharePeer(WS_GW, GW_KEY)
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_GW,
+                                   '--listen', '127.0.0.1:%d' % WS_M, '--modbus-interval', '1',
+                                   '--control-port', str(WS_CTL), '--control-token', 'ctok-w',
+                                   '--modbus-auth', 'waveshare', '--modbus-auth-key', GW_KEY],
+                                  stdout=open(os.path.join(SCRATCH, 'scr_ws.log'), 'w'), stderr=subprocess.STDOUT))
+    time.sleep(1.2)
+
+    def ctl_ws(*cmds):
+        return subprocess.run([sys.executable, CTLB, '--control-port', str(WS_CTL), '--control-token', 'ctok-w']
+                              + list(cmds), capture_output=True, text=True, timeout=15).stdout.strip()
+
+    check('waveshare auth: the start log names the scheme',
+          'modbus auth waveshare' in open(os.path.join(SCRATCH, 'scr_ws.log')).read())
+    for _ in range(30):
+        try:
+            status, m = wait_metrics(WS_M, want='scraper_up')
+            if m.get('scraper_up') == 1:
+                break
+        except Exception:
+            pass
+        time.sleep(0.3)
+    status, m = wait_metrics(WS_M, want='scraper_up')
+    check('waveshare auth: the gateway password opens the poll (scraper_up 1)', m.get('scraper_up') == 1,
+          str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
+    check('waveshare auth: the gateway saw the password (no bad attempts)',
+          ws.ok_attempts >= 1 and ws.bad_attempts == 0,
+          'ok=%d bad=%d' % (ws.ok_attempts, ws.bad_attempts))
+    check('waveshare auth: the per-setting show carries auth=',
+          ctl_ws('show', 'modbus-auth') == 'ok modbus-auth=waveshare', ctl_ws('show', 'modbus-auth')[:120])
+    # the reconnect re-proves: request restart drops the session, the next
+    # poll dials fresh and hands the password over again
+    ok_before = ws.ok_attempts
+    r = ctl_ws('request', 'restart')
+    check('waveshare auth: the restart verb drops the modbus session',
+          r.startswith('ok modbus session dropped'), r[:100])
+    for _ in range(30):
+        if ws.ok_attempts > ok_before:
+            break
+        time.sleep(0.3)
+    check('waveshare auth: the reconnect hands the password over again',
+          ws.ok_attempts > ok_before, 'ok=%d' % ws.ok_attempts)
+    status, m = wait_metrics(WS_M, want='scraper_up')
+    check('waveshare auth: the poll recovers after the restart', m.get('scraper_up') == 1,
+          str(m.get('scraper_up')))
+    # the wrong password: a spawned instance (the key is startup-only) — the
+    # proofs fail against the gateway, the poll goes down, the log carries
+    # the exchange errors
+    procs.append(subprocess.Popen([sys.executable, P, '--upstream', '127.0.0.1:%d' % WS_GW,
+                                   '--listen', '127.0.0.1:%d' % WS_M_BAD, '--modbus-interval', '1',
+                                   '--control-port', '0', '--modbus-auth', 'waveshare',
+                                   '--modbus-auth-key', 'gw-pass2'],
+                                  stdout=open(os.path.join(SCRATCH, 'scr_ws_bad.log'), 'w'), stderr=subprocess.STDOUT))
+    time.sleep(4.0)
+    status, m = wait_metrics(WS_M_BAD, want='scraper_up')
+    check('waveshare auth: the wrong password keeps the connector failed (scraper_up 0)',
+          m.get('scraper_up') == 0, str({k: m.get(k) for k in ('scraper_up', 'scraper_modbus_errors_total')}))
+    check('waveshare auth: the gateway counted the bad attempts',
+          ws.bad_attempts >= 1, 'bad=%d' % ws.bad_attempts)
+    check('waveshare auth: the failed proofs land in the log as exchange errors',
+          'Waveshare TCP auth failed' in open(os.path.join(SCRATCH, 'scr_ws_bad.log')).read())
+    procs[-1].terminate()
+    procs[-1].wait(timeout=10)
+    time.sleep(0.5)
+    # the scheme dance (the scheme is not a secret — it sets live; the KEY
+    # stands): the short standing key refuses the suite wake, the waveshare
+    # wake re-proves the standing password, a bogus scheme refuses live
+    r = ctl_ws('set', 'modbus-auth', 'none')
+    check('waveshare auth: the device auth disables live',
+          r.startswith('ok modbus-auth=none'), r[:100])
+    ok_before = ws.ok_attempts
+    r = ctl_ws('set', 'modbus-auth', 'suite')
+    check('waveshare auth: going suite over the short standing key refuses',
+          r.startswith('% error: the suite auth rejects the standing key'), r[:130])
+    r = ctl_ws('set', 'modbus-auth', 'bogus')
+    check('waveshare auth: a bogus scheme refuses live',
+          r.startswith('% error:') and "use 'suite' / 'waveshare'" in r, r[:130])
+    r = ctl_ws('set', 'modbus-auth', 'waveshare')
+    check('waveshare auth: the scheme wakes over the standing key',
+          r.startswith('ok modbus-auth=waveshare'), r[:100])
+    for _ in range(30):
+        if ws.ok_attempts > ok_before:
+            break
+        time.sleep(0.3)
+    check('waveshare auth: the woken scheme hands the standing password over',
+          ws.ok_attempts > ok_before, 'ok=%d' % ws.ok_attempts)
+    status, m = wait_metrics(WS_M, want='scraper_up')
+    check('waveshare auth: the poll recovers under the woken scheme', m.get('scraper_up') == 1,
+          str(m.get('scraper_up')))
+    r = ctl_ws('set', 'modbus-auth', 'none')
+    check('waveshare auth: the device auth disables again', r.startswith('ok'), r[:60])
+    # the floors at start (the dry-run proves): a short key with no scheme
+    # passes (dormant material), the same key under waveshare passes too
+    # (the gateway's own rule is non-empty ASCII, not the 16 floor), a
+    # non-ASCII password refuses, waveshare without a key refuses
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'none',
+                        '--modbus-auth-key', 'shorty'], capture_output=True, text=True, timeout=15)
+    check('waveshare auth: a short key with no scheme is accepted at start (dormant)',
+          r.returncode == 0 and 'dry-run' in (r.stdout + r.stderr), (r.stdout + r.stderr)[-160:])
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'waveshare',
+                        '--modbus-auth-key', 'shorty'], capture_output=True, text=True, timeout=15)
+    check('waveshare auth: a short ASCII password passes the waveshare floor',
+          r.returncode == 0 and 'dry-run' in (r.stdout + r.stderr), (r.stdout + r.stderr)[-160:])
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'waveshare',
+                        '--modbus-auth-key', 'pässwörd'], capture_output=True, text=True, timeout=15)
+    check('waveshare auth: a non-ASCII password refuses the start',
+          r.returncode == 1 and 'must be ASCII' in r.stderr, r.stderr[-160:])
+    r = subprocess.run([sys.executable, P, '--dry-run', '--modbus-auth', 'waveshare'],
+                       capture_output=True, text=True, timeout=15)
+    check('waveshare auth: waveshare without a key fails the config fast',
+          r.returncode == 1 and 'needs a key' in r.stderr, r.stderr[-160:])
+
     # 9. the metrics ACL: the cache's acl/connect reading on the /metrics
     # listener — the accept-time IP gate (the inline grammar + the file: chain)
     r = subprocess.run([sys.executable, P, '--dry-run',

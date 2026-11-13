@@ -12,6 +12,30 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Added
 
+- **modbus-scraper: the Waveshare TCP auth on the device leg
+  (`--modbus-auth waveshare`)** — the scraper now connects straight to a
+  Waveshare RS485-to-TCP gateway: after every connect it sends the shared
+  `--modbus-auth-key` as the gateway's connection password (raw ASCII, no
+  framing) and waits for the verdict — `OK` opens the plain Modbus
+  session, anything else (a rejection, a non-Waveshare peer's exception
+  frame, silence, an early EOF) fails the connect like any other device
+  fault and the poller keeps retrying. The handshake itself is the cache's
+  upstream-leg implementation, already shared in `common/modbus/client.py`
+  (`waveshare_handshake_client`) — the scraper's leg now names the scheme
+  (the knob values are `suite|waveshare|none`, live via
+  `set modbus/auth waveshare`), the key floor is scheme-aware (min 16
+  characters for `suite`, non-empty ASCII for `waveshare`; a key set with
+  no scheme yet stays dormant and going `suite` over a short standing
+  password refuses at start and on the live set), and the key row speaks
+  both schemes. The registry row's scheme surfaces override the shared
+  canon inline (the cache's server-side `modbus/auth` and the fake stay
+  suite-only — no pv-suite tool demands a Waveshare password from its own
+  clients); the man page, the README row, the NixOS key-file option
+  description and docs/specs/MODBUS.md (the waveshare subsection, the
+  support map, the knob table) follow, and the scrape-regtest proves the
+  password path against a stand-in gateway (the good and the wrong
+  password, the reconnect re-proof, the live scheme dance, the dry-run
+  floors).
 - **modbus-replay: the trace rotates at a size (`--trace-max-mb` /
   `--trace-files`)** — an unbounded capture is a disk hazard (a capture
   proxy can sit in-line for days), so the writer now answers the audit

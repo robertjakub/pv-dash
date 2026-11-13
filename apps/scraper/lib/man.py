@@ -33,7 +33,11 @@ shared key (\\fB--modbus-auth-key\\fR, min 16 characters) with a crypt handshake
 right after every connect \\(em 52 bytes: magic, fresh nonce,
 HMAC\\-SHA256 proof; the peer answers \\fBOK\\fR and plain Modbus follows,
 or \\fBERR\\fR and the connection fails (the poller keeps retrying).
-Empty auth = no auth at all.
+With \\fB--modbus-auth waveshare\\fR the key goes out as a Waveshare
+RS485\\-to\\-TCP gateway's connection password (raw ASCII, right after
+every connect) and the gateway's \\fBOK\\fR opens the plain Modbus
+session \\(em anything else fails the connect like any other device
+fault. Empty auth = no auth at all.
 .PP
 The exposition endpoint is the tool's serving surface: the connection caps
 (\\fB--metrics-max-clients\\fR total, \\fB--metrics-max-conn-per-ip\\fR per peer,

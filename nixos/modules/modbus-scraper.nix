@@ -144,7 +144,7 @@ in
       '';
     };
 
-    modbusAuthKeyFile = mkFileOption "The shared key the suite handshake proves (min 16 characters). Needs settings.MODBUS_AUTH = \"suite\".";
+    modbusAuthKeyFile = mkFileOption "The key the scraper presents: the suite handshake's shared key (min 16 characters) or the Waveshare TCP connection password. Needs settings.MODBUS_AUTH.";
     controlTokenFile = mkFileOption "The control token from a file (the first line is the token) — the hardened way to pass the secret over TCP control.";
     controlOpsTokenFile = mkFileOption "The read-only ops control token from a file (the first line is the token). Needs controlTokenFile.";
     authTokenFile = mkFileOption "The /metrics bearer token from a file (single line, trimmed).";

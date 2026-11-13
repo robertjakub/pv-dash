@@ -5,6 +5,21 @@ The open items live in the family-wide [TODO](../../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
+The Waveshare TCP auth joined the scraper's device leg: `--modbus-auth
+waveshare` sends the shared `--modbus-auth-key` as a Waveshare
+RS485-to-TCP gateway's connection password (raw ASCII right after every
+connect; the gateway's OK opens plain Modbus, anything else fails the
+connect and the poller retries) — the cache's upstream-leg discipline
+verbatim, speaking the shared handshake in `common/modbus/client.py`'s
+`open_socket`. The scheme accepts at the flag/env/config layer and live
+(`set modbus/auth waveshare`), the standing-key floor is scheme-aware
+(going suite over a short standing password refuses; the dormant
+no-scheme key-set still passes non-empty ASCII), and the key row's
+wording speaks both schemes. The regtest grew the waveshare block: a
+stand-in gateway peer proves the password path, the wrong password's
+poll-down, the live scheme dance over a standing key and the dry-run
+floors.
+
 The manual moved to the operator packs: `apps/scraper/MANUAL.md` is
 `extras/manuals/modbus-scraper.md` now (the daemon-named page;
 `dev/generators/manual.py` renders it there, `--check` gates it — the

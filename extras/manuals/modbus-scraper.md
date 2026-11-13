@@ -97,8 +97,8 @@ the inverter Modbus settings
 | `upstream` | `set modbus upstream` | settable | `HOST:PORT` | `--upstream` / `UPSTREAM` | the inverter Modbus endpoint |
 | `modbus-unit` | `set modbus unit` | settable | `ID` | `--modbus-unit` / `MODBUS_UNIT` | the Modbus unit id the session speaks |
 | `modbus-offset` | `set modbus offset` | settable | `N` | `--modbus-offset` / `MODBUS_OFFSET` | added to register addresses |
-| `modbus-auth` | `set modbus auth` | settable | `suite\|none` | `--modbus-auth` / `MODBUS_AUTH` | the Modbus auth scheme: suite (the crypt handshake) or none |
-| `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the suite handshake's shared key, min 16 characters (`file:<path>` reads an owner-only file) *(hidden)* |
+| `modbus-auth` | `set modbus auth` | settable | `suite\|waveshare\|none` | `--modbus-auth` / `MODBUS_AUTH` | the auth scheme the scraper speaks to the device: suite (the crypt handshake), waveshare (the gateway connection password) or none |
+| `modbus-auth-key` | — | startup-only (secret) | `KEY` | `--modbus-auth-key` / `MODBUS_AUTH_KEY` | the key the scraper presents: the suite handshake's shared key (min 16 characters) or the Waveshare gateway password (`file:<path>` reads an owner-only file) *(hidden)* |
 | `modbus-timeout` | `set modbus timeout` | settable | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | Modbus connect/read timeout in seconds |
 | `modbus-read-delay` | `set modbus read-delay` | settable | `s` | `--modbus-read-delay` / `MODBUS_READ_DELAY` | seconds between consecutive device reads within a poll cycle |
 | `modbus-merge-gap` | `set modbus merge-gap` | settable | `registers` | `--modbus-merge-gap` / `MODBUS_MERGE_GAP` | max register gap when merging the profile's source ranges into block reads; the plan rebuilds |

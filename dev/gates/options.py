@@ -92,6 +92,7 @@ EXEMPT = {
     ('options', 'metrics-server'): ('env',),  # the fake reads no env twin
     ('options', 'metrics/limits'): ('setting-help',),  # the caps prose differs per side
     ('options', 'modbus'): ('setting-help',),  # the session side differs (client upstream vs served fake)
+    ('options', 'modbus-auth'): ('help', 'setting-help', 'value-help', 'hint', 'values'),  # the scraper's device leg speaks the Waveshare scheme (the server sides stay suite-only)
     ('options', 'modbus-auth-key'): ('help', 'setting-help',),  # the key's audience differs (the cache's clients vs the handshake)
     ('options', 'modbus-merge-gap'): ('setting-help',),  # the poll side's own ranges prose
     ('options', 'system'): ('setting-help',),  # the socket's per-tool purpose

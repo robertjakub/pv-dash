@@ -113,7 +113,7 @@ def main():
     tools = tools or TOOLS
     blocks = []
     for tool in tools:
-        path = os.path.join(ROOT, tool, 'lib', 'options.json')
+        path = os.path.join(ROOT, 'apps', tool, 'lib', 'options.json')
         if not os.path.exists(path):
             print('list_options.py: no registry at %s' % path)
             return 1

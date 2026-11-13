@@ -239,6 +239,11 @@ check('the shipped example: the views render', r.returncode == 0
       and 'addr 32064' in r.stdout,
       (r.stdout.strip().splitlines() or ['-'])[0][:120])
 check('the shipped example: two sessions named', '(session 2)' in r.stdout, '')
+check('the shipped example: the packets name their sources',
+      '127.0.0.1:64824  #1:7  req' in r.stdout and 'inverter-lan:502  #1:7  rsp' in r.stdout
+      and 'device inverter-lan:502' in r.stdout
+      and '#1:-  raw' in r.stdout and '#2:-  raw' in r.stdout,
+      next((l for l in r.stdout.splitlines() if 'device ' in l), '-'))
 
 print()
 print('== the device: the fake inverter ==')
@@ -412,6 +417,99 @@ p_kick.send_signal(signal.SIGTERM)
 p_kick.wait(timeout=10)
 
 print()
+print('== two clients, one capture (the pairing) ==')
+
+# two clients on one capture proxy never cross-pair: every accepted
+# client gets its own upstream connection and its own conn id, a
+# response can only arrive on the socket pair that carried its request,
+# and the pairing walks the MBAP transaction id inside the connection —
+# pipelined requests included (the most recent open one stands in for a
+# device that echoes a foreign id).
+
+TRACE_TWO = TRACE + '.two.pvmb'
+TXN_TWO = {'a1': 7711, 'b1': 7712, 'b2': 7713, 'a2': 7714, 'a3': 7715, 'a4': 7716}
+fc3_two = struct.pack('>BHH', 3, 32003, 1)   # client B's distinguishing shape
+
+def read_frame(s):
+    head = recvn(s, 7)
+    txn_, proto, length, unit_ = struct.unpack('>HHHB', head)
+    return head + recvn(s, length - 1)
+
+p_two = daemon(['--listen', '127.0.0.1:%d' % PORT_CAP, '--upstream', '127.0.0.1:%d' % PORT_FAKE,
+                '--capture', TRACE_TWO], LOG % 'two')
+check('the two-client capture came up', wait_port(PORT_CAP))
+try:
+    s_a = socket.create_connection(('127.0.0.1', PORT_CAP), timeout=10)
+    s_a.settimeout(10)
+    s_b = socket.create_connection(('127.0.0.1', PORT_CAP), timeout=10)
+    s_b.settimeout(10)
+    a1 = live_exchange(s_a, fc3_req, TXN_TWO['a1'])
+    check('client A: the fc3 exchange answered',
+          a1 == struct.pack('>H', TXN_TWO['a1']) + frames['fc3'][2:], a1.hex())
+    b1 = live_exchange(s_b, fc4_req, TXN_TWO['b1'])
+    check('client B: the fc4 exchange answered',
+          b1 == struct.pack('>H', TXN_TWO['b1']) + frames['fc4'][2:], b1.hex())
+    b2 = live_exchange(s_b, fc3_two, TXN_TWO['b2'])
+    check('client B: the fc3 32003 exchange answered',
+          b2[:7] == struct.pack('>HHHB', TXN_TWO['b2'], 0, 5, 1) and b2[7] == 3, b2.hex())
+    a2 = live_exchange(s_a, fc6_req, TXN_TWO['a2'])
+    check('client A: the fc6 exchange answered',
+          a2[:2] == struct.pack('>H', TXN_TWO['a2']), a2.hex())
+    # the pipelining probe: two requests on the wire before either
+    # answer is read — the txn-aware pairing keeps both straight
+    s_a.sendall(struct.pack('>HHHB', TXN_TWO['a3'], 0, len(fc3_req) + 1, 1) + fc3_req)
+    s_a.sendall(struct.pack('>HHHB', TXN_TWO['a4'], 0, len(fc4_req) + 1, 1) + fc4_req)
+    a3 = read_frame(s_a)
+    a4 = read_frame(s_a)
+    check('the pipelined pair answered both, in order',
+          a3[:2] == struct.pack('>H', TXN_TWO['a3']) and a3[7:] == frames['fc3'][7:]
+          and a4[:2] == struct.pack('>H', TXN_TWO['a4']),
+          (a3 + a4).hex())
+    s_a.close()
+    s_b.close()
+except (OSError, ConnectionError) as e:
+    check('the two-client capture ran', False, str(e))
+p_two.send_signal(signal.SIGTERM)
+p_two.wait(timeout=10)
+
+two_headers, two_recs = walk_pvmb(open(TRACE_TWO, 'rb').read(), 'the two-client trace')
+two_reqs = [r_ for r_ in two_recs if r_['kind'] == 0]
+two_rsps = [r_ for r_ in two_recs if r_['kind'] == 1]
+two_raws = [r_ for r_ in two_recs if r_['kind'] in (2, 3)]
+check('the two-client trace holds 6 request + 6 response records',
+      len(two_reqs) == 6 and len(two_rsps) == 6,
+      '%d req / %d rsp / %d raw' % (len(two_reqs), len(two_rsps), len(two_raws)))
+two_keys = lambda recs: {(r_['conn'], struct.unpack('>H', r_['raw'][:2])[0])
+                         for r_ in recs if r_['raw']}
+check('every response rode its request\'s connection + txn',
+      two_keys(two_reqs) == two_keys(two_rsps) and len(two_keys(two_reqs)) == 6,
+      str(sorted(two_keys(two_rsps))))
+check('the two clients rode two distinct conn ids',
+      len({r_['conn'] for r_ in two_recs}) == 2,
+      str(sorted({r_['conn'] for r_ in two_recs})))
+
+r = subprocess.run([sys.executable, DUMP, TRACE_TWO], capture_output=True, text=True)
+heads = [ln for ln in r.stdout.splitlines() if ln.startswith('conn ')]
+check('the dump pairs both clients, zero orphans',
+      r.returncode == 0 and '0 orphan(s)' in r.stdout and '(orphan' not in r.stdout
+      and len(heads) == 2 and all('client 127.0.0.1:' in h for h in heads),
+      next((h for h in heads), r.stdout.splitlines()[0] if r.stdout else '-')[:140])
+blocks, cur = {}, None
+for ln in r.stdout.splitlines():
+    if ln.startswith('conn '):
+        cur = ln.split()[1]
+        blocks[cur] = []
+    elif cur is not None:
+        blocks[cur].append(ln)
+fc6_block = next((k for k, v in blocks.items()
+                  if any('addr 40001 value 1234' in ln for ln in v)), None)
+b_block = next((k for k, v in blocks.items()
+                if any('addr 32003' in ln for ln in v)), None)
+check('the conversations keep the clients apart',
+      fc6_block is not None and b_block is not None and fc6_block != b_block,
+      str({k: len(v) for k, v in blocks.items()}))
+
+print()
 print('== the converter: between the shapes ==')
 
 r = subprocess.run([sys.executable, DUMP, TRACE, '--to', 'json', '-o', TRACE_JSON + '.conv'],
@@ -470,9 +568,13 @@ check('the answer index carries the query, the data words, the latency, the ask 
 check('the values dump address-prefixed under the lines',
       '32064:  ' in r.stdout, next((l for l in r.stdout.splitlines() if '32064:' in l), '-'))
 check('the conversations pair the exchange',
-      'req  FC3 (read holding registers) unit 1 addr 32064 count 2' in r.stdout
-      and 'rsp' in r.stdout and 'ms' in r.stdout,
+      '  req  FC3 (read holding registers) unit 1 addr 32064 count 2' in r.stdout
+      and ':%d  rsp' % TXN['fc3'] in r.stdout and 'ms' in r.stdout,
       next((l for l in r.stdout.splitlines() if 'req' in l and '->' in l), '-')[:140])
+check('the conversations name both ends of the pipe',
+      'client 127.0.0.1:' in r.stdout
+      and 'device 127.0.0.1:%d' % PORT_FAKE in r.stdout,
+      next((l for l in r.stdout.splitlines() if 'device ' in l), '-'))
 check('the refused write rode its exception into the views',
       'FC6 (write single register) unit 1 addr 40001 value 1234' in r.stdout
       and 'exception 1' in r.stdout, '')
@@ -567,6 +669,15 @@ check('the live-viewed capture pipes the wire', live_again == frames['fc3'], liv
 time.sleep(1.0)
 p_live.send_signal(signal.SIGTERM)
 p_live.wait(timeout=10)
+p_livev = start([sys.executable, DUMP, '--socket', FEED_CAP, '--values'],
+                log=LOG % 'livev')
+time.sleep(1.0)
+livev_again = raw_exchange(PORT_CAP, fc3_req, TXN['fc3'])
+check('the values-viewed capture pipes the wire', livev_again == frames['fc3'],
+      livev_again.hex())
+time.sleep(1.0)
+p_livev.send_signal(signal.SIGTERM)
+p_livev.wait(timeout=10)
 p_livecap.send_signal(signal.SIGTERM)
 p_livecap.wait(timeout=10)
 live_log = read_log(LOG % 'live')
@@ -575,6 +686,22 @@ check('the live view rendered the exchange',
       next((l for l in live_log.splitlines() if 'pending' in l), '-')[:120])
 check('the live view named the client', 'client 127.0.0.1:' in live_log,
       next((l for l in live_log.splitlines() if 'client' in l), '-')[:80])
+check('the live view named the answer\'s source (the device)',
+      ':%d  rsp' % TXN['fc3'] in live_log,
+      next((l for l in live_log.splitlines() if 'rsp' in l), '-')[:100])
+check('the live view hides the values by default',
+      '32064:  ' not in live_log and 'pending' in live_log,
+      next((l for l in live_log.splitlines() if 'pending' in l), '-')[:120])
+livev_log = read_log(LOG % 'livev')
+check('the live view dumps the values under --values',
+      '32064:  ' in livev_log and 'rsp' in livev_log,
+      next((l for l in livev_log.splitlines() if '32064:' in l), '-')[:100])
+
+r = subprocess.run([sys.executable, DUMP, EXAMPLE, '--values'],
+                   capture_output=True, text=True)
+check('the dump: --values refused on the file views',
+      r.returncode == 1 and 'rides the live view' in r.stderr,
+      (r.stderr.strip().splitlines() or ['-'])[-1])
 
 print()
 print('== the posture ==')
@@ -582,7 +709,7 @@ print('== the posture ==')
 for name, proc in (('cap', p_cap), ('rep', p_rep), ('rep0', p_rep0), ('pass', p_pass), ('fake', p_fake)):
     check('%s: alive at the end' % name, proc.poll() is None or proc.returncode == 0,
           str(proc.returncode))
-for name in ('cap', 'rep', 'rep0', 'pass', 'fake', 'warn', 'live', 'livecap'):
+for name in ('cap', 'rep', 'rep0', 'pass', 'fake', 'warn', 'live', 'livev', 'livecap'):
     log = read_log(LOG % name)
     check('%s: zero tracebacks' % name, 'Traceback' not in log)
 for name in ('cap', 'rep', 'rep0', 'pass'):

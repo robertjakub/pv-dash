@@ -181,12 +181,18 @@ The reader face is its own bin,
 page): the three static views of a trace file (the summary, the answer
 index — per unique query, the recorded reply the replay will serve
 with the recorded latency and the ask count — and the conversations,
-the per-connection query→answer diagram), the converter
+the per-connection query→answer diagram — one block per connection
+naming both ends of the pipe, every packet line carrying its source
+host:port and its `#conn:txn` pairing key (the record's own `peer`, the
+MBAP transaction id — a device echoing a foreign id shows right
+there)), the converter
 (`--to json|binary -o OUT` — either shape reads, the other writes, the
 raw bytes the one truth: a binary→json→binary round trip lands
 byte-identical) and the live view (`--socket` — the feed renders
-realtime, a request prints `pending`, its response completes the
-exchange; `^C` ends it clean).
+realtime, every packet line naming its source host:port and its
+`#conn:txn` key; a request prints `pending`, its response completes the
+exchange; the value dumps ride only with `--values` — off by default,
+the file views always dump them; `^C` ends it clean).
 
 ## Usage
 

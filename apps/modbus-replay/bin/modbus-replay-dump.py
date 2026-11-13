@@ -7,7 +7,9 @@ is the record). One tool, three abilities:
                  index (query -> the recorded reply the replay will
                  serve, the latency, the ask count) and the
                  conversations (the per-connection query->answer
-                 diagram, unpaired records marked in place);
+                 diagram, both ends named, every packet line carrying
+                 its source host:port and its #conn:txn pairing key,
+                 unpaired records marked in place);
   the converter  --to json|binary -o OUT — either shape reads, the
                  other writes; the raw bytes are the one truth (the
                  JSON side re-derives the decoded echo, never copies
@@ -16,7 +18,8 @@ is the record). One tool, three abilities:
   the live view  --socket [PATH] — the daemon's record feed
                  (--dump-socket) pushes every record as it lands; the
                  conversations render realtime (a request prints
-                 pending, its response completes the exchange). The
+                 pending, its response completes the exchange;
+                 --values adds the value dumps, off by default). The
                  default path derives the family's ctl way:
                  /tmp/modbus-replay-<listen-port>.socket.
 
@@ -114,6 +117,16 @@ def frame_words(rec, is_request):
     return rec['note'] or 'framing lost — raw bytes only'
 
 
+def conn_txn(rec):
+    """The record's #conn:txn token — the pairing key the index walks,
+    re-derived from the raw frame's MBAP head (the txn the client chose;
+    a response echoes its request's) — '-' for the txn half when there
+    is no head (the raw records: the handshakes, the framing lost)."""
+    if rec['kind'] in (KIND_REQ, KIND_RSP) and len(rec['raw']) >= 8:
+        return '#%d:%d' % (rec['conn'], struct.unpack('>H', rec['raw'][:2])[0])
+    return '#%d:-' % rec['conn']
+
+
 def answer_index(idx):
     """The answer map: one line per unique (unit, request PDU) — the
     query, the recorded reply the replay will serve, the recorded
@@ -133,9 +146,12 @@ def answer_index(idx):
 
 
 def conversations(idx):
-    """The query->answer diagram: one block per (session, conn), one
-    line per exchange, the unpaired records marked in place — who
-    asked what, got what, how fast; the concurrency named."""
+    """The query->answer diagram: one block per (session, conn) — the
+    head names both ends of the pipe, one line per exchange, the
+    unpaired records marked in place; every packet line names its
+    source host:port and its #conn:txn pairing key (the record's own
+    peer, the txn the MBAP head carries — a response echoing a foreign
+    id shows right there), the concurrency named."""
     print()
     print('--- the conversations ---')
     blocks = {}
@@ -150,7 +166,12 @@ def conversations(idx):
     for pos, ((session, conn), recs) in enumerate(blocks.items()):
         peer = next((r['peer'] for r in recs
                      if r['kind'] in (KIND_REQ, KIND_RAW_C2D)), None)
+        device = next((r['peer'] for r in recs
+                       if r['kind'] in (KIND_RSP, KIND_RAW_D2C)), None) \
+            or idx.session_headers.get(session, {}).get('upstream')
         head = 'conn %d  client %s' % (conn, peer or 'unknown')
+        if device:
+            head += '  device %s' % device
         span = spans[(session, conn)]
         if span:
             for earlier in order[:pos]:
@@ -163,26 +184,29 @@ def conversations(idx):
         print(head)
         for r in recs:
             when = stamp(r['ts'])
+            src = r['peer'] or 'unknown'
+            ct = conn_txn(r)
             if r['kind'] == KIND_REQ:
                 rsp_no = idx.pairs.get(r['no'])
                 if rsp_no is None:
-                    print('  #%d %s  req  %s  (no answer recorded)'
-                          % (r['no'], when, frame_words(r, True)))
+                    print('  #%d %s  %s  %s  req  %s  (no answer recorded)'
+                          % (r['no'], when, src, ct, frame_words(r, True)))
                     continue
                 rsp = idx.records[rsp_no - 1]
                 latency = max(0.0, (rsp['ts'] or 0.0) - (r['ts'] or 0.0))
-                print('  #%d %s  req  %s  -> #%d  rsp  %s  %.1fms'
-                      % (r['no'], when, frame_words(r, True), rsp_no,
+                print('  #%d %s  %s  %s  req  %s  -> #%d  %s  %s  rsp  %s  %.1fms'
+                      % (r['no'], when, src, ct, frame_words(r, True), rsp_no,
+                         rsp['peer'] or 'unknown', conn_txn(rsp),
                          frame_words(rsp, False), latency * 1000.0))
                 if len(r['raw']) >= 8 and len(rsp['raw']) >= 8:
                     block_under(value_block(r['raw'][7:], rsp['raw'][7:], cap=16))
             elif r['kind'] == KIND_RSP:
                 if r['no'] not in rsp_targets:
-                    print('  #%d %s  rsp  %s  (orphan — no request recorded)'
-                          % (r['no'], when, frame_words(r, False)))
+                    print('  #%d %s  %s  %s  rsp  %s  (orphan — no request recorded)'
+                          % (r['no'], when, src, ct, frame_words(r, False)))
             else:
-                print('  #%d %s  raw  %s (%d byte(s))'
-                      % (r['no'], when, r['note'] or 'framing lost',
+                print('  #%d %s  %s  %s  raw  %s (%d byte(s))'
+                      % (r['no'], when, src, ct, r['note'] or 'framing lost',
                          len(r['raw'])))
 
 
@@ -233,9 +257,12 @@ def recv_exact(sock, n):
     return buf
 
 
-def live(sock_path):
+def live(sock_path, values=False):
     """The feed: connect, the header (the same peek a file gets), then
-    the records as they land — the conversations render realtime."""
+    the records as they land — the conversations render realtime. The
+    values (the address-prefixed words, the bit strings) ride only with
+    --values: a busy feed stays one line a frame; the trace file has
+    everything, the file views dump the values always."""
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
         sock.connect(sock_path)
@@ -278,29 +305,37 @@ def live(sock_path):
             key = (session, rec['conn'])
             if key not in printed:
                 printed.add(key)
-                print('conn %d  client %s' % (rec['conn'], rec['peer'] or 'unknown'))
+                label = 'client' if rec['kind'] in (KIND_REQ, KIND_RAW_C2D) \
+                    else 'device'
+                print('conn %d  %s %s'
+                      % (rec['conn'], label, rec['peer'] or 'unknown'))
             elif rec['ts'] > 0:
                 span = spans.setdefault(key, [rec['ts'], rec['ts']])
                 span[1] = max(span[1], rec['ts'])
             when = stamp(rec['ts'])
+            src = rec['peer'] or 'unknown'
+            ct = conn_txn(rec)
             if rec['kind'] == KIND_REQ:
                 words = frame_words(rec, True)
                 pending[rec['conn']] = (no, rec['ts'], words, rec['raw'])
-                print('  #%d %s  req  %s  (pending)' % (no, when, words))
+                print('  #%d %s  %s  %s  req  %s  (pending)'
+                      % (no, when, src, ct, words))
             elif rec['kind'] == KIND_RSP:
                 req = pending.pop(rec['conn'], None)
                 words = frame_words(rec, False)
                 if req is None:
-                    print('  #%d %s  rsp  %s  (orphan — no request recorded)'
-                          % (no, when, words))
+                    print('  #%d %s  %s  %s  rsp  %s  (orphan — no request recorded)'
+                          % (no, when, src, ct, words))
                 else:
                     latency = max(0.0, (rec['ts'] or 0.0) - (req[1] or 0.0))
-                    print('  #%d %s  rsp  %s  (%.1fms)' % (no, when, words, latency * 1000.0))
-                    if len(req[3]) >= 8 and len(rec['raw']) >= 8:
+                    print('  #%d %s  %s  %s  rsp  %s  (%.1fms)'
+                          % (no, when, src, ct, words, latency * 1000.0))
+                    if values and len(req[3]) >= 8 and len(rec['raw']) >= 8:
                         block_under(value_block(req[3][7:], rec['raw'][7:], cap=16))
             else:
-                print('  #%d %s  raw  %s (%d byte(s))'
-                      % (no, when, rec['note'] or 'framing lost', len(rec['raw'])))
+                print('  #%d %s  %s  %s  raw  %s (%d byte(s))'
+                      % (no, when, src, ct, rec['note'] or 'framing lost',
+                         len(rec['raw'])))
     except ConnectionError:
         print('--- the feed closed (the daemon stopped, or the capture '
               'outpaced this viewer — the trace file has everything) ---')
@@ -315,6 +350,9 @@ def validate(args):
     if args.socket is not None and args.to:
         problems.append('--to converts a snapshot — a live feed converts nothing '
                         '(the combo is racy by definition)')
+    if args.values and args.socket is None:
+        problems.append('--values rides the live view — the file views dump the '
+                        'values always (the file is the artifact, studied at leisure)')
     if args.out and not args.to:
         problems.append('-o writes the converted trace — it needs --to')
     if args.to and not args.out:
@@ -341,6 +379,11 @@ def main():
                    help='the daemon\'s record feed (--dump-socket): the '
                         'conversations render live; bare --socket spells the '
                         'derived default (/tmp/modbus-replay-<listen-port>.socket)')
+    p.add_argument('--values', action='store_true',
+                   help='the live view: dump the values under the completed '
+                        'exchanges (the address-prefixed words, the bit '
+                        'strings) — off by default, a busy feed stays one '
+                        'line a frame (the file views always dump them)')
     p.add_argument('--to', choices=('json', 'binary'),
                    help='convert the trace to the other shape (with -o OUT)')
     p.add_argument('-o', '--out', help='the converted trace\'s path (0600)')
@@ -359,7 +402,7 @@ def main():
         raise SystemExit(1)
     try:
         if args.socket is not None:
-            live(args.socket)
+            live(args.socket, values=args.values)
         elif args.to:
             convert(args.trace, args.to, args.out)
         else:

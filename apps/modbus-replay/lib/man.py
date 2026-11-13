@@ -146,10 +146,12 @@ the answer index \\(em one line per unique (unit, request PDU): the
 query, the recorded reply the replay will serve (the read data's hex
 words included), the recorded latency, the ask count \\(em and the
 conversations \\(em the per\\-connection query\\->answer diagram: one
-block per connection with the client's peer, one line per exchange
-(request \\-> response, both frame numbers, the recorded latency), the
-concurrent connections named, the unpaired records marked in place
-(no answer recorded / orphan / the raw handshake lines).
+block per connection naming both ends of the pipe (the client\'s and
+the device\'s peers), one line per exchange (request \\-> response,
+each packet\'s source host:port and its #conn:txn pairing key, both
+frame numbers, the recorded latency), the concurrent connections
+named, the unpaired records marked in place (no answer recorded /
+orphan / the raw handshake lines).
 .PP
 The converter (\\fB--to json|binary \\-o OUT\\fR): either shape reads,
 the other writes \\(em the raw bytes are the one truth (the JSON side
@@ -160,9 +162,14 @@ crc recomputes.
 .PP
 The live view (\\fB--socket\\fR [PATH]): the daemon's record feed
 (\\fB--dump-socket\\fR) pushes every record as it lands \\(em the
-conversations render realtime; a request prints pending, its response
-completes the exchange with the latency. Bare \\fB--socket\\fR spells
-the derived default (/tmp/modbus\\-replay\\-<listen\\-port>.socket)."""
+conversations render realtime, every packet line naming its source
+host:port and its #conn:txn pairing key; a request prints pending, its
+response completes the exchange with the latency. The value dumps (the
+address\\-prefixed words, the bit strings) ride only with
+\\fB--values\\fR \\(em off by default, a busy feed stays one line a
+frame (the file views dump the values always). Bare \\fB--socket\\fR
+spells the derived default
+(/tmp/modbus\\-replay\\-<listen\\-port>.socket)."""
     signals = """.SH SIGNALS
 .TP
 .BR SIGTERM ", " SIGINT

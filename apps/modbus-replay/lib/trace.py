@@ -40,9 +40,11 @@ recorded response under its request's identity — unit + function code
 counter; a replayed session speaks its own) — the most recent response
 winning, with the recorded device latency (rsp.ts - req.ts) alongside
 for --replay-speed and the ask count alongside for the dump's
-answer-index view. The per-conn pairing (a response pairs with the
-most recent request on its connection, per run — the conn ids restart
-each run) is the dump's conversation view."""
+answer-index view. The per-conn pairing (a response pairs with its
+request by the MBAP transaction id within their connection — pipelining
+included — falling back to the most recent open request for a device
+that echoes a foreign id; per run — the conn ids restart each run) is
+the dump's conversation view."""
 import json
 import os
 import socket
@@ -516,12 +518,15 @@ class TraceIndex:
     reader) and the ask count (how many times the capture saw the
     query). The trace may wear either shape — the binary PVMB blocks
     or the JSON v1 lines; the first bytes pick the walk. The
-    conversations come from the same pass: a response pairs with the
-    most recent request on its connection (per run — the conn ids
-    restart each run). A trace that opens wrong (missing, foreign
-    format, a future version) refuses with a clean one-liner; a torn
-    tail or a mid-file corruption keeps what parsed — the loss noted
-    in the summary; the summary feeds the start log."""
+    conversations come from the same pass: a response pairs with its
+    request by the MBAP transaction id within their connection (per
+    run — the conn ids restart each run), the most recent open request
+    standing in when a device echoes a foreign id — so concurrent
+    clients and pipelined requests pair correctly. A trace that opens
+    wrong (missing, foreign format, a future version) refuses with a
+    clean one-liner; a torn tail or a mid-file corruption keeps what
+    parsed — the loss noted in the summary; the summary feeds the
+    start log."""
 
     def __init__(self, path):
         self.path = path
@@ -539,7 +544,7 @@ class TraceIndex:
         self.records = []     # every record, in order — the dump's views read these
         self.pairs = {}       # a request record's no -> its response record's no
         self.session_headers = {}   # the session no -> the run header's (upstream, started)
-        self._pending = {}    # (session, conn) -> (ts, pdu, no) — the open request
+        self._pending = {}    # (session, conn, txn) -> (ts, pdu, no) — the open requests
         self._first_ts = None
         self._last_ts = None
         try:
@@ -590,10 +595,17 @@ class TraceIndex:
             self.requests += 1
             key = (unit, pdu)
             self.counts[key] = self.counts.get(key, 0) + 1
-            self._pending[(session, conn)] = (ts, pdu, entry['no'])
+            self._pending[(session, conn, raw[:2])] = (ts, pdu, entry['no'])
         elif kind == KIND_RSP:
             self.responses += 1
-            req = self._pending.pop((session, conn), None)
+            req = self._pending.pop((session, conn, raw[:2]), None)
+            if req is None:
+                # a device that echoes a foreign txn id: the most recent
+                # still-open request on the connection pairs
+                cand = [k for k in self._pending if k[:2] == (session, conn)]
+                if cand:
+                    k = max(cand, key=lambda k_: self._pending[k_][2])
+                    req = self._pending.pop(k)
             if req is None:
                 self.orphans += 1
                 return entry

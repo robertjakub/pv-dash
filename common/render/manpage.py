@@ -10,15 +10,18 @@ from the same builders. Stdlib only.
 
 The family's one section ladder per page class (the LADDERS table): a
 daemon page carries SIGNALS, CONTROL, SECURITY, ENVIRONMENT, FILES,
-EXIT STATUS (in that order) after OPTIONS, a ctl page EXAMPLES,
-ENVIRONMENT, EXIT STATUS, a cli page ENVIRONMENT, EXIT STATUS —
-page(kind=...) asserts the page conforms, so a missing, extra or
-misordered section fails the build instead of shipping."""
+EXIT STATUS (in that order) after OPTIONS, a sidecar page (a daemon
+with no control plane) the same ladder without CONTROL, a ctl page
+EXAMPLES, ENVIRONMENT, EXIT STATUS, a cli page ENVIRONMENT, EXIT
+STATUS — page(kind=...) asserts the page conforms, so a missing, extra
+or misordered section fails the build instead of shipping."""
 import textwrap
 
 LADDERS = {
     'daemon': ('SIGNALS', 'CONTROL', 'SECURITY', 'ENVIRONMENT', 'FILES',
                'EXIT STATUS'),
+    'sidecar': ('SIGNALS', 'SECURITY', 'ENVIRONMENT', 'FILES',
+                'EXIT STATUS'),
     'ctl': ('EXAMPLES', 'ENVIRONMENT', 'EXIT STATUS'),
     'cli': ('ENVIRONMENT', 'EXIT STATUS'),
 }

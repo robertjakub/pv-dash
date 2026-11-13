@@ -581,7 +581,7 @@ try:
           os.stat(gsock).st_mode & 0o777 == 0o660, oct(os.stat(gsock).st_mode))
     r = cli('show version\nquit\n', 15516 + BASE, {'CTL': gsock}, use_flag=False)
     check('control: the group socket speaks (the owner, us)', r.returncode == 0
-          and 'modbus-cache 0.5.0' in r.stdout, repr(r.stdout[-120:]))
+          and 'modbus-cache 0.5.1' in r.stdout, repr(r.stdout[-120:]))
 
     # 5b-2. the console pager: the pure arithmetic (no tty) + the pty smoke
     #       (the welcome-wave trick: a real pty against a real daemon — the
@@ -992,9 +992,11 @@ try:
     d = _json.load(open(dumpfile))
     check('request dump: the settings-only dump keeps the words out', d.get('registers') == []
           and d.get('settings', {}).get('modbus/interval') == 2.0, str(d.get('settings')))
+    ctl_cmd('set modbus-interval 120', 15537 + BASE)   # quiesce the poller: the refill must not land in the flush->show pair
     ctl_cmd('request flush cache', 15537 + BASE)
     r = ctl_cmd('show cache', 15537 + BASE)
     check('request restore: the clear emptied the cache first', '0 word(s) cached' in r, r[:80])
+    ctl_cmd('set modbus-interval 2', 15537 + BASE)
     r = ctl_cmd('request restore', 15537 + BASE)
     check('request restore: the settings-only dump restores the override (the cache stays empty)',
           r.startswith('ok restored 0 word(s), 1 setting(s)'), r[:120])

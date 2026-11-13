@@ -60,44 +60,39 @@ scripts.
   the default). The census's one home — the registries are the truth,
   this is the cross-tool view
   on demand.
-- **`compare_options.py`** — the knobs compared across the tools: the
-  rows grouped by their flat name, the four identity fields checked
-  (the flat name, the live path, the env twin, the flag) — identical
-  in every tool that carries the knob = the common candidates (the
-  shared-definition list); any drift prints as a per-tool table, one
-  line per field, `*` on the drifted values, the drifting fields
-  named on the knob's header line; the single-tool knobs and the
-  near-misses (one live path answering to several flat names, an
-  alias only some tools carry) follow as notes. `--tool` names the
-  tools comma separated with `all` the default.
-- **`options_drift.py`** — the knobs compared against the canon: every
-  knob in its FOLDED form (the loader's own `canon_fold`), the canon
-  blocks' adoption census (FAMILY / partial / DEAD), the rows that
-  contradict their own block (the inline-wins overrides) beside the
-  block gaps (the fold-up candidates), the promotion list (the whole
-  shape agreeing, still inline) and the shape-field drifts that block a
-  shared definition; `live`/`alias`/`node`/`no-env`/`group` are the
-  per-tool console placements and never gate a match. Report only —
-  the form gates live in `lint/options.py`, the tool-vs-tool identity
-  fields in `compare_options.py`. `--tool` names the tools comma
-  separated with `all` the default.
-- **`option_diff.py`** — one flat name, every tool, every section: the
-  deep diff beside the family-scale pair (`compare_options.py` the
-  identity fields, `options_drift.py` the whole family). The search
-  walks the registry's three sections (options, show, commands — the
-  canon's own three) and every one that rows the name reports: the
-  EFFECTIVE rows per tool (the loader's own `canon_fold`), the
-  byte-identical field on one line and the drift one tool per line
-  (`*` on the off-majority values), the canon state (the block, the
-  refs, the inline-wins deviations, the block gaps) and the move
-  verdict — what riding shared/suite/options.json takes: the fields the
-  block could carry (byte-identical on every carrier), the console
-  placements the house keeps on the rows, the gated drift with its
-  exempt status, and the must-ref / byte-equal-twins predictions. The
-  verdict re-uses `lint/options.py`'s own GATED/EXEMPT/SECTION_FIELD/
-  KEY_RANK and the loader's `canon_fold` — it can never drift from the
-  gates it predicts. `python3 scripts/option_diff.py <flat-name>`;
-  `--tool` names the tools comma separated with `all` the default.
+- **[`options_compare.py`](options_compare.py)** — the registries'
+  compare tools, one script, three lenses:
+  `family` (the default) groups the knob rows by flat name and checks
+  the four identity fields (the flat name, the live path, the env twin,
+  the flag) — identical in every tool that carries the knob = the
+  common candidates (the shared-definition list); any drift prints as a
+  per-tool table, one line per field, `*` on the drifted values, the
+  drifting fields named on the knob's header line; the single-tool
+  knobs and the near-misses (one live path answering to several flat
+  names, an alias only some tools carry) follow as notes. `drift` puts
+  every knob in its FOLDED form (the loader's own `canon_fold`) against
+  the canon: the canon blocks' adoption census (FAMILY / partial /
+  DEAD), the rows that contradict their own block (the inline-wins
+  overrides) beside the block gaps (the fold-up candidates), the
+  promotion list (the whole shape agreeing, still inline) and the
+  shape-field drifts that block a shared definition;
+  `live`/`alias`/`node`/`no-env`/`group` are the per-tool console
+  placements and never gate a match. `name <flat>` is the deep diff on
+  one registry name across the three sections (options, show, commands
+  — the canon's own three): the EFFECTIVE rows per tool (the loader's
+  own `canon_fold`), the byte-identical field on one line and the drift
+  one tool per line (`*` on the off-majority values), the canon state
+  (the block, the refs, the inline-wins deviations, the block gaps) and
+  the move verdict — what riding shared/suite/options.json takes: the
+  fields the block could carry (byte-identical on every carrier), the
+  console placements the house keeps on the rows, the gated drift with
+  its exempt status, and the must-ref / byte-equal-twins predictions.
+  The name verdict re-uses `gates/options.py`'s own
+  GATED/EXEMPT/SECTION_FIELD/KEY_RANK and the loader's `canon_fold` —
+  it can never drift from the gates it predicts. Report only — the form
+  gates live in `gates/options.py`.
+  `python3 scripts/options_compare.py name <flat-name>`; `--tool` names
+  the tools comma separated with `all` the default.
 
 ## The checks (the shipped artifacts)
 

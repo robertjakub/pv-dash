@@ -481,6 +481,26 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   the protocol.json row moves from common/README's wire table into the
   shared/README table it belongs in.
 
+### Changed
+
+- **The three compare tools combine into
+  `scripts/options_compare.py`** — `compare_options.py`,
+  `option_diff.py` and `options_drift.py` were the key-alignment
+  waves' three lenses over the registries (the four identity fields,
+  the one-name deep diff, the whole-family canon report) with three
+  copies of the `--tool` parser, the loader and the field tuples; one
+  script carries them as the verbs `family` (the default — the bare
+  run keeps the old spelling's shape), `name <flat>` and `drift`, the
+  shared `--tool` grammar and the loader deduped, the reports'
+  rendered shapes unchanged. The merge repairs what the apps/ move
+  broke and nothing noticed: the three tools still resolved
+  `<root>/<tool>/lib/options.json` from before the tools moved under
+  apps/ — every invocation since died rc 1 on a missing registry; the
+  combined script spells `apps/<tool>/lib/options.json` and the
+  family lens folds with the tool's own name (the old call passed the
+  whole registry path as the canon label). The scripts README's three
+  rows collapse into one.
+
 ### Removed
 
 - **`scripts/set_group.py` + `scripts/set_live.py`** — the one-field

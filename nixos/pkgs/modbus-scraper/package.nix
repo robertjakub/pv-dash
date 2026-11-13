@@ -47,7 +47,7 @@ stdenv.mkDerivation (finalAttrs: {
     install -dm755 $out/share/examples
     install -m644 examples/metrics.json examples/modbus-scraper.conf $out/share/examples/
     install -m644 ${../../../extras/examples}/acl-ip-prefix.json $out/share/examples/
-    install -Dm644 ${../../../extras/alerts}/scraper.yml $out/share/alerts/scraper.yml
+    install -Dm644 ${../../../extras/alerts}/scraper.yml $out/share/alerts.yml
     install -Dm644 ${../../../shared}/schema/acl-ip-prefix.schema.json $out/share/shared/schema/acl-ip-prefix.schema.json
     install -Dm644 schema/metrics.schema.json $out/share/schema/metrics.schema.json
     install -dm755 $out/share/profiles

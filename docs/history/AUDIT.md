@@ -1,4 +1,4 @@
-# Security-audit history — the pv-suite tree (rev. 1–28)
+# Security-audit history — the pv-suite tree (rev. 1–31)
 
 The per-revision record behind [SECURITY.md](../SECURITY.md): the revision history,
 the closed findings with their fix and verification. Findings keep their
@@ -32,7 +32,7 @@ numbers across revisions; the current state lives in SECURITY.md.
 | 22 | the control-listener unification | ONE listener tier in `common/control.py`; the private copies shed |
 | 23 | the metrics-stack unification | one metrics stack on all four tools; the default binds renumbered 9350–9353 |
 | 24 | the secrets-startup-only wave | the live secret rotation retired family-wide (see SECURITY.md) |
-| 25 | the alert rules pack | F16 closed — the detection half of the audit vocabulary ships with the exporter (`scraper/alerts.yml`; the cache side on a new `modbus_cache_write_refused_total` counter; the pack since re-homed to `alerts/scraper.yml` + `alerts/cache.yml`) |
+| 25 | the alert rules pack | F16 closed — the detection half of the audit vocabulary ships with the exporter (`scraper/alerts.yml`; the cache side on a new `modbus_cache_write_refused_total` counter; the pack since re-homed to `extras/alerts/scraper.yml` + `extras/alerts/cache.yml`) |
 | 26 | the audit trail forwarding | `--audit-forward syslog` mirrors every finished line — the per-writer hash chain included — to the local syslog socket (`FailLoudSysLogHandler`, the bin name the tag; journald picks the lines up sealed); the sink stays the authority (a send failure stops the mirroring with one stderr note, never the trail); a socket-less spelling refuses to start |
 | 27 | the audit-forward targets (the F10 finish line) | the target grammar `none` / `syslog` / `syslog:/path` / `udp://host[:514]` (RFC5426) / `tcp://host[:514]` (RFC6587); the envelope rides `--audit-forward-format` (`rfc5424`/`cef`) carrying the native line verbatim + the prefix and chain hash as extracted fields — the chain verifies off-box and a chain break can page; `--audit-log none` + a forward is the remote-only mode (the collector the sole holder, the chain reseeds per run); grammar errors and a missing explicit socket refuse hard, an unresolvable remote target warns with the lazy re-arm; TLS deliberately out (the docs/TODO.md anchor) |
 | 28 | the docs consolidation (no re-audit) | docs/AUDIT.md became docs/SECURITY.md — the family's one security document: the reporting note, the one-screen posture, the four tools' stories (absorbed from the tool READMEs' Security sections, which became pointers), the deployment-hardening and supply-chain/ACL summaries beside the links; the F-ledger unchanged since rev. 27 |

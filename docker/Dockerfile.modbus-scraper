@@ -2,12 +2,12 @@
 # Runs as the unprivileged user `pvsuite`; the profiles come from the shared
 # build context (shared/profiles/).
 #
-# Build (the context = ../scraper, the entrypoint
+# Build (the context = ../apps/scraper, the entrypoint
 # = ../docker/entrypoints, the shared code = ../common):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-scraper -t modbus-scraper \
 #       --build-context shared=../shared \
-#       --build-context scripts=../docker --build-context common=../common ../scraper
+#       --build-context scripts=../docker --build-context common=../common ../apps/scraper
 #   # or: docker compose up -d modbus-scraper
 #
 # Run:

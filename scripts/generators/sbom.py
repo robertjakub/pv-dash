@@ -216,7 +216,7 @@ def render_cdx(f):
          'purl': 'pkg:npm/echarts@%s' % f['vendor']['echarts'],
          'licenses': lic('Apache-2.0'),
          'properties': [
-             {'name': 'pv-suite:vendored-at', 'value': 'dashboard/static/vendor/echarts.min.js'},
+             {'name': 'pv-suite:vendored-at', 'value': 'apps/dashboard/static/vendor/echarts.min.js'},
              {'name': 'pv-suite:note', 'value': 'the only third-party code in the suite'}]},
         {'bom-ref': 'zrender', 'type': 'library', 'name': 'zrender', 'version': f['vendor']['zrender'],
          'purl': 'pkg:npm/zrender@%s' % f['vendor']['zrender'],
@@ -394,14 +394,15 @@ grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter app
 
 # the container layer
 docker build -t pv-sbom-check \\
-    --build-context scripts=../docker --build-context common=../common ../cache   # or the others
+    --build-context shared=../shared --build-context common=../common \\
+    --build-context examples=../extras/examples ../apps/cache   # or the others (run from docker/)
 docker run --rm pv-sbom-check sh -c 'apk info -v | sort'                          # the apk set
 
 # the nix pin
 cat flake.lock
 
 # the vendored exception
-head -c 400 dashboard/static/vendor/echarts.min.js                            # the Apache-2.0 notice
+head -c 400 apps/dashboard/static/vendor/echarts.min.js                  # the Apache-2.0 notice
 ```
 
 For the NIS2/DORA supply-chain rows: the suite's "known-vulnerabilities"

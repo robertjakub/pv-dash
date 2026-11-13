@@ -471,7 +471,8 @@ def main(argv):
                          % ', '.join(unknown))
     if check:
         if drift:
-            print('drift: %s' % ', '.join(drift))
+            print('examples: the rendered examples are stale — re-run '
+                  'python3 scripts/generators/examples.py')
             return 1
         print('examples up to date')
     return 0

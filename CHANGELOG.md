@@ -7,7 +7,7 @@ the dashboard, the scraper and the cache each numbered their own releases
 before the repo restructured into one suite.
 
 This file keeps **Unreleased and the current release** only — the release
-history (0.4.0 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
+history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
 
 ## Unreleased
 ### Added

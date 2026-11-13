@@ -120,10 +120,10 @@ embedded profile gates belong to `scripts/lint/profile.py`. The
 shipped examples — one shared copy each under `extras/examples/`:
 `acl-write-registers.json` (the deye register policy: the
 clean-slate deny, the allows, the deny carves, the re-opens) and
-`examples/acl-ip-prefix.json` (every tool's ip-prefix gate). The
+`acl-ip-prefix.json` (every tool's ip-prefix gate). The
 **JSON Schemas** ship beside them (`shared/schema/acl-ip-prefix.schema.json`
 + `shared/schema/acl-write-registers.schema.json` at the root,
-`cache/schema/` for selection, `scraper/schema/` for metrics —
+`apps/scraper/schema/` for metrics —
 draft 2020-12) — schema-valid can still be
 loader-refused (the strict-CIDR host-bit spellings, the range bounds), so
 the loader stays the strict word; wire them into an editor by `$schema`

@@ -105,9 +105,8 @@ they name the wire.
   range half landed: one shared tree gates every tool with a unit knob
   (`shared/suite/protocol.json` — 1..247, `unit_in_range`; start and
   reload validate, the Modbus servers refuse out-of-range ids in-band,
-  `check_options.py` gates the check). What remains: the scraper's row
-  still declares `min: 0, max: 255` and only its live set gates on it
-  (`apps/scraper/lib/control.py:306`) while start refuses `<1`. Outcome:
+  `check_options.py` gates the check). The scraper's row is a thin ref
+  now (no bounds of its own). Outcome:
   one name, one flag, one env, live everywhere, the row bounds = the
   shared tree's range (the NixOS `unitId`/`modbusUnit` renames follow).
 - **the listener caps, the console schemes** `[all]` — the flat names
@@ -124,16 +123,15 @@ they name the wire.
   `limits/client-timeout` (one family, two leaves, `:186` vs `:107`).
   Outcome: `<surface>/limits/{max-clients,client-timeout,max-conn-per-ip}`; the
   leaf is `client-timeout` everywhere.
-- **the /metrics caps, four postures** `[scraper]` `[inverter]`
-  `[dashboard]` — the cache has the full trio (defaults 64/5.0/0,
-  `METRICS_*` envs, bounds, live, `apps/cache/lib/options.json:179-195`);
-  the scraper has **no rows at all** (its base trio *is* the /metrics
-  trio); the inverter has the rows but no live, no env, no bounds
-  (`env: null` + the F11 note, `apps/inverter/lib/options.json:227-240`);
-  the dashboard has envs but **defaults `metrics-max-clients` 16** vs
-  64 (`apps/dashboard/lib/options.json:102`) and no live/bounds. Outcome:
-  the cache's row shape family-wide, default vector {64, 0, 5.0}, the
-  scraper's always-on endpoint documented as the exception.
+- **the /metrics caps, the fold landed** `[scraper]` `[inverter]`
+  `[dashboard]` — the canon trio folds family-wide now: the scraper's
+  rows are thin refs (its base trio *is* the /metrics trio), the
+  inverter's rows thin-ref with the F11 no-env refusals riding, the
+  dashboard's rows thin-ref to the canon default 64 with bounds. The
+  residual: the defaults are one vector {64, 0, 5.0} by the canon
+  block, the scraper's always-on endpoint documented as the exception
+  (its 300 s client-timeout keeps its inline override). Any remaining
+  move is the canon block's, not the rows'.
 - **`metrics/listen` means two sockets** `[cache]` `[scraper]` — the
   cache's `metrics-listen` is the /metrics bind
   (`apps/cache/lib/options.json:159`); the scraper's `listen` row carries
@@ -175,7 +173,7 @@ they name the wire.
   `inverter:138`). Outcome: the node-ful
   spelling wins each time.
 - **the knob sweep's blind spots** `[common]` — `family_drift.py`
-  still intersects by literal row name (`knobs_shared()`: **30** names
+  still intersects by literal row name (`knobs_shared()`: **34** names
   present in all four today), so every near-miss pair above
   (`unit`/`modbus-unit`, `metrics-token`/`auth-token`) is never
   diffed; the tool-specific remainder names the absent rows but diffs
@@ -266,13 +264,12 @@ they name the wire.
   and "restart to apply" (apps/inverter/README.md:204). Outcome: a
   two-phrase lexicon in `shared/suite/texts.json`, every surface renders it,
   the marker rule ("the % changed exception") stays.
-- **the scraper's man page still ships `unset`** `[scraper]` —
-  `apps/scraper/lib/man.py:70` reads `set/unset/show/help` and the
-  generated page carries it (`apps/scraper/man/modbus-scraper.1:254`); the
-  other three say `set/clear`. The `--check` gate passes because the
-  *source* is stale — it catches stale output, not stale prose. (The
-  cli pages' `% changed` / `[confirm]` divergence stays open too — a
-  docs nicety, not a lie.) Outcome: the source line, regenerate.
+- *(landed — the docs redo)*: **the scraper's man page's `unset`** —
+  `apps/scraper/lib/man.py` reads `set/clear/show/help` and the
+  generated page carries it; the other three agreed all along. The
+  `--check` gate catches stale output, not stale prose. (The
+  cli pages' `% changed` / `[confirm]` divergence stays open — a
+  docs nicety, not a lie.)
 - **the cache's ops-token refusal renders the secret** `[cache]` —
   the validate `fail()` prints the value it looked up
   (`apps/cache/lib/config.py:286-288`), and for `control-ops-token` that
@@ -340,9 +337,9 @@ they name the wire.
   state the policy in the READMEs/man SECURITY or AUDIT (and keep
   it), or fail fast.
 - **the ctl exits 0 on a refused command** — a `fail` reply prints
-  `% error: ...` and exits 0 (`common/wire/ctl.py:143-144`; the only
+  `% error: ...` and exits 0 (`common/wire/cli.py` the reply ladder; the only
   nonzero exits are mac/auth/transport), pinned by the suite
-  (`tests/cache-regtest.py:2351`); the ctl man's EXIT STATUS even
+  (`tests/suites/cache-regtest.py`; the man page's EXIT STATUS even
   promises "every command answered ok" (`common/render/manpage.py:46`).
   Outcome: decide (rc 1 when any reply is `fail`), reword EXIT STATUS.
 - **the 401 bodies, three spellings** — `unauthorized\n` (scraper
@@ -442,7 +439,7 @@ re-open — is the history half:
 ### CROSS-TOOL
 
 - **the remaining audit findings** `[cache]` `[scraper]` `[inverter]`
-  `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 28): F17
+  `[docker]` — the open set (per [SECURITY.md](SECURITY.md) rev. 31): F17
   (the volume secrets), F14 (TLS — the item below), F15 (INFO — the
   bearer token + the localhost bind are the controls, the scraper
   README carries the privacy note), F1 (accepted); re-run the audit
@@ -497,7 +494,7 @@ re-open — is the history half:
   stay `10.0.0.5` to the ACL, not `::ffff:10.0.0.5`), `parse_listen`'s
   bracketed grammar verified end to end, the regtest coverage on the
   `::1` pair (the v6 loopback works on Linux and macOS alike; the
-  v4-mapped carve proof), and the doc pass (docs/common/ACL.md's family notes,
+  v4-mapped carve proof), and the doc pass (docs/specs/ACL.md's family notes,
   the AUDIT posture rows, the NixOS `listenHost`'s v6 spelling + the
   dual-stack note — `openFirewall`'s v6 half is the deployment's
   ip6tables business). The docker compose network stays v4 (the demo's
@@ -646,8 +643,17 @@ re-open — is the history half:
   stop.
 - **the docs site** — **the scaffold is in** (`docs/book/`, the
   mdBook form: the READMEs/audit/TODO/changelog included via
-  `{{#include}}`); what remains is the publishing: build + deploy the book
-  on GH Pages in the CI item's workflow.
+  `{{#include}}`); what remains is the publishing: build + deploy the
+  book on GH Pages in the CI item's workflow.
+- *(landed — the docs redo, the manuals-home ruling)*: the four
+  `<tool>/MANUAL.md` pages stay per-tool beside their registries —
+  `shared/manuals/` ruled out (the pages are loaded by no tool; the
+  alerts precedent) and `extras/manuals/` declined (the operator-pack
+  contract holds: manuals are product docs, not operator packs). The
+  browsing home is the book: the Manuals page includes all four by
+  `{{#include}}` beside a SUMMARY row; the pages' relative
+  the `MANUAL.md` links in the per-tool READMEs stay
+  disk-true (the book page is the reader's route).
 
 ### CROSS-TOOL
 
@@ -741,7 +747,7 @@ re-open — is the history half:
   (dashboard, the generic docker envs retired) — since retired by the
   bare-name wave (the record above); with the one short `*_CTL` form for the
   control port; the constants audit put `log_levels` in every tool's
-  `lib/static.json` (and the metrics-endpoint defaults on the dashboard),
+  `lib/statics.py` / `lib/defaults.json` (and the metrics-endpoint defaults on the dashboard),
   and the scraper's register map now lives in the device profile alone —
   the register/scale knobs are gone and `set modbus profile` swaps the map
   live (a bad profile rolls back).
@@ -794,12 +800,10 @@ re-open — is the history half:
   mutual-exclusion error). (Since retired by the `-file` sibling
   removal: there are no `*_FILE` twins — `file:<path>` inside the plain
   token value is the one spelling.)
-- **the man pages** — one roff page per tool in each subproject's `man/`
-  (`man/` per subproject; 13 pages: the three cache binaries,
-  the three inverter binaries, the three scraper binaries and the
-  dashboard server + its two clients), installed by the Nix
+- **the man pages** — one roff page per binary under `apps/<tool>/man/`
+  (eight pages: each tool's daemon + its cli), installed by the Nix
   packages (`share/man/man1/`) and linted with `mandoc -Tlint`.
-- **the demo stack, the Modbus chain** — `docker/compose.yaml`: the three
+- **the demo stack, the Modbus chain** — `docker/demo/compose.yaml`: the three
   alpine images (one Dockerfile per tool, unprivileged `pvsuite`, tools on
   `PATH`), the shared external `config` volume seeded by `entrypoint.sh`
   (bundled defaults copied in, existing files kept), the profiles +

@@ -3,12 +3,12 @@
 # /prom. Runs as the unprivileged user `pvsuite`; the entrypoint is the
 # shared one (seed the config volume, then su-exec).
 #
-# Build (the context = ../dashboard, the entrypoint + common = the named contexts;
+# Build (the context = ../apps/dashboard, the entrypoint + common = the named contexts;
 # the entrypoint lives at docker/entrypoints/entrypoint.sh):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.dashboard -t dashboard \
 #       --build-context scripts=../docker --build-context common=../common \
-#       --build-context shared=../shared ../dashboard
+#       --build-context shared=../shared ../apps/dashboard
 #   # or: docker compose up -d dashboard
 #
 # Run:

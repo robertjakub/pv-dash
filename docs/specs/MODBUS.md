@@ -398,8 +398,8 @@ serves `1` when the scaled value is nonzero; the decode divides by the
 gain).
 
 Device register maps live in `shared/profiles/*.json`
-(`sun2000.json`, `demo-fc4.json`, `deye-sg03lp1.json`,
-`deye-sg04lp3.json`, `deye-sg05lp3.json`); the schema is
+(`sun2000.json`, `sun2000_full.json`, `demo-fc4.json`,
+`deye-sg03lp1.json`, `deye-sg04lp3.json`, `deye-sg05lp3.json`); the schema is
 `shared/profiles/README.md`. Per entry: `name`, `register`, `type`, optional
 `fc` — word types `3` (default) or `4`, `bit` entries `1` (default) or
 `2` — optional per-entry `ttl`, `scale`, `desc`. A
@@ -432,7 +432,7 @@ no knob.
 | `max_pdu` | 253 | 253 | 253 |
 | `max_count` | 125 | 125 | 125 |
 | register space | 65536 | 65536 | 65536 |
-| unit id | 1..247, validated at start (`modbus unit`) | 1..247, validated at start (`modbus unit`) | 1 default, 1..247 validated at start (`--modbus-unit`) |
+| unit id | 1..247, validated at start (`modbus unit`) | 1..247, validated at start (`modbus unit`) | 1 default, 1..247 validated at start (`--unit`) |
 | socket timeout | 3.0 s (`modbus timeout`) | 3.0 s (`modbus timeout`) | — |
 | client idle timeout | 300 s (`limits client-timeout`) | — | 300 s (`client-timeout`) |
 | max clients | 64 (`limits max-clients`) | — | 64 (`max-clients`) |
@@ -474,7 +474,7 @@ either way).
 | `modbus-auth-upstream` | `--modbus-auth-upstream suite\|waveshare\|none` | `MODBUS_UPSTREAM_AUTH` | `modbus auth-upstream` | cache |
 | `modbus-auth-upstream-key` *(secret)* | `--modbus-auth-upstream-key` | `MODBUS_UPSTREAM_AUTH_KEY` | `modbus auth upstream-key` | cache |
 | `upstream` | `--upstream HOST:PORT` | `UPSTREAM` | `modbus upstream` | cache, scraper |
-| `modbus-unit` | `--modbus-unit` | `MODBUS_UNIT` | `modbus unit` | cache, scraper, fake (flag only) |
+| `modbus-unit` | `--modbus-unit` | `MODBUS_UNIT` | `modbus unit` | cache, scraper (the fake's knob is `unit` / `--unit`) |
 | `modbus-timeout` | `--modbus-timeout` | `MODBUS_TIMEOUT` | `modbus timeout` | cache, scraper |
 | `offset` | `--modbus-offset` | `MODBUS_OFFSET` | `modbus offset` | scraper |
 | `allow-write` | `--allow-write` | `ALLOW_WRITE` | `write allow` | cache, fake |

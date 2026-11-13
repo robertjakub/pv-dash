@@ -2,12 +2,12 @@
 # Runs as the unprivileged user `pvsuite`; the profiles come from the shared
 # build context (shared/profiles/).
 #
-# Build (the context = ../inverter, the entrypoint
+# Build (the context = ../apps/inverter, the entrypoint
 # = ../docker/entrypoints, the shared code = ../common):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-fake-inverter -t modbus-fake-inverter \
 #       --build-context shared=../shared \
-#       --build-context scripts=../docker --build-context common=../common ../inverter
+#       --build-context scripts=../docker --build-context common=../common ../apps/inverter
 #   # or: docker compose up -d
 #
 # Run:

@@ -80,14 +80,15 @@ grep -rhE '^import |^from ' --include='*.py' common apps/cache apps/inverter app
 
 # the container layer
 docker build -t pv-sbom-check \
-    --build-context scripts=../docker --build-context common=../common ../cache   # or the others
+    --build-context shared=../shared --build-context common=../common \
+    --build-context examples=../extras/examples ../apps/cache   # or the others (run from docker/)
 docker run --rm pv-sbom-check sh -c 'apk info -v | sort'                          # the apk set
 
 # the nix pin
 cat flake.lock
 
 # the vendored exception
-head -c 400 dashboard/static/vendor/echarts.min.js                            # the Apache-2.0 notice
+head -c 400 apps/dashboard/static/vendor/echarts.min.js                  # the Apache-2.0 notice
 ```
 
 For the NIS2/DORA supply-chain rows: the suite's "known-vulnerabilities"

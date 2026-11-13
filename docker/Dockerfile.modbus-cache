@@ -2,14 +2,14 @@
 # Runs as the unprivileged user `pvsuite`; the profiles come from the shared
 # build context (shared/profiles/).
 #
-# Build (the context = ../cache, the entrypoint
+# Build (the context = ../apps/cache, the entrypoint
 # = ../docker/entrypoints, the shared code = ../common, the shared example
 # files = ../extras/examples):
 #   cd docker
 #   docker build -f ../docker/Dockerfile.modbus-cache -t modbus-cache \
 #       --build-context shared=../shared \
 #       --build-context examples=../extras/examples \
-#       --build-context scripts=../docker --build-context common=../common ../cache
+#       --build-context scripts=../docker --build-context common=../common ../apps/cache
 #   # or: docker compose up -d modbus-cache
 #
 # Run:

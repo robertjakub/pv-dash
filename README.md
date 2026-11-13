@@ -14,6 +14,7 @@ the Deye hybrids — packaged together as one Nix flake:
 | [`apps/scraper/`](apps/scraper/README.md) | `modbus-scraper` | Prometheus exporter for a Modbus TCP inverter (stdlib only) with a NixOS module |
 | [`apps/cache/`](apps/cache/README.md) | `modbus-cache` | **Experimental** Modbus TCP caching proxy that multiplexes the inverter's single client connection |
 | [`apps/inverter/`](apps/inverter/README.md) | `modbus-fake-inverter` | **Experimental** fake inverter + battery + smart meter for testing the stack without hardware — with a runtime control server, console-style CLI and chaos injection |
+| [`apps/modbus-replay/`](apps/modbus-replay/README.md) | `modbus-replay` | **Experimental** Modbus TCP capture/replay sidecar — dump the wire to a trace file, replay it: debug the poll planning, the write-through and the chaos behavior against real hardware traces without the hardware |
 | [`extras/`](extras/README.md) | — | The operator-side packs nothing in the suite loads: the alert rules (`alerts/`, one file per watched exporter), the shared sample files the tools' `file:` acl gates point at (`examples/` — `acl-ip-prefix.json`, [docs/specs/ACL.md](docs/specs/ACL.md)) and the Graylog content pack (`graylog/`) and the daemons' generated manuals (`manuals/`) |
 | [`shared/`](shared/README.md) | — | The family's shared data, outside every package — the device profiles ([`shared/profiles/`](shared/profiles/README.md), one JSON schema consumed by all three Modbus tools: `name → register/type/scale` with per-entry descriptions; ships `sun2000`, `sun2000_full`, `demo-fc4`, `deye-sg03lp1`, `deye-sg04lp3` and `deye-sg05lp3`, a linter and a formatter keep them in shape), `texts.json` (the static texts `common/render/texts.py`'s `T()` reads) and [`shared/schema/`](shared/schema/README.md) (the shared JSON Schemas, draft 2020-12 — `acl-ip-prefix.schema.json`, the standalone acl file's schema (the loader stays the strict word)) |
 | [`common/`](common/README.md) | — | The shared stdlib-only Python package (imported as `common`), six functional subpackages: `render/` (texts, man pages), `runtime/` (daemon ladder, audit, version), `settings/` (the option registry — one knob, one source — config plumbing, dumps), `wire/` (the signed wire + RBAC, both ctl/cli ends), `serve/` (the gates + metrics skeleton), `modbus/` (the wire core) |
@@ -59,7 +60,9 @@ pv-suite/
 │   ├── dashboard/  #   the dashboard web UI + proxy server
 │   ├── scraper/    #   modbus-scraper exporter
 │   ├── cache/      #   modbus-cache proxy
-│   └── inverter/   #   fake inverter + control clients (test/demo tool)
+│   ├── inverter/   #   fake inverter + control clients (test/demo tool)
+│   └── modbus-replay/  #   the capture/replay sidecar (debug tool — no control
+│                   #   plane, no container, no package)
 ├── nixos/        # the Nix tree: the packages (pkgs/<tool>/), the service
 │                 #   modules (modules/<tool>.nix) and the [Nix reference](nixos/README.md)
 ├── shared/       # the family's shared data: profiles/, schema/, suite/ ([docs](shared/README.md))
@@ -105,18 +108,19 @@ marker for their legs.
 
 ```bash
 dev/battery/battery.py                    # the commit loop: the fast set, the fuzz budgets at 100 (~3 min)
-dev/battery/battery.py quick              # all ten, the fuzz budgets at 300 (~3 min) — the pre-push loop
-dev/battery/battery.py full               # all ten, the suite defaults — the nightly
-dev/battery/battery.py cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, common likewise
+dev/battery/battery.py quick              # all eleven, the fuzz budgets at 300 (~3 min) — the pre-push loop
+dev/battery/battery.py full               # all eleven, the suite defaults — the nightly
+dev/battery/battery.py cache              # the cache's commit set (~5 min); scraper, inverter, dashboard, replay, common likewise
 dev/battery/battery.py control-fuzz       # named suite(s) — e.g. the one you are iterating on
 ```
 
-The ten suites (stdlib only, scratch ports, self-cleaning; each prints
+The eleven suites (stdlib only, scratch ports, self-cleaning; each prints
 ALL PASS or a FAILURES list):
 
 - `cache-regtest` — the cache: the full functional battery
 - `inverter-regtest` — the fake: the F11/F13 surface (client caps, timeouts, per-IP, the count gate)
 - `scrape-regtest` — the scraper + the fake's machines
+- `replay-regtest` — the sidecar: capture → the trace → byte-identical replay, the miss policies
 - `audit-chain` — the audit trails' hash chains + `dev/gates/audit_verify.py`
 - `cache-stress` — the cache: 100 clients / 15 s load
 - `cache-fuzz` [n] / `scrape-fuzz` [n] — n hostile client / HTTP frames

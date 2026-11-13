@@ -1,8 +1,11 @@
 # The suite's design (DESIGN.md)
 
-One product, four tools: the modbus-cache proxy, the modbus-scraper
-exporter, the modbus-fake-inverter and the dashboard — one shared core
-(`common/`), one control-wire grammar, one option registry per tool.
+One product, four tools plus a sidecar: the modbus-cache proxy, the
+modbus-scraper exporter, the modbus-fake-inverter and the dashboard —
+one shared core (`common/`), one control-wire grammar, one option
+registry per tool — and the modbus-replay sidecar, the debug
+instrument that captures/replays their Modbus wire (no control plane,
+no deployment shape; it rides the same registry/config/man ladder).
 This page is the map and the maintenance in one: the shape, every doc
 filed by grain (one home per story, the ledgers split current vs
 history), and the redo that keeps the doc set true — run it per wave,

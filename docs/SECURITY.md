@@ -243,7 +243,7 @@ the intended demo feature, gated by control-server access only.
   the session cookie, the `?auth=<token>` bootstrap), the default bind
   `127.0.0.1`, a token-less non-loopback bind refuses to start (F21).
 
-## 5. The four tools
+## 5. The five tools
 
 **modbus-cache** — the production-relevant surface. Modbus TCP as spoken by
 the SUN2000 inverter has no auth, no encryption and no access control:
@@ -280,6 +280,18 @@ read-count gate against oversized replies, the optional `--modbus-auth
 suite` handshake and the `--metrics-acl` IP gate for demos that want them.
 Synthetic data only — nothing served is measured from a real device; there
 is no PII and no production telemetry to protect.
+
+**modbus-replay** — the sidecar records the wire, so its data story is
+the trace file's: 0600 at rest, values and names included, and a
+Waveshare capture carries the gateway's connection password raw — treat
+a trace as a secret (it is a slice of the device's truth). The listen
+binds 127.0.0.1 by default; there is no control plane to authenticate,
+no audit trail (the trace IS the record) and no connection gating — no
+connect ACL, no client caps, only `--client-timeout` kicks the silent:
+any peer that can reach the port is served/piped, and a bind past
+loopback answers a five-line WARNING banner, not a refusal (the
+operator may genuinely want the share). A debug instrument: trusted
+LAN, next to the tools it debugs, never published.
 
 ## 6. Deployment hardening
 

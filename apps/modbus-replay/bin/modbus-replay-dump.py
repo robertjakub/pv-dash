@@ -39,8 +39,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(here))))   # 
 from lib.man import dump_page
 from lib.statics import DEFAULT_LISTEN_PORT
 from lib.trace import (HDR_HEAD, KIND_RAW_C2D, KIND_RAW_D2C, KIND_REQ,
-                       KIND_RSP, READ_FCS, TRACE_MAGIC, TraceIndex,
-                       TraceWriter, decode_record, describe_frame,
+                       KIND_RSP, TRACE_MAGIC, TraceIndex, TraceWriter,
+                       decode_record, describe_frame,
                        parse_binary_header)
 
 DEFAULT_FEED = '/tmp/modbus-replay-%d.socket' % DEFAULT_LISTEN_PORT
@@ -55,22 +55,55 @@ def stamp(ts):
                         round((ts % 1) * 1000) % 1000)
 
 
-def rsp_words(unit, pdu):
-    """The response's words for the answer-index line: the describe,
-    plus the read data's hex u16 words (capped) — the values the
-    device answered, the wire's own truth."""
-    words = describe_frame(unit, pdu, is_request=False)
-    if pdu and not pdu[0] & 0x80 and pdu[0] in READ_FCS and len(pdu) >= 2:
-        n = pdu[1]
-        data = pdu[2:2 + n]
-        count = len(data) // 2
-        if count:
-            shown = struct.unpack('>%dH' % count, data[:count * 2])
-            text = ' '.join('%04x' % w for w in shown[:8])
-            if count > 8:
-                text += ' …(%d more)' % (count - 8)
-            words += ': %s' % text
-    return words
+def value_lines(addr, data, cap=None):
+    """The values' dump: 8 hex words a line, each line prefixed with
+    its first register's address (the hexdump's shape — no per-word
+    prefixes); cap = the word cap for the conversations (None = the
+    full block, the answer index's render)."""
+    count = len(data) // 2
+    if not count:
+        return []
+    words = struct.unpack('>%dH' % count, data[:count * 2])
+    shown = list(words if cap is None else words[:cap])
+    lines = []
+    for i in range(0, len(shown), 8):
+        chunk = shown[i:i + 8]
+        lines.append('%d:  %s' % (addr + i, ' '.join('%04x' % w for w in chunk)))
+    if cap is not None and count > cap:
+        lines[-1] += '  …(+%d more)' % (count - cap)
+    return lines
+
+
+def value_block(req_pdu, rsp_pdu, cap=None):
+    """One exchange's value lines: a read's data words dumped
+    address-prefixed (FC3/FC4), a bits read's bit string (FC1/FC2 —
+    the wire's bit order, LSB first per byte), a block write's payload
+    (FC16 — the request's own words, the write-through debug's truth).
+    Empty for the shapes that carry no values (the echoes, the
+    exceptions)."""
+    if not rsp_pdu or rsp_pdu[0] & 0x80:
+        return []
+    fc = rsp_pdu[0]
+    if fc in (3, 4) and len(req_pdu) >= 5:
+        addr, _count = struct.unpack('>HH', req_pdu[1:5])
+        n = rsp_pdu[1] if len(rsp_pdu) >= 2 else 0
+        return value_lines(addr, rsp_pdu[2:2 + n], cap)
+    if fc in (1, 2) and len(req_pdu) >= 5:
+        addr, count = struct.unpack('>HH', req_pdu[1:5])
+        n = rsp_pdu[1] if len(rsp_pdu) >= 2 else 0
+        bits = ''.join(format(b, '08b')[::-1] for b in rsp_pdu[2:2 + n])[:count]
+        return ['%d..%d:  %s' % (addr, addr + count - 1, bits)]
+    if fc == 16 and len(req_pdu) >= 6:
+        addr, _count = struct.unpack('>HH', req_pdu[1:5])
+        n = req_pdu[5]
+        return value_lines(addr, req_pdu[6:6 + n], cap)
+    return []
+
+
+def block_under(lines):
+    """The block's lines as the indent under an exchange/index line."""
+    for line in lines:
+        print('      %s' % line)
 
 
 def frame_words(rec, is_request):
@@ -84,7 +117,8 @@ def frame_words(rec, is_request):
 def answer_index(idx):
     """The answer map: one line per unique (unit, request PDU) — the
     query, the recorded reply the replay will serve, the recorded
-    latency, the ask count. The winners stay the winners."""
+    latency, the ask count, the values dumped address-prefixed under
+    the line. The winners stay the winners."""
     print()
     n = len(idx.index)
     print('--- the answer index (%d unique quer%s) ---'
@@ -93,8 +127,9 @@ def answer_index(idx):
         unit, req_pdu = key
         print('%s -> %s  latency %gms  asked %dx'
               % (describe_frame(unit, req_pdu, is_request=True),
-                 rsp_words(unit, rsp_pdu), latency * 1000.0,
-                 idx.counts.get(key, 1)))
+                 describe_frame(unit, rsp_pdu, is_request=False),
+                 latency * 1000.0, idx.counts.get(key, 1)))
+        block_under(value_block(req_pdu, rsp_pdu))
 
 
 def conversations(idx):
@@ -139,6 +174,8 @@ def conversations(idx):
                 print('  #%d %s  req  %s  -> #%d  rsp  %s  %.1fms'
                       % (r['no'], when, frame_words(r, True), rsp_no,
                          frame_words(rsp, False), latency * 1000.0))
+                if len(r['raw']) >= 8 and len(rsp['raw']) >= 8:
+                    block_under(value_block(r['raw'][7:], rsp['raw'][7:], cap=16))
             elif r['kind'] == KIND_RSP:
                 if r['no'] not in rsp_targets:
                     print('  #%d %s  rsp  %s  (orphan — no request recorded)'
@@ -248,7 +285,7 @@ def live(sock_path):
             when = stamp(rec['ts'])
             if rec['kind'] == KIND_REQ:
                 words = frame_words(rec, True)
-                pending[rec['conn']] = (no, rec['ts'], words)
+                pending[rec['conn']] = (no, rec['ts'], words, rec['raw'])
                 print('  #%d %s  req  %s  (pending)' % (no, when, words))
             elif rec['kind'] == KIND_RSP:
                 req = pending.pop(rec['conn'], None)
@@ -259,6 +296,8 @@ def live(sock_path):
                 else:
                     latency = max(0.0, (rec['ts'] or 0.0) - (req[1] or 0.0))
                     print('  #%d %s  rsp  %s  (%.1fms)' % (no, when, words, latency * 1000.0))
+                    if len(req[3]) >= 8 and len(rec['raw']) >= 8:
+                        block_under(value_block(req[3][7:], rec['raw'][7:], cap=16))
             else:
                 print('  #%d %s  raw  %s (%d byte(s))'
                       % (no, when, rec['note'] or 'framing lost', len(rec['raw'])))

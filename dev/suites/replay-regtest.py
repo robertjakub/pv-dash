@@ -415,6 +415,8 @@ check('the answer index carries the query, the data words, the latency, the ask 
       'FC3 (read holding registers) unit 1 addr 32064 count 2 ->' in r.stdout
       and 'asked 1x' in r.stdout and 'latency' in r.stdout,
       next((l for l in r.stdout.splitlines() if '->' in l), '-')[:140])
+check('the values dump address-prefixed under the lines',
+      '32064:  ' in r.stdout, next((l for l in r.stdout.splitlines() if '32064:' in l), '-'))
 check('the conversations pair the exchange',
       'req  FC3 (read holding registers) unit 1 addr 32064 count 2' in r.stdout
       and 'rsp' in r.stdout and 'ms' in r.stdout,

@@ -120,6 +120,19 @@ values accept `true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`.
 | **Trace feed** | | |
 | `--trace-socket` | `none` | the record feed's unix socket: `default` = the derived `/tmp/modbus-cache-<listen-port>-trace.socket`, a path, or `none` = off; every wire record fans out to the connected `modbus-replay-dump --socket` (the same PVMB protocol modbus-replay's feed speaks); binds `0600`; live-settable (`set trace-socket`) |
 | `--trace-sources` | `all` | the wire voices the feed carries: `all`, `client` (the served answers + their provenance) or `upstream` (the poller's polls + the forwards) — whole voices on/off, never sampling; live-settable |
+
+The feed's records carry a `conn` id pairing each request with its reply,
+and the two wire faces count in **disjoint spaces**: the client face numbers
+its sessions from 1 (one id per client connection), the upstream face rides
+`100000 + <connection serial>` — so `conn=100001` is the device conversation's
+first incarnation, `conn=100002` the same after a reconnect. The split exists
+because a forwarded request keeps the client's own transaction id: one conn
+space would make the dump tool pair the device's reply with the client's
+request instead of keeping the two stories apart. The client face's records
+state the provenance in the `note` (`served from cache`, `forwarded — device
+reply`, `refused: …`, `diag registers`); the device's true bytes appear as
+the upstream conversation beside them, and the upstream auth handshake rides
+byte-less (`PVA1 handshake (bytes withheld)` — no proof, no password).
 | **Metrics** | | |
 | `--metrics-server` | off | serve the cache's own Prometheus `/metrics` endpoint — live-settable (`set metrics enable on/off`); **refuses to start beyond loopback without `--metrics-token`** (F13) |
 | `--metrics-listen` | `127.0.0.1:9351` | the metrics bind address (`0.0.0.0:PORT` = every interface, token mandatory beyond loopback) |

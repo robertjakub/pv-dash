@@ -13,15 +13,16 @@ file.
 
 The control server is a JSON-lines listener: a unix socket (the default
 `/tmp/fake-inverter-5502.socket`) or a TCP port on 127.0.0.1 — the
-`--control-port` flag, env `CTL`, `0` = off. Two clients speak it:
+`--control-port` flag, env `CTL`, `0` = off. One client speaks it — the
+**cli**, one-shot words, piped batch or the console:
 
-    python3 bin/modbus-fake-ctl.py --control-port 15599 show registers
+    python3 bin/modbus-fake-cli.py --control-port 15599 show registers
     python3 bin/modbus-fake-cli.py
 
-- the **ctl** runs one command per invocation (or a batch on stdin);
-- the **cli** is the interactive console: `?` lists the words, TAB completes,
-  `help <setting>` describes one, `help config` maps every knob to its control
-  command, `show knobs` prints the dictionary.
+- the one-shot spelling runs one command per invocation (or a batch on stdin);
+- the **console** is the interactive session: `?` lists the words, TAB
+  completes, `help <setting>` describes one, `help config` maps every knob to
+  its control command, `show knobs` prints the dictionary.
 
 The fake keeps its trusted-LAN posture (F11): control works over TCP without
 a token too; over the unix socket a trusted peer (root, the daemon's own
@@ -87,7 +88,7 @@ The kinds — every row of the tables below carries one:
 The tables spell the knob's registry key — the one internal name the wire,
 the replies and the dispatch take; the set / clear column spells the console
 words (the live path as words — the config files and the state dumps speak
-them; the flat registry name answers the same set everywhere, the ctls
+them; the flat registry name answers the same set everywhere, the clients
 translate). The namespaces group them.
 
 ### general

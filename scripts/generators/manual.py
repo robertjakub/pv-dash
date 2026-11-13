@@ -21,7 +21,7 @@ from lib.registry import folded as fold_rows, raw as raw_registry, wired
 # the daemons in the chain order the README tells: fake -> cache -> scraper,
 # then the dashboard that renders the numbers — the tool dir, the daemon
 # name, the bin whose --man carries the startup surface, the one-line
-# blurb, the ctl/cli bins, the default control socket, the ctl example
+# blurb, the cli bin, the default control socket, the one-shot example
 # (port + command, the bins' docstrings' own), whether TCP control refuses
 # to start without a token (F5; the fake is the F11 exempt) and the
 # bundled config script (the bundled sample's checkout path, examples/)
@@ -30,23 +30,23 @@ TOOLS = (
      'A dependency-free (Python stdlib only) Modbus TCP caching proxy for '
      'single-client devices: it polls the inverter once and serves every '
      'client from the cache.',
-     'modbus-cache-ctl', 'modbus-cache-cli', '/tmp/modbus-cache-15502.socket',
+     'modbus-cache-cli', '/tmp/modbus-cache-15502.socket',
      '15509', 'request flush cache', True, 'apps/cache/examples/modbus-cache.conf'),
     ('scraper', 'modbus-scraper', 'modbus-scraper',
      'A dependency-free (Python stdlib only) Prometheus exporter that polls '
      'a Modbus device and exposes the metrics at /metrics.',
-     'modbus-scraper-ctl', 'modbus-scraper-cli', '/tmp/modbus-scraper-9350.socket',
+     'modbus-scraper-cli', '/tmp/modbus-scraper-9350.socket',
      '15509', 'request poll now', True, 'apps/scraper/examples/modbus-scraper.conf'),
     ('inverter', 'fake-inverter', 'modbus-fake-inverter',
      'A dependency-free (Python stdlib only) Modbus TCP server that plays '
      'an inverter — the battery, the smart meter, the diagnostics — for '
      'the family to develop and test against.',
-     'modbus-fake-ctl', 'modbus-fake-cli', '/tmp/fake-inverter-5502.socket',
+     'modbus-fake-cli', '/tmp/fake-inverter-5502.socket',
      '15599', 'show registers', False, 'apps/inverter/examples/modbus-fake-inverter.conf'),
     ('dashboard', 'dashboard', 'dashboard',
      'A single-page dashboard for home PV monitoring, fed by Prometheus: '
      'it serves the page and proxies the upstream queries.',
-     'dashboard-ctl', 'dashboard-cli', '/tmp/dashboard-8080.socket',
+     'dashboard-cli', '/tmp/dashboard-8080.socket',
      '15598', 'request reload-config', True, 'apps/dashboard/examples/dashboard.conf'),
 )
 
@@ -154,7 +154,7 @@ def knob_row(opt):
     """One knob table row: the registry key, the console spelling a running
     daemon takes (the live path as words — the config files and the dumps
     speak it; the flat registry name answers the same set/clear/show words
-    on the wire and the ctls translate), the kind,
+    on the wire and the clients translate), the kind,
     the value shape, the flag / env twins and the description (the
     setting-help — the wire's own wording)."""
     set_cell = '—'
@@ -198,7 +198,7 @@ def knobs_section(rows):
                 'clear column spells the console words (the live path as '
                 'words — the config files and the state dumps speak them; '
                 'the flat registry name answers the same set everywhere, '
-                'the ctls translate). The namespaces group '
+                'the clients translate). The namespaces group '
                 'them.'), '']
     order = [''] + [n.name for n in nodes if n.name in buckets]
     by_name = {n.name: n for n in nodes}
@@ -278,7 +278,7 @@ def show_section(shows):
     return out
 
 
-def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
+def render(tool, daemon, daemon_bin, blurb, cli, sock, port, example,
            token_mandatory, conf, rows, shows, meta):
     """The page: the speaking-to-the-daemon intro (the clients, the token
     rules, the kinds legend), then the three tables — commands, knobs,
@@ -312,17 +312,18 @@ def render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example,
                      'without one.')
     w(wrap('The control server is a JSON-lines listener: a unix socket (the '
            'default `%s`) or a TCP port on 127.0.0.1 — the `--control-port` '
-           'flag, env `CTL`, `0` = off. Two clients speak it:' % sock))
+           'flag, env `CTL`, `0` = off. One client speaks it — the **cli**, '
+           'one-shot words, piped batch or the console:' % sock))
     w('')
-    w('    python3 bin/%s.py --control-port %s %s' % (ctl, port, example))
+    w('    python3 bin/%s.py --control-port %s %s' % (cli, port, example))
     w('    python3 bin/%s.py' % cli)
     w('')
-    w(bullet('the **ctl** runs one command per invocation (or a batch on '
-             'stdin);'))
-    w(bullet('the **cli** is the interactive console: `?` lists the words, '
-             'TAB completes, `help <setting>` describes one, `help config` '
-             'maps every knob to its control command, `show knobs` prints '
-             'the dictionary.'))
+    w(bullet('the one-shot spelling runs one command per invocation (or a '
+             'batch on stdin);'))
+    w(bullet('the **console** is the interactive session: `?` lists the '
+             'words, TAB completes, `help <setting>` describes one, '
+             '`help config` maps every knob to its control command, '
+             '`show knobs` prints the dictionary.'))
     w('')
     w(token)
     w('')
@@ -391,9 +392,9 @@ def raw_angle_guard(text, path):
 def main(argv):
     check = '--check' in argv
     drift = False
-    for tool, daemon, daemon_bin, blurb, ctl, cli, sock, port, example, token_mandatory, conf in TOOLS:
+    for tool, daemon, daemon_bin, blurb, cli, sock, port, example, token_mandatory, conf in TOOLS:
         rows, shows, meta = load(tool)
-        page = render(tool, daemon, daemon_bin, blurb, ctl, cli, sock, port,
+        page = render(tool, daemon, daemon_bin, blurb, cli, sock, port,
                       example, token_mandatory, conf, rows, shows, meta)
         raw_angle_guard(page, daemon)
         path = os.path.join(REPO, 'apps', tool, 'MANUAL.md')

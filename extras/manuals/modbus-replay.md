@@ -4,6 +4,34 @@ A dependency-free (Python stdlib only) Modbus TCP capture/replay sidecar: it
 pipes the wire to a trace file in capture mode and serves the trace in
 replay mode. Part of the pv-suite family.
 
+## The family
+
+- the replay is the debug sidecar: **it taps the chain's Modbus hops**
+  (capture — the wire keeps flowing, the trace grows beside it) **or stands in
+  for the device** (replay — the client debugs against the recorded hardware).
+
+    the device (the sun2000 — or the fake standing in)
+         |  Modbus TCP :502
+         v
+    modbus-cache :15502 ---- the one client slot, multiplexed
+         |
+         v
+    modbus-scraper :9350 /metrics
+         |
+         v
+    prometheus ---- the alert pack (extras/alerts/)
+         |
+         v
+    the dashboard :8080
+
+    modbus-replay rides beside any Modbus hop: the tap in capture,
+    the recorded device in replay, the dump tool rendering.
+
+- every hop is optional: the scraper can poll the device straight (no cache),
+  the dashboard can read a collector you already run, the fake can stand in
+  for the device — and the suite auth can run on either Modbus hop
+  independently (the peers must speak the same scheme with the same key).
+
 ## Run it
 
     # capture: the cache's polls to the real device, the wire to a trace
@@ -288,6 +316,31 @@ resolver's last rung after flag > env > config); the namespaces group them.
   subscribes the same way, so the cache's live wire records to a file with
   `--socket /tmp/modbus-cache-<listen-port>-trace.socket --record …`.
 
+## Deployment
+
+- none by design — the sidecar is a checkout tool: run it from a checkout
+  (`apps/modbus-replay/dev` is the launcher) or a plain `python3` line, next
+  to the tools it debugs. No container image, no Nix package, no NixOS module,
+  no service unit — a deployment would defeat the sidecar (it debugs
+  deployments, it is not one).
+
+## The docs map
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
+| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
+
 ## Source layout
 
 - `bin/modbus-replay.py` — the daemon (capture, pass-through, replay);
@@ -299,6 +352,30 @@ resolver's last rung after flag > env > config); the namespaces group them.
 - the sidecar is stdlib-only and shares no service packaging — no container
   image, no Nix package, no NixOS module; the family's `common/` package (the
   trace writer, the record encoding) is imported by path from the checkout.
+
+## Troubleshooting
+
+- **it will not start** — the bind failures and the flag refusals answer one
+  clean line + exit 1 (capture and replay are mutually exclusive, a knob
+  without its file refuses); `--help` and the man page carry the startup
+  surface.
+
+- **the trace looks torn** — a killed capture leaves a readable file: the walk
+  keeps what parsed and notes the loss (the section above); a mid-file CRC
+  failure resyncs at the next run header — the records between the tear and
+  the re-anchor are lost with the tear.
+
+- **replay answers exception 11** — a request the trace never recorded (the
+  miss): the log spells the request — that is the poll-planning debug;
+  `--replay-miss zero` keeps a changed poll plan running instead.
+
+- **the dump shows nothing on the live view** — the feed socket path is the
+  derived `/tmp/modbus-replay-<listen-port>.socket` (the cache's feed spells
+  its own); a slow subscriber is dropped by design, the file keeps every
+  record.
+
+- **deeper** — `--log-level DEBUG` logs the framing decisions; `SIGUSR2` dumps
+  the thread stacks.
 
 ## Testing
 

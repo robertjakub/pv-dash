@@ -3,6 +3,34 @@
 A single-page dashboard for home PV monitoring, fed by Prometheus: it serves
 the page and proxies the upstream queries. Part of the pv-suite family.
 
+## The family
+
+- the dashboard is the chain's face: **the browser's window onto the scraper's
+  numbers** — Prometheus behind it, the energy math in the page, the proxy
+  keeping the collector off the wire.
+
+    the device (the sun2000 — or the fake standing in)
+         |  Modbus TCP :502
+         v
+    modbus-cache :15502 ---- the one client slot, multiplexed
+         |
+         v
+    modbus-scraper :9350 /metrics
+         |
+         v
+    prometheus ---- the alert pack (extras/alerts/)
+         |
+         v
+    the dashboard :8080
+
+    modbus-replay rides beside any Modbus hop: the tap in capture,
+    the recorded device in replay, the dump tool rendering.
+
+- every hop is optional: the scraper can poll the device straight (no cache),
+  the dashboard can read a collector you already run, the fake can stand in
+  for the device — and the suite auth can run on either Modbus hop
+  independently (the peers must speak the same scheme with the same key).
+
 ## Run it
 
     python3 bin/dashboard.py                          # upstream http://localhost:9090
@@ -85,6 +113,12 @@ the page and proxies the upstream queries. Part of the pv-suite family.
     python3 bin/dashboard-cli.py
 
 - the one-shot spelling runs one command per invocation (or a batch on stdin).
+
+- the wire is **JSON lines**: one request per line, one reply per line — the
+  reply's `status` face speaks `ok` / `fail` / `bye` (the closing) with a
+  `note` where the row says one; the `auth` verb carries the token, and a
+  signed wire authenticates each frame with an HMAC mac (the audit lines carry
+  it beside the command).
 
 - the **console** is the interactive session: `?` lists the words, TAB
   completes, `help <setting>` describes one, `help config` maps every knob to
@@ -403,16 +437,37 @@ the state dump: the live overrides' file, the restore-on-start
   spelled is the remote-only mode, and `--no-audit-log` disables entirely.
   Rotation: `--audit-max-mb`, `--audit-daily`, `--audit-files`.
 
-- `--audit-forward` mirrors every line — the per-writer hash chain included —
-  onward: `syslog`, `syslog:/path`, `udp://host[:514]` or `tcp://host[:514]`
-  (the off-box copy, the F10 answer); the envelope rides
-  `--audit-forward-format` (`rfc5424` the default, or `cef`).
+- `--audit-forward` mirrors every line — the hash chain included — onward:
+  `syslog` (the local socket auto-scan), `syslog:/path` (an explicit socket),
+  `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]` (RFC6587
+  octet-count framing) — the **off-box copy**: an edited local trail breaks
+  its chain, and a scheduled search at the collector can chain-verify the
+  extracted prefix/chain fields and alert on a break; a line that left the box
+  before an attacker arrived cannot be touched from it.
 
-- the wire commands (with their peer and mac), the auth failures and the
-  request accounting ride the trail; the 12-hex chained hash per entry is
-  verified by `dev/gates/audit_verify.py` — any edit, deletion or reordering
-  shows up as a chain break. The writer is named by `--audit-instance` (the
-  control port when unset).
+- the remote envelope rides `--audit-forward-format` (`rfc5424`, the default,
+  or `cef` — the local syslog forms keep the verbatim send). A send failure
+  notes once on stderr and the next event re-arms (the note carries the
+  dropped count).
+
+- `--audit-log none` turns the local file off: with a forward spelled that is
+  the **remote-only mode** (the collector is the sole holder — no file, no XDG
+  directory, the chain reseeds at GENESIS per run), without one the audit is
+  disabled (the state `--no-audit-log` spells).
+
+- the line names its writer — the daemon the `tag=daemon` role, the ctl and
+  cli clients the shared `tag=cli` role — and carries an `instance=<id>` word:
+  the **control port** when `--audit-instance` is unset (unique per host by
+  construction), the override when spelled. Keep an override unique among
+  everything that shares one collector; the chain groups by the (application,
+  writer, instance) triple.
+
+- the 12-hex token after the event name is the entry's **chained hash** (the
+  audit's F10): any edit, deletion or reordering shows up as a chain break in
+  `dev/gates/audit_verify.py` (run it on a trail file, the family's XDG
+  trails, or a journald dump on stdin). **Every wire command is audited once,
+  by the server** (with the client peer, the role, and the frame's mac when
+  the wire is signed).
 
 ## Register maps
 
@@ -420,6 +475,40 @@ the state dump: the live overrides' file, the restore-on-start
   renders Prometheus series. The metric selectors live in `config.js` (its own
   section below); the registers themselves are the scraper's and the cache's
   business.
+
+## Deployment
+
+- **NixOS** — the module `nixos/modules/dashboard.nix` renders the server as a
+  hardened service (the options mapped in `docs/NIXOS.md`): the listen, the
+  upstream, the page token (`*File`), `staticDir` and `solarConfig` ride the
+  module — the static assets can ship straight from the store.
+
+- **containers** — `docker/Dockerfile.dashboard`, the demo compose stack (the
+  dashboard + prometheus + the scraper) and the prod split beside it
+  (`docker/README.md`); the env file (`docker/env/dashboard.env.example`)
+  carries the bind, the upstream and the page token.
+
+- **static-only** — any web server works (`python3 -m http.server 8080 -d static`):
+  set `prometheusUrl` to the direct Prometheus URL and allow the CORS — the
+  control plane and the audit are a `dashboard.py` feature (the static face
+  alone has neither).
+
+## The docs map
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
+| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
 
 ## Source layout
 
@@ -434,6 +523,27 @@ the state dump: the live overrides' file, the restore-on-start
 - the shared machinery lives in the suite's `common/` package (the control
   spine, the audit, the manpage generator) and `shared/` (the texts, the
   schemas) — `lib/` imports it by path; nothing is packaged separately.
+
+## Troubleshooting
+
+- **the page says DEMO DATA** — Prometheus is unreachable from the server:
+  check `--prom-url` / `PROM_URL` (the proxy targets it, not the browser —
+  unless `config.js` names a direct URL, which then needs the CORS).
+
+- **the page boots with defaults** — `/config.js` 404ed: the `--config-js`
+  override file is missing (the section above); the fuzz pin guarantees a
+  bogus override never crashes the server.
+
+- **the auth dance fails** — the `?auth=<token>` exchange sets the session
+  cookie once; a rejected exchange means the token mismatched (the audit trail
+  carries the auth failure), scripts must send `Authorization: Bearer` on
+  every request.
+
+- **connections dropped** — the caps (`--max-clients`, `--max-conn-per-ip`)
+  refuse and log beyond their limits; the /metrics pair has its own two.
+
+- **deeper** — `--log-level DEBUG`, `SIGUSR2`'s thread stacks, the audit trail
+  chain-verifying with `dev/gates/audit_verify.py`.
 
 ## Testing
 

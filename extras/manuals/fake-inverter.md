@@ -4,6 +4,34 @@ A dependency-free (Python stdlib only) Modbus TCP server that plays an
 inverter — the battery, the smart meter, the diagnostics — for the family to
 develop and test against. Part of the pv-suite family.
 
+## The family
+
+- the fake stands in for the device: **the whole chain debugs against it
+  without hardware** — the scraper polls it, the cache fronts it, the replay
+  captures and replays it, the suites start it automatically.
+
+    the device (the sun2000 — or the fake standing in)
+         |  Modbus TCP :502
+         v
+    modbus-cache :15502 ---- the one client slot, multiplexed
+         |
+         v
+    modbus-scraper :9350 /metrics
+         |
+         v
+    prometheus ---- the alert pack (extras/alerts/)
+         |
+         v
+    the dashboard :8080
+
+    modbus-replay rides beside any Modbus hop: the tap in capture,
+    the recorded device in replay, the dump tool rendering.
+
+- every hop is optional: the scraper can poll the device straight (no cache),
+  the dashboard can read a collector you already run, the fake can stand in
+  for the device — and the suite auth can run on either Modbus hop
+  independently (the peers must speak the same scheme with the same key).
+
 ## Run it
 
     python3 apps/inverter/bin/modbus-fake-inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
@@ -34,8 +62,8 @@ develop and test against. Part of the pv-suite family.
 
 - the fake ships as an alpine container — stdlib-only, no pip, running as the
   unprivileged `pvsuite` user with the tools on `PATH`
-  (`Dockerfile.fake-inverter` + `compose.yaml`; see `docker/README.md`). The
-  image loads its own bundled conf
+  (`docker/Dockerfile.modbus-fake-inverter` + `compose.yaml`; see
+  `docker/README.md`). The image loads its own bundled conf
   (`/pv-suite/inverter/modbus-fake-inverter.conf`, the built-in `--config`
   target) — the env file and the CMD flags override it. The version reports as
   `0.5.1` inside the image (no git metadata; a checkout shows `0.5.1-<short git>`).
@@ -112,6 +140,12 @@ develop and test against. Part of the pv-suite family.
     python3 bin/modbus-fake-cli.py
 
 - the one-shot spelling runs one command per invocation (or a batch on stdin).
+
+- the wire is **JSON lines**: one request per line, one reply per line — the
+  reply's `status` face speaks `ok` / `fail` / `bye` (the closing) with a
+  `note` where the row says one; the `auth` verb carries the token, and a
+  signed wire authenticates each frame with an HMAC mac (the audit lines carry
+  it beside the command).
 
 - the **console** is the interactive session: `?` lists the words, TAB
   completes, `help <setting>` describes one, `help config` maps every knob to
@@ -418,39 +452,46 @@ the state dump: the live overrides' file, the restore-on-start
   restores the configured value); the env twins spell the same names
   upper-snake.
 
-- `--audit-forward` mirrors every line — the per-writer hash chain included —
-  onward: `syslog` (the local socket auto-scan), `syslog:/path` (an explicit
-  socket), `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]`
-  (RFC6587 framing) — the **off-box copy** beside the file/stdout sink (the
-  F10 answer); the remote envelope rides `--audit-forward-format` (`rfc5424`,
-  the default, or `cef`), a send failure notes once and the next event
-  re-arms.
+- `--audit-forward` mirrors every line — the hash chain included — onward:
+  `syslog` (the local socket auto-scan), `syslog:/path` (an explicit socket),
+  `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]` (RFC6587
+  octet-count framing) — the **off-box copy**: an edited local trail breaks
+  its chain, and a scheduled search at the collector can chain-verify the
+  extracted prefix/chain fields and alert on a break; a line that left the box
+  before an attacker arrived cannot be touched from it.
+
+- the remote envelope rides `--audit-forward-format` (`rfc5424`, the default,
+  or `cef` — the local syslog forms keep the verbatim send). A send failure
+  notes once on stderr and the next event re-arms (the note carries the
+  dropped count).
 
 - `--audit-log none` turns the local file off: with a forward spelled that is
-  the **remote-only mode** (the collector is the sole holder, the chain
-  reseeds at GENESIS per run), without one the audit is disabled (the state
-  `--no-audit-log` spells).
+  the **remote-only mode** (the collector is the sole holder — no file, no XDG
+  directory, the chain reseeds at GENESIS per run), without one the audit is
+  disabled (the state `--no-audit-log` spells).
 
-- the line names its writer — the fake `application=INV tag=daemon`, the ctl
-  and cli clients the shared `application=INV tag=cli` role — and carries an
-  `instance=<id>` word naming the writer daemon: the **control port** when
-  `--audit-instance` is unset (unique per host by construction), the override
-  when spelled. Keep an override unique among everything that shares one
-  collector — the native line and CEF carry no hostname, so pooled trails name
-  their instances apart; the chain groups by the triple.
+- the line names its writer — the daemon the `tag=daemon` role, the ctl and
+  cli clients the shared `tag=cli` role — and carries an `instance=<id>` word:
+  the **control port** when `--audit-instance` is unset (unique per host by
+  construction), the override when spelled. Keep an override unique among
+  everything that shares one collector; the chain groups by the (application,
+  writer, instance) triple.
+
+- the 12-hex token after the event name is the entry's **chained hash** (the
+  audit's F10): any edit, deletion or reordering shows up as a chain break in
+  `dev/gates/audit_verify.py` (run it on a trail file, the family's XDG
+  trails, or a journald dump on stdin). **Every wire command is audited once,
+  by the server** (with the client peer, the role, and the frame's mac when
+  the wire is signed).
 
     2026-11-03T20:10:06Z AUDIT application=INV tag=daemon instance=15991 type=start hash=3f9a21c04de7 version=0.5.1 modbus=127.0.0.1:5502 control=127.0.0.1:15991 profile=sun2000 description='…'
     2026-11-03T20:10:07Z AUDIT application=INV tag=daemon instance=15991 type=command hash=9c41e2b7a058 peer=127.0.0.1:54425 cmd='set soc 40' result=ok
     2026-11-03T20:10:08Z AUDIT application=INV tag=daemon instance=15991 type=reset hash=77b0c4e19d23 signal=SIGUSR1 pins=1 coils=0 overlay=0
     2026-11-03T20:10:08Z AUDIT application=INV tag=daemon instance=15991 type=shutdown hash=5e2af8c30b61 reason=SIGTERM-received uptime=2s conns=0 requests=0 chaos_hits=0
 
-- the 12-hex token after the event name is the entry's **chained hash** (the
-  audit's F10): any edit, deletion or reordering shows up as a chain break in
-  `dev/gates/audit_verify.py`. **Every wire command is audited once, by the
-  server** (with the peer, the role, the mac); the clients audit their session
-  and the local-only events; the fake logs its lifecycle (`START`, `RELOAD`,
-  `RESET`, `SHUTDOWN`). ping/pong keepalives are never logged; the file is
-  flushed per event.
+- the clients audit their session and the local-only events; the fake logs its
+  lifecycle (`START`, `RELOAD`, `RESET`, `SHUTDOWN`); ping/pong keepalives are
+  never logged; the file is flushed per event.
 
 ## Register maps (the profile)
 
@@ -493,6 +534,19 @@ the state dump: the live overrides' file, the restore-on-start
   it exists so the scraper's `scraper_cache_*` auto-detection can be exercised
   without a cache. The only address range the fake hardcodes.
 
+## Deployment
+
+- **containers** — the fake's deployment is the alpine image
+  (`docker/Dockerfile.modbus-fake-inverter`): stdlib-only, the unprivileged
+  `pvsuite` user, the bundled conf as the default `--config` target; the demo
+  compose stack runs it beside the cache and the scraper (`docker/README.md`),
+  the env file (`docker/env/modbus-fake-inverter.env.example`) and the CMD
+  flags carry the shape.
+
+- **NixOS** — no service module for the fake by design (a test tool does not
+  ship as infrastructure); point `--modbus-profile` at a `shared/profiles/`
+  copy and run it from the checkout or the container.
+
 ## Chaos injection (`--chaos`)
 
 - `--chaos 0.4` (probability, `--seed` for reproducibility) makes the fake
@@ -503,6 +557,23 @@ the state dump: the live overrides' file, the restore-on-start
 - unlike the regression suites' scripted EvilInverter this runs unattended:
   point the scraper at it and watch `scraper_modbus_errors_total` climb while
   `scraper_up` flips, with the fake never dying. Tune or disable live (`set chaos off`).
+
+## The docs map
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
+| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
 
 ## Source layout
 
@@ -516,6 +587,25 @@ the state dump: the live overrides' file, the restore-on-start
   spine, the Modbus server, the audit, the manpage generator) and `shared/`
   (the texts, the schemas, the profiles) — `lib/` imports it by path; nothing
   is packaged separately.
+
+## Troubleshooting
+
+- **errors climbing on the scraper** — with `--chaos` on that is the fake
+  working as intended: `scraper_modbus_errors_total` climbs while `scraper_up`
+  flips and the fake never dies; tune or disable live (`set chaos off`,
+  `--seed` pins a run).
+
+- **reads answer yesterday's writes** — the write overlay: register/coil
+  writes stick until `reset` (or `SIGUSR1`, or the shutdown) — the audit
+  trail's `type=reset` event names what was dropped.
+
+- **a pin refuses at start** — the demo machines are runtime set words: the
+  config file and the flags carry the registry knobs only; drive the pins over
+  the control wire.
+
+- **deeper** — `--log-level DEBUG` logs every frame both ways; `SIGUSR2` dumps
+  the thread stacks; the audit trail chain-verifies with
+  `dev/gates/audit_verify.py`.
 
 ## Testing
 

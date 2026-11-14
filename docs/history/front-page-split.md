@@ -84,47 +84,57 @@ five READMEs; `check_options` ALL PASS with the manual flag gate; the
 drift doc regenerated current; the lint-gates battery **ALL PASS**
 (Nov 14, `dev/battery/battery.py lint-gates`, 1/1).
 
-## Appendix — the five manuals' ladders (the Nov 14 survey)
+## Appendix — the five manuals' ladders (the Nov 14 survey, the full-documentation expansion)
 
 The one-ladder rule as shipped — every page's heading chain, the Knobs'
 `###` namespaces beside (no H4 ships anywhere: the knob tables carry the
 rows, the namespaces are the last heading level):
 
-- **modbus-cache** — Run it · How it works · The control plane · Commands ·
-  Knobs (general, acl, modbus, system, control, control/ops, metrics,
-  metrics/limits, audit, audit/rotate, dump, trace, limits, write) ·
-  Show reports · Signals · Configuration · Runtime control · Access
-  control · Metrics · Audit logging · Register maps · Persistence · Trace
-  feed · Source layout · Testing
-- **modbus-scraper** — Run it · How it works · The control plane ·
-  Commands · Knobs (modbus, metrics, modbus/caps, system, metrics/limits,
-  control, control/ops, metrics/auth, audit, audit/rotate, dump) · Show
-  reports · Signals · Configuration · Runtime control · Access control ·
-  Metrics · Alerting · Battery · Audit logging · Register maps (the
-  register defaults) · Register maps and the metrics spec · Source layout ·
+- **modbus-cache** — The family · Run it · How it works · The control
+  plane · Commands · Knobs (general, acl, modbus, system, control,
+  control/ops, metrics, metrics/limits, audit, audit/rotate, dump, trace,
+  limits, write) · Show reports · Signals · Configuration · Runtime
+  control · Access control · Metrics · Tuning · Audit logging · Register
+  maps · Diagnostics registers · Persistence · Trace feed · Deployment ·
+  The docs map · Source layout · Troubleshooting · Testing
+- **modbus-scraper** — The family · Run it · How it works · The control
+  plane · Commands · Knobs (modbus, metrics, modbus/caps, system,
+  metrics/limits, control, control/ops, metrics/auth, audit, audit/rotate,
+  dump) · Show reports · Signals · Configuration · Runtime control ·
+  Access control · Metrics · Alerting · Battery · Tuning · Audit logging ·
+  Register maps (the register defaults) · Register maps and the metrics
+  spec · Deployment · The docs map · Source layout · Troubleshooting ·
   Testing
-- **fake-inverter** — Run it · How it works · The control plane · Commands ·
-  Knobs (general, system, modbus, write, control, control/ops, metrics,
-  audit, audit/rotate, dump) · Show reports · Signals · Configuration ·
-  Runtime control · Access control · Metrics · Audit logging · Register
-  maps (the profile) · Served registers (the default profile) · Chaos
-  injection (`--chaos`) · Source layout · Testing
-- **dashboard** — Run it · How it works · The control plane · Commands ·
-  Knobs (general, system, auth, control, control/ops, metrics, audit,
-  audit/rotate, dump) · Show reports · Configuration · Page configuration
-  (config.js) · Runtime control · Access control · Behind a reverse proxy ·
-  Metrics · Audit logging · Register maps · Source layout · Testing
-- **modbus-replay** — Run it · How it works · Knobs (general) · Signals ·
-  Configuration · Runtime control · Access control · Metrics · Audit
-  logging · Register maps · The trace format · Replay mode · The record
-  feed and the dump tool · Source layout · Testing
+- **fake-inverter** — The family · Run it · How it works · The control
+  plane · Commands · Knobs (general, system, modbus, write, control,
+  control/ops, metrics, audit, audit/rotate, dump) · Show reports ·
+  Signals · Configuration · Runtime control · Access control · Metrics ·
+  Audit logging · Register maps (the profile) · Served registers (the
+  default profile) · Deployment · Chaos injection (`--chaos`) · The docs
+  map · Source layout · Troubleshooting · Testing
+- **dashboard** — The family · Run it · How it works · The control plane ·
+  Commands · Knobs (general, system, auth, control, control/ops, metrics,
+  audit, audit/rotate, dump) · Show reports · Configuration · Page
+  configuration (config.js) · Runtime control · Access control · Behind a
+  reverse proxy · Metrics · Audit logging · Register maps · Deployment ·
+  The docs map · Source layout · Troubleshooting · Testing
+- **modbus-replay** — The family · Run it · How it works · Knobs
+  (general) · Signals · Configuration · Runtime control · Access control ·
+  Metrics · Audit logging · Register maps · The trace format · Replay
+  mode · The record feed and the dump tool · Deployment · The docs map ·
+  Source layout · Troubleshooting · Testing
 
-The shared spine every ctl-tool page walks: Run it → How it works → The
-control plane → Commands → Knobs → Show reports → Signals → Configuration
-→ Runtime control → Access control → Metrics → Audit logging → Register
-maps → Source layout → Testing, with the tool's own extras slotted
-between (the ladder the `SECTION_ORDER` map in the generator enforces —
-an unknown title rides at the tail in its authored order).
+The shared spine every page walks: The family → Run it → How it works →
+[The control plane → Commands → Knobs → Show reports] → Signals →
+Configuration → Runtime control → Access control → Metrics → Audit
+logging → Register maps → Deployment → The docs map → Source layout →
+Troubleshooting → Testing, with the tool's own extras slotted between.
+Three stories are spliced from one source (`FAMILY_SPLICES` in the
+generator — told once, rendered everywhere): the audit-forward chain, the
+battery-runner rule, the docs map. The expansion recovered the split's
+one real loss (the cache's Diagnostics registers table, mined from the
+pre-split README) and added the operator sections the READMEs never had
+(The family, Tuning, Deployment, Troubleshooting).
 
 ## Not verified (the honest residue)
 

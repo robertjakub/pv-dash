@@ -30,7 +30,21 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   Security -> License, no other H2s, License closes; it globs
   `apps/*/README.md`, the sidecar included), `check_options`' flag gate
   reads the manual pages, the links gate skips the fifth generated page,
-  and the book's Manuals page gathers all five.
+  and the book's Manuals page gathers all five. The manuals then became
+  FULL documentation: one canonical ladder per page (`SECTION_ORDER` in
+  the generator — The family, Run it, How it works, The control plane,
+  the Commands/Knobs/Show-reports tables, Signals, Configuration,
+  Runtime control, Access control, Metrics, Audit logging, Register
+  maps, Tuning, Diagnostics registers, Deployment, The docs map, Source
+  layout, Troubleshooting, Testing, the tool's own extras beside, an
+  honestly-absent topic its one-line absence) — the family-wide stories
+  (the audit forward, the runner rule, the docs map) spliced from one
+  source, the cache's Diagnostics registers table recovered from the
+  pre-split README, the composition map and the links into
+  `docs/SECURITY.md` / `docs/specs/ACL.md` / `docs/specs/MODBUS.md` /
+  `docs/NIXOS.md` / `docker/README.md` riding every page, and the wave
+  record's appendix carrying the five pages' full heading survey
+  (docs/history/front-page-split.md).
 
 ### Added
 

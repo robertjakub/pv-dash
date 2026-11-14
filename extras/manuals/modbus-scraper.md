@@ -4,6 +4,34 @@ A dependency-free (Python stdlib only) Prometheus exporter that polls a
 Modbus device and exposes the metrics at /metrics. Part of the pv-suite
 family.
 
+## The family
+
+- the scraper is the chain's poller: **Modbus in, Prometheus out** — through
+  the cache (the usual shape: the cache multiplexes the device) or straight at
+  the device when nothing else shares it.
+
+    the device (the sun2000 — or the fake standing in)
+         |  Modbus TCP :502
+         v
+    modbus-cache :15502 ---- the one client slot, multiplexed
+         |
+         v
+    modbus-scraper :9350 /metrics
+         |
+         v
+    prometheus ---- the alert pack (extras/alerts/)
+         |
+         v
+    the dashboard :8080
+
+    modbus-replay rides beside any Modbus hop: the tap in capture,
+    the recorded device in replay, the dump tool rendering.
+
+- every hop is optional: the scraper can poll the device straight (no cache),
+  the dashboard can read a collector you already run, the fake can stand in
+  for the device — and the suite auth can run on either Modbus hop
+  independently (the peers must speak the same scheme with the same key).
+
 ## Run it
 
     python3 apps/scraper/bin/modbus-scraper.py --upstream 192.168.1.100:502
@@ -68,6 +96,12 @@ family.
     python3 bin/modbus-scraper-cli.py
 
 - the one-shot spelling runs one command per invocation (or a batch on stdin).
+
+- the wire is **JSON lines**: one request per line, one reply per line — the
+  reply's `status` face speaks `ok` / `fail` / `bye` (the closing) with a
+  `note` where the row says one; the `auth` verb carries the token, and a
+  signed wire authenticates each frame with an HMAC mac (the audit lines carry
+  it beside the command).
 
 - the **console** is the interactive session: `?` lists the words, TAB
   completes, `help <setting>` describes one, `help config` maps every knob to
@@ -422,6 +456,27 @@ the state dump: the live overrides' file, the restore-on-start
 
 - the fake inverter emulates the battery for testing: `python3 apps/inverter/bin/modbus-fake-inverter.py`.
 
+## Tuning
+
+- **the poll cadence** — `--modbus-interval` (the loop's sleep; the alert
+  thresholds assume the default 10s) and `--modbus-timeout` (the
+  per-transaction ceiling).
+
+- **the slow dongle** — `--modbus-merge-gap` widens the address gap that still
+  merges into one block read (fewer transactions per poll),
+  `--modbus-read-delay` paces them; `show uplink` renders the block plan and
+  its per-block latency — a stalled plan shows right there.
+
+- **the sanity caps** — `--max-kwp` / `--max-grid-kw` are the bad-data fence
+  (a reading above a cap answers HTTP 503 until a good poll, never silently
+  wrong numbers); size them to the array and the power line (`max-kwp` ≤
+  `max-grid-kw`, a startup warning otherwise).
+
+- **the exposition** — `--metrics-prefix` renames the family (`huawei_` the
+  default; the dashboard's `config.js` selectors must follow),
+  `--metrics-spec` renames/rewords the individual metrics without touching the
+  code.
+
 ## Audit logging
 
 - logging is `logging`-based with **UTC timestamps by default**
@@ -440,27 +495,37 @@ the state dump: the live overrides' file, the restore-on-start
   state home by default — `dev/gates/audit_verify.py` walks it like the
   others).
 
-- `--audit-forward` mirrors every line — the per-writer hash chain included —
-  onward: `syslog` (the local socket auto-scan), `syslog:/path` (an explicit
-  socket), `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]`
-  (RFC6587 framing) — the **off-box copy** (the F10 answer): a scheduled
-  search at the collector can chain-verify the extracted prefix/chain fields
-  and alert on a break.
+- `--audit-forward` mirrors every line — the hash chain included — onward:
+  `syslog` (the local socket auto-scan), `syslog:/path` (an explicit socket),
+  `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]` (RFC6587
+  octet-count framing) — the **off-box copy**: an edited local trail breaks
+  its chain, and a scheduled search at the collector can chain-verify the
+  extracted prefix/chain fields and alert on a break; a line that left the box
+  before an attacker arrived cannot be touched from it.
 
 - the remote envelope rides `--audit-forward-format` (`rfc5424`, the default,
-  or `cef` — the local forms keep the verbatim send). A send failure notes
-  once and the next event re-arms.
+  or `cef` — the local syslog forms keep the verbatim send). A send failure
+  notes once on stderr and the next event re-arms (the note carries the
+  dropped count).
 
 - `--audit-log none` turns the local file off: with a forward spelled that is
-  the **remote-only mode** (the collector is the sole holder, the chain
-  reseeds at GENESIS per run), without one the audit is disabled (the state
-  `--no-audit-log` spells).
+  the **remote-only mode** (the collector is the sole holder — no file, no XDG
+  directory, the chain reseeds at GENESIS per run), without one the audit is
+  disabled (the state `--no-audit-log` spells).
 
-- every line names its writer daemon in `instance=<id>` — the control port
-  when `--audit-instance` is unset (unique per host by construction), the
-  override when spelled; keep an override unique among everything that shares
-  one collector (the native line and CEF carry no hostname) — the chain groups
-  by the (application, writer, instance) triple.
+- the line names its writer — the daemon the `tag=daemon` role, the ctl and
+  cli clients the shared `tag=cli` role — and carries an `instance=<id>` word:
+  the **control port** when `--audit-instance` is unset (unique per host by
+  construction), the override when spelled. Keep an override unique among
+  everything that shares one collector; the chain groups by the (application,
+  writer, instance) triple.
+
+- the 12-hex token after the event name is the entry's **chained hash** (the
+  audit's F10): any edit, deletion or reordering shows up as a chain break in
+  `dev/gates/audit_verify.py` (run it on a trail file, the family's XDG
+  trails, or a journald dump on stdin). **Every wire command is audited once,
+  by the server** (with the client peer, the role, and the frame's mac when
+  the wire is signed).
 
 ## Register maps (the register defaults)
 
@@ -534,6 +599,39 @@ the state dump: the live overrides' file, the restore-on-start
     batt     [battery_net_watts]    Net battery power in watts (positive …
     pv       [pv_generation_watts]  PV input power in watts (the …
 
+## Deployment
+
+- **NixOS** — the module `nixos/modules/modbus-scraper.nix` renders the
+  exporter as a hardened service (the options mapped in `docs/NIXOS.md`, the
+  packaging in `nixos/README.md`); the rendered config validates with
+  `--dry-run` before a switch.
+
+- **containers** — `docker/Dockerfile.modbus-scraper`, the demo and prod
+  compose stacks beside it (`docker/README.md`); the env file
+  (`docker/env/modbus-scraper.env.example`) carries the bare upper-snake
+  twins.
+
+- **systemd (plain)** — run it behind journald (`--audit-log -`), the token as
+  a `LoadCredential=` file passed as `file:<path>` (the re-read on `SIGHUP` is
+  the rotation story).
+
+## The docs map
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
+| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
+
 ## Source layout
 
 - `bin/modbus-scraper.py` — the exporter; `bin/modbus-scraper-cli.py` — the
@@ -549,12 +647,37 @@ the state dump: the live overrides' file, the restore-on-start
   `shared/` (the texts, the schemas, the profiles) — `lib/` imports it by
   path; nothing is packaged separately.
 
+## Troubleshooting
+
+- **it will not start** — the bind failures and the config errors answer one
+  clean line + exit 1 (a non-loopback listen without `--auth-token` is the
+  usual one — the F13 floor); `--dry-run` prints the effective settings
+  without touching the ports.
+
+- **HTTP 503 on /metrics** — the sanity caps refusing the last poll (bad data
+  above `--max-kwp`/`--max-grid-kw`, a negative PV): the log names the
+  offending reading; the page returns with the next good poll — never silently
+  wrong numbers.
+
+- **the poll is failing** — `scraper_up == 0`, the error counter climbing, the
+  freshness gauge aging: the log names the Modbus exception code per failed
+  poll; `show uplink` splits a device stall from an outage (the per-block
+  latencies).
+
+- **deeper** — `--log-level DEBUG` logs every poll's transactions; `SIGUSR2`
+  dumps the thread stacks; the audit trail chain-verifies with
+  `dev/gates/audit_verify.py`.
+
 ## Testing
 
 - two standalone suites live in the suite root `dev/suites/` — stdlib only,
   each starts its own fake inverter + exporters on scratch ports and cleans up
   after itself. Every scenario must end with the exporter serving correct
   metrics and **zero tracebacks** in the logs.
+
+- the fake inverter is the suites' workhorse — its own subproject and manual
+  (`extras/manuals/fake-inverter.md`): the suites start it automatically;
+  point the scraper at it by hand to debug the poll loop hardware-free.
 
     dev/battery/battery.py scraper        # the scraper profile: the regtest, the fuzz, the
                                     #   audit chain (the suites refuse without the

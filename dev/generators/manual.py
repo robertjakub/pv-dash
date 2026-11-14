@@ -88,9 +88,15 @@ EXTRA_COMMANDS = {
 # the bracket/paren mix keeps the closes readable.
 REF = {
     'cache': {
+        'family': [
+            ('b', 'the cache is the chain\'s multiplexer: **one client slot '
+                  'at the device** (the inverter accepts one Modbus TCP '
+                  'client), any number of Modbus clients behind it — the '
+                  'scraper polls through it, the write tools and the debug '
+                  'sessions share the slot, the replay taps the hop.'),
+        ],
         'run': [
-            ('c', 'python3 apps/cache/bin/modbus-cache.py --upstream 192.168.1.100:5502\n'
-                  'python3 apps/scraper/bin/modbus-scraper.py --upstream :15502'),
+            ('c', 'python3 apps/cache/bin/modbus-cache.py --upstream 192.168.1.100:5502'),
             ('b', 'the proxy binds `127.0.0.1:15502` (loopback only) — '
                   '`--listen 0.0.0.0:15502` serves the LAN.'),
             ('b', '`--dry-run` validates the configuration and the register map '
@@ -408,39 +414,7 @@ REF = {
                       'logs / journald way — the NixOS module ships with it). '
                       'Rotation: `--audit-max-mb 10` (the default), '
                       '`--audit-daily` (UTC midnight), `--audit-files 3`.'),
-                ('b', 'the F10 answer is opt-in: `--audit-forward` mirrors every '
-                      'line — the hash chain included — onward: `syslog` (the '
-                      'local socket auto-scan), `syslog:/path` (an explicit '
-                      'socket), `udp://host[:514]` (RFC5426, best-effort) or '
-                      '`tcp://host[:514]` (RFC6587 octet-count framing) — the '
-                      '**off-box copy**: an edited local trail breaks its '
-                      'chain, and a scheduled search at the collector can '
-                      'chain-verify the extracted prefix/chain fields and alert '
-                      'on a break; a line that left the box before an attacker '
-                      'arrived cannot be touched from it.'),
-                ('b', 'the remote envelope rides `--audit-forward-format` '
-                      '(`rfc5424`, the default, or `cef` — the local syslog '
-                      'forms keep the verbatim send). A send failure notes once '
-                      'on stderr and the next event re-arms (the note carries '
-                      'the dropped count).'),
-                ('b', '`--audit-log none` turns the local file off: with a '
-                      'forward spelled that is the **remote-only mode** (the '
-                      'collector is the sole holder — no file, no XDG '
-                      'directory, the chain reseeds at GENESIS per run), '
-                      'without one the audit is disabled (the state '
-                      '`--no-audit-log` spells).'),
-                ('b', 'the line names its writer — the proxy '
-                      '`application=CACHE tag=daemon`, the ctl and cli clients '
-                      'the shared `application=CACHE tag=cli` role — and '
-                      'carries an `instance=<id>` word naming the writer '
-                      'daemon: the **control port** when `--audit-instance` is '
-                      'unset (unique per host by construction), the override '
-                      'when spelled. Keep an override unique among everything '
-                      'that shares one collector: two caches on different hosts '
-                      'may share a name (the RFC5424 envelope adds the hostname '
-                      'beside it), but the native line and CEF carry no host — '
-                      'pooled there, name them apart. The chain groups by the '
-                      '(application, writer, instance) triple.'),
+                ('fam', 'audit_forward'),
                 ('c', '2026-11-04T07:16:40Z AUDIT application=CACHE tag=daemon '
                       'instance=15502 type=start hash=4e1b92f0c7a3 version=0.5.1 '
                       'upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 '
@@ -456,18 +430,11 @@ REF = {
                       'instance=15502 type=shutdown hash=d94a1f07c3e2 '
                       'reason=SIGTERM-received uptime=65s clients=1 hits=412 '
                       'misses=9'),
-                ('b', 'the 12-hex token after the event name is the entry\'s '
-                      '**chained hash** (the audit\'s F10): any edit, deletion '
-                      'or reordering shows up as a chain break in '
-                      '`dev/gates/audit_verify.py` (run it on this file, the '
-                      'family\'s XDG trails, or a journald dump on stdin). '
-                      '**Every wire command is audited once, by the server** '
-                      '(with the client peer, the role, and the frame\'s mac '
-                      'when the wire is signed); the per-client **request '
-                      'accounting** rides the same trail (one `REQUESTS` event '
-                      'per client per `--audit-requests` period, plus a final '
-                      'tally on every disconnect). The trail is thread-safe and '
-                      'flushed per event.'),
+                ('b', 'the per-client **request accounting** rides the same '
+                      'trail (one `REQUESTS` event per client per '
+                      '`--audit-requests` period, plus a final tally on every '
+                      'disconnect). The trail is thread-safe and flushed per '
+                      'event.'),
                 ('c', "journalctl -u modbus-cache --since today | grep 'write:'"
                       "      # all write attempts\n"
                       'journalctl -u modbus-cache | grep -E \'SIGHUP|shutdown\''
@@ -487,12 +454,97 @@ REF = {
                       '                                    #   the audit chain (the stress suite rides quick/full)\n'
                       'dev/battery/battery.py cache-regtest      # one suite — every run needs the runner (the suites\n'
                       '                                    #   refuse without the runner\'s PV_RUN_DIR)'),
-                ('b', 'the suites **always run through the battery runner** '
-                      '(`dev/battery/battery.py`) — it owns the run dir, the '
-                      'port slots and the tally, and a standalone suite run '
-                      'refuses (a hand-run collides across sessions). A new '
-                      'behavior ships with a check: a scenario that fails '
-                      'without it and names the registry rows it pins.'),
+                ('fam', 'runner'),
+            ]),
+            ('Diagnostics registers', [
+                ('b', 'the cache synthesizes a 4-register block at **65000** '
+                      'from live poller state — answered instantly, never '
+                      'forwarded, never cached, never part of a profile '
+                      '(FC3 only): the clients tell live data from '
+                      'cache-served values, and the scraper auto-detects '
+                      'the block and exports it as the `scraper_cache_*` '
+                      'gauges.'),
+                ('t', ('register', 'meaning'),
+                 ('**65000**', 'magic `0xCAFE` (the validity check for clients)'),
+                 ('**65001**', '`1` if the last completed poll cycle had at '
+                  'least one successful read, else `0`'),
+                 ('**65002**', 'seconds since the last successful device read '
+                  '(`65535` = none yet)'),
+                 ('**65003**', 'the cache process\' uptime in seconds')),
+                ('b', 'reads that straddle the block are rejected with '
+                      'exception `02` (illegal data address) — read the four '
+                      'words whole. Reply unit ids are validated on every '
+                      'forwarded request before anything is cached.'),
+            ]),
+            ('Tuning', [
+                ('b', '**the poll cadence** — `--modbus-interval` (the loop\'s '
+                      'sleep, the wall the cache ages against) and '
+                      '`--modbus-timeout` (the per-transaction ceiling; '
+                      '`timeout` above `interval` just means polls run '
+                      'back-to-back).'),
+                ('b', '**the slow dongle** — `--modbus-merge-gap` widens the '
+                      'address gap that still merges into one block read '
+                      '(fewer transactions, bigger replies), '
+                      '`--modbus-read-delay` paces the blocks (the breathing '
+                      'room some RS485-to-TCP gateways need); a block the '
+                      'device refuses splits in halves and retries — the plan '
+                      'converges to the largest blocks the device actually '
+                      'answers (`show uplink` renders the plan and its '
+                      'latency).'),
+                ('b', '**the freshness budget** — `--cache-ttl` is the global '
+                      'staleness ceiling, an entry\'s **`ttl`** field '
+                      '**replaces** it per register (a fast power word at 5s '
+                      'next to a nameplate word at 1h, one poll cadence for '
+                      'both); the diagnostics block\'s 65002 tells the clients '
+                      'how old the words actually are.'),
+                ('b', '**the clients** — `--max-clients` / '
+                      '`--max-conn-per-ip` cap the fan-out, '
+                      '`--client-timeout` reaps the stalls (every refused or '
+                      'reaped connection is a logged, audited event).'),
+            ]),
+            ('Deployment', [
+                ('b', '**NixOS** — the module `nixos/modules/modbus-cache.nix` '
+                      'renders the daemon as a hardened service (the options '
+                      'mapped in `docs/NIXOS.md`, the packaging in '
+                      '`nixos/README.md`): the env file, the state dirs and '
+                      'the secret `*File` options ride the module; the '
+                      'rendered config validates with `--dry-run` before a '
+                      'switch.'),
+                ('b', '**containers** — `docker/Dockerfile.modbus-cache` '
+                      '(stdlib-only, the unprivileged user), the demo and '
+                      'prod compose stacks beside it (`docker/README.md`); '
+                      'the image loads its bundled conf as the default '
+                      '`--config` target — the env file '
+                      '(`docker/env/modbus-cache.env.example`) and the CMD '
+                      'flags carry the deployment shape.'),
+                ('b', '**systemd (plain)** — run it behind journald '
+                      '(`--audit-log -` rides the NixOS module; journald '
+                      'stores, seals and rotates), the secrets as '
+                      '`LoadCredential=` files passed as `file:<path>`.'),
+            ]),
+            ('Troubleshooting', [
+                ('b', '**it will not start** — every bind failure answers one '
+                      '`cannot bind` line + exit 1 (the port taken? `ss -ltnp '
+                      '| grep 15502`); every configuration error aborts with '
+                      'a clean one-line error before anything binds — '
+                      '`--dry-run` prints the effective settings without '
+                      'touching the ports.'),
+                ('b', '**clients refused** — the log names the gate: `not on '
+                      'the connect ACL`, the client limit reached, the write '
+                      'gates\' `WRITE-REFUSED` (the audit trail carries the '
+                      'client, the frame, the gate per refusal).'),
+                ('b', '**stale or dead data** — the diagnostics block\'s '
+                      '65001/65002 and the `modbus_cache_poll_up` / '
+                      '`modbus_cache_last_poll_age_seconds` gauges tell a '
+                      'poll failure from a slow one; the log names the '
+                      'failing block and the exception code per cycle.'),
+                ('b', '**deeper** — `--log-level DEBUG` logs every frame both '
+                      'ways; `SIGUSR2` dumps the thread stacks (the '
+                      'family\'s faulthandler hook); the audit trail '
+                      'chain-verifies with `dev/gates/audit_verify.py`.'),
+            ]),
+            ('The docs map', [
+                ('fam', 'docs'),
             ]),
             ('Configuration', [
                 ('b', 'the config file (`--config PATH`, env `CONFIG`) speaks '
@@ -573,6 +625,12 @@ REF = {
         ],
     },
     'scraper': {
+        'family': [
+            ('b', 'the scraper is the chain\'s poller: **Modbus in, '
+                  'Prometheus out** — through the cache (the usual shape: '
+                  'the cache multiplexes the device) or straight at the '
+                  'device when nothing else shares it.'),
+        ],
         'run': [
             ('c', 'python3 apps/scraper/bin/modbus-scraper.py --upstream 192.168.1.100:502\n'
                   'curl http://localhost:9350/metrics'),
@@ -851,30 +909,7 @@ REF = {
                       '**SCR audit trail** (`--audit-log`, the XDG state home '
                       'by default — `dev/gates/audit_verify.py` walks it like '
                       'the others).'),
-                ('b', '`--audit-forward` mirrors every line — the per-writer '
-                      'hash chain included — onward: `syslog` (the local '
-                      'socket auto-scan), `syslog:/path` (an explicit socket), '
-                      '`udp://host[:514]` (RFC5426, best-effort) or '
-                      '`tcp://host[:514]` (RFC6587 framing) — the **off-box '
-                      'copy** (the F10 answer): a scheduled search at the '
-                      'collector can chain-verify the extracted prefix/chain '
-                      'fields and alert on a break.'),
-                ('b', 'the remote envelope rides `--audit-forward-format` '
-                      '(`rfc5424`, the default, or `cef` — the local forms '
-                      'keep the verbatim send). A send failure notes once and '
-                      'the next event re-arms.'),
-                ('b', '`--audit-log none` turns the local file off: with a '
-                      'forward spelled that is the **remote-only mode** (the '
-                      'collector is the sole holder, the chain reseeds at '
-                      'GENESIS per run), without one the audit is disabled '
-                      '(the state `--no-audit-log` spells).'),
-                ('b', 'every line names its writer daemon in `instance=<id>` — '
-                      'the control port when `--audit-instance` is unset '
-                      '(unique per host by construction), the override when '
-                      'spelled; keep an override unique among everything that '
-                      'shares one collector (the native line and CEF carry no '
-                      'hostname) — the chain groups by the (application, '
-                      'writer, instance) triple.'),
+                ('fam', 'audit_forward'),
             ]),
             ('Testing', [
                 ('b', 'two standalone suites live in the suite root '
@@ -883,15 +918,77 @@ REF = {
                       'after itself. Every scenario must end with the exporter '
                       'serving correct metrics and **zero tracebacks** in the '
                       'logs.'),
+                ('b', 'the fake inverter is the suites\' workhorse — its own '
+                      'subproject and manual '
+                      '(`extras/manuals/fake-inverter.md`): the suites start '
+                      'it automatically; point the scraper at it by hand to '
+                      'debug the poll loop hardware-free.'),
                 ('c', 'dev/battery/battery.py scraper        # the scraper profile: the regtest, the fuzz, the\n'
                       '                                #   audit chain (the suites refuse without the\n'
                       '                                #   runner\'s PV_RUN_DIR)'),
-                ('b', 'the suites **always run through the battery runner** '
-                      '(`dev/battery/battery.py`) — it owns the run dir, the '
-                      'port slots and the tally, and a standalone suite run '
-                      'refuses (a hand-run collides across sessions). A new '
-                      'behavior ships with a check: a scenario that fails '
-                      'without it and names the registry rows it pins.'),
+                ('fam', 'runner'),
+            ]),
+            ('Tuning', [
+                ('b', '**the poll cadence** — `--modbus-interval` (the loop\'s '
+                      'sleep; the alert thresholds assume the default 10s) '
+                      'and `--modbus-timeout` (the per-transaction ceiling).'),
+                ('b', '**the slow dongle** — `--modbus-merge-gap` widens the '
+                      'address gap that still merges into one block read '
+                      '(fewer transactions per poll), `--modbus-read-delay` '
+                      'paces them; `show uplink` renders the block plan and '
+                      'its per-block latency — a stalled plan shows right '
+                      'there.'),
+                ('b', '**the sanity caps** — `--max-kwp` / `--max-grid-kw` '
+                      'are the bad-data fence (a reading above a cap answers '
+                      'HTTP 503 until a good poll, never silently wrong '
+                      'numbers); size them to the array and the power line '
+                      '(`max-kwp` ≤ `max-grid-kw`, a startup warning '
+                      'otherwise).'),
+                ('b', '**the exposition** — `--metrics-prefix` renames the '
+                      'family (`huawei_` the default; the dashboard\'s '
+                      '`config.js` selectors must follow), `--metrics-spec` '
+                      'renames/rewords the individual metrics without '
+                      'touching the code.'),
+            ]),
+            ('Deployment', [
+                ('b', '**NixOS** — the module `nixos/modules/modbus-scraper.nix` '
+                      'renders the exporter as a hardened service (the '
+                      'options mapped in `docs/NIXOS.md`, the packaging in '
+                      '`nixos/README.md`); the rendered config validates with '
+                      '`--dry-run` before a switch.'),
+                ('b', '**containers** — `docker/Dockerfile.modbus-scraper`, '
+                      'the demo and prod compose stacks beside it '
+                      '(`docker/README.md`); the env file '
+                      '(`docker/env/modbus-scraper.env.example`) carries the '
+                      'bare upper-snake twins.'),
+                ('b', '**systemd (plain)** — run it behind journald '
+                      '(`--audit-log -`), the token as a `LoadCredential=` '
+                      'file passed as `file:<path>` (the re-read on '
+                      '`SIGHUP` is the rotation story).'),
+            ]),
+            ('Troubleshooting', [
+                ('b', '**it will not start** — the bind failures and the '
+                      'config errors answer one clean line + exit 1 '
+                      '(a non-loopback listen without `--auth-token` is the '
+                      'usual one — the F13 floor); `--dry-run` prints the '
+                      'effective settings without touching the ports.'),
+                ('b', '**HTTP 503 on /metrics** — the sanity caps refusing '
+                      'the last poll (bad data above `--max-kwp`/'
+                      '`--max-grid-kw`, a negative PV): the log names the '
+                      'offending reading; the page returns with the next '
+                      'good poll — never silently wrong numbers.'),
+                ('b', '**the poll is failing** — `scraper_up == 0`, the '
+                      'error counter climbing, the freshness gauge aging: '
+                      'the log names the Modbus exception code per failed '
+                      'poll; `show uplink` splits a device stall from an '
+                      'outage (the per-block latencies).'),
+                ('b', '**deeper** — `--log-level DEBUG` logs every poll\'s '
+                      'transactions; `SIGUSR2` dumps the thread stacks; the '
+                      'audit trail chain-verifies with '
+                      '`dev/gates/audit_verify.py`.'),
+            ]),
+            ('The docs map', [
+                ('fam', 'docs'),
             ]),
             ('Configuration', [
                 ('b', 'the config file (`--config` picks it; the default hunt: '
@@ -985,6 +1082,12 @@ REF = {
         ],
     },
     'inverter': {
+        'family': [
+            ('b', 'the fake stands in for the device: **the whole chain '
+                  'debugs against it without hardware** — the scraper '
+                  'polls it, the cache fronts it, the replay captures and '
+                  'replays it, the suites start it automatically.'),
+        ],
         'run': [
             ('c', 'python3 apps/inverter/bin/modbus-fake-inverter.py                       '
                   '# 127.0.0.1:5502 — scraper defaults just work\n'
@@ -1018,9 +1121,9 @@ REF = {
                   '`true`/`false`, `1`/`0`, `yes`/`no`, `on`/`off`. The same '
                   'twins ride the start in the ladder — `CHAOS=0.9` at '
                   'creation is honored, SIGHUP retunes a running fake.'),
-            ('b', 'the fake ships as an alpine container — stdlib-only, no '
+                ('b', 'the fake ships as an alpine container — stdlib-only, no '
                   'pip, running as the unprivileged `pvsuite` user with the '
-                  'tools on `PATH` (`Dockerfile.fake-inverter` + '
+                  'tools on `PATH` (`docker/Dockerfile.modbus-fake-inverter` + '
                   '`compose.yaml`; see `docker/README.md`). The image loads '
                   'its own bundled conf '
                   '(`/pv-suite/inverter/modbus-fake-inverter.conf`, the '
@@ -1184,30 +1287,7 @@ REF = {
                       'too and `set audit disable on/off` is the kill switch '
                       '(`clear <setting>` restores the configured value); the '
                       'env twins spell the same names upper-snake.'),
-                ('b', '`--audit-forward` mirrors every line — the per-writer '
-                      'hash chain included — onward: `syslog` (the local '
-                      'socket auto-scan), `syslog:/path` (an explicit socket), '
-                      '`udp://host[:514]` (RFC5426, best-effort) or '
-                      '`tcp://host[:514]` (RFC6587 framing) — the **off-box '
-                      'copy** beside the file/stdout sink (the F10 answer); '
-                      'the remote envelope rides `--audit-forward-format` '
-                      '(`rfc5424`, the default, or `cef`), a send failure '
-                      'notes once and the next event re-arms.'),
-                ('b', '`--audit-log none` turns the local file off: with a '
-                      'forward spelled that is the **remote-only mode** (the '
-                      'collector is the sole holder, the chain reseeds at '
-                      'GENESIS per run), without one the audit is disabled '
-                      '(the state `--no-audit-log` spells).'),
-                ('b', 'the line names its writer — the fake '
-                      '`application=INV tag=daemon`, the ctl and cli clients '
-                      'the shared `application=INV tag=cli` role — and carries '
-                      'an `instance=<id>` word naming the writer daemon: the '
-                      '**control port** when `--audit-instance` is unset '
-                      '(unique per host by construction), the override when '
-                      'spelled. Keep an override unique among everything that '
-                      'shares one collector — the native line and CEF carry '
-                      'no hostname, so pooled trails name their instances '
-                      'apart; the chain groups by the triple.'),
+                ('fam', 'audit_forward'),
                 ('c', '2026-11-03T20:10:06Z AUDIT application=INV tag=daemon '
                       'instance=15991 type=start hash=3f9a21c04de7 '
                       'version=0.5.1 modbus=127.0.0.1:5502 control=127.0.0.1:15991 '
@@ -1222,16 +1302,10 @@ REF = {
                       'instance=15991 type=shutdown hash=5e2af8c30b61 '
                       'reason=SIGTERM-received uptime=2s conns=0 requests=0 '
                       'chaos_hits=0'),
-                ('b', 'the 12-hex token after the event name is the entry\'s '
-                      '**chained hash** (the audit\'s F10): any edit, deletion '
-                      'or reordering shows up as a chain break in '
-                      '`dev/gates/audit_verify.py`. **Every wire command is '
-                      'audited once, by the server** (with the peer, the '
-                      'role, the mac); the clients audit their session and '
-                      'the local-only events; the fake logs its lifecycle '
-                      '(`START`, `RELOAD`, `RESET`, `SHUTDOWN`). ping/pong '
-                      'keepalives are never logged; the file is flushed per '
-                      'event.'),
+                ('b', 'the clients audit their session and the local-only '
+                      'events; the fake logs its lifecycle (`START`, '
+                      '`RELOAD`, `RESET`, `SHUTDOWN`); ping/pong keepalives '
+                      'are never logged; the file is flushed per event.'),
             ]),
             ('Testing', [
                 ('b', 'the fake is the suites\' workhorse — it is exercised '
@@ -1241,12 +1315,44 @@ REF = {
                 ('c', 'dev/battery/battery.py inverter        # the inverter profile: the fake\'s regtest, the\n'
                       '                                  #   control fuzz, the audit chain (the suites refuse\n'
                       '                                  #   without the runner\'s PV_RUN_DIR)'),
-                ('b', 'the suites **always run through the battery runner** '
-                      '(`dev/battery/battery.py`) — it owns the run dir, the '
-                      'port slots and the tally, and a standalone suite run '
-                      'refuses (a hand-run collides across sessions). A new '
-                      'behavior ships with a check: a scenario that fails '
-                      'without it and names the registry rows it pins.'),
+                ('fam', 'runner'),
+            ]),
+            ('Deployment', [
+                ('b', '**containers** — the fake\'s deployment is the alpine '
+                      'image (`docker/Dockerfile.modbus-fake-inverter`): '
+                      'stdlib-only, the unprivileged `pvsuite` user, the '
+                      'bundled conf as the default `--config` target; the '
+                      'demo compose stack runs it beside the cache and the '
+                      'scraper (`docker/README.md`), the env file '
+                      '(`docker/env/modbus-fake-inverter.env.example`) and '
+                      'the CMD flags carry the shape.'),
+                ('b', '**NixOS** — no service module for the fake by design '
+                      '(a test tool does not ship as infrastructure); point '
+                      '`--modbus-profile` at a `shared/profiles/` copy and '
+                      'run it from the checkout or the container.'),
+            ]),
+            ('Troubleshooting', [
+                ('b', '**errors climbing on the scraper** — with `--chaos` on '
+                      'that is the fake working as intended: '
+                      '`scraper_modbus_errors_total` climbs while '
+                      '`scraper_up` flips and the fake never dies; tune or '
+                      'disable live (`set chaos off`, `--seed` pins a '
+                      'run).'),
+                ('b', '**reads answer yesterday\'s writes** — the write '
+                      'overlay: register/coil writes stick until `reset` '
+                      '(or `SIGUSR1`, or the shutdown) — the audit trail\'s '
+                      '`type=reset` event names what was dropped.'),
+                ('b', '**a pin refuses at start** — the demo machines are '
+                      'runtime set words: the config file and the flags '
+                      'carry the registry knobs only; drive the pins over '
+                      'the control wire.'),
+                ('b', '**deeper** — `--log-level DEBUG` logs every frame both '
+                      'ways; `SIGUSR2` dumps the thread stacks; the audit '
+                      'trail chain-verifies with '
+                      '`dev/gates/audit_verify.py`.'),
+            ]),
+            ('The docs map', [
+                ('fam', 'docs'),
             ]),
             ('Configuration', [
                 ('b', 'the config file (`--config PATH`, `$CONFIG`, then '
@@ -1349,6 +1455,12 @@ REF = {
         ],
     },
     'dashboard': {
+        'family': [
+            ('b', 'the dashboard is the chain\'s face: **the browser\'s '
+                  'window onto the scraper\'s numbers** — Prometheus '
+                  'behind it, the energy math in the page, the proxy '
+                  'keeping the collector off the wire.'),
+        ],
         'run': [
             ('c', 'python3 bin/dashboard.py                          # upstream http://localhost:9090\n'
                   'python3 bin/dashboard.py --listen 127.0.0.1:8080 --upstream '
@@ -1531,12 +1643,53 @@ REF = {
                 ('c', 'dev/battery/battery.py dashboard             # the dashboard profile: the control fuzz +\n'
                       '                                       #   the audit chain (the suites refuse without\n'
                       '                                       #   the runner\'s PV_RUN_DIR)'),
-                ('b', 'the suites **always run through the battery runner** '
-                      '(`dev/battery/battery.py`) — it owns the run dir, the '
-                      'port slots and the tally, and a standalone suite run '
-                      'refuses (a hand-run collides across sessions). A new '
-                      'behavior ships with a check: a scenario that fails '
-                      'without it and names the registry rows it pins.'),
+                ('fam', 'runner'),
+            ]),
+            ('Deployment', [
+                ('b', '**NixOS** — the module `nixos/modules/dashboard.nix` '
+                      'renders the server as a hardened service (the options '
+                      'mapped in `docs/NIXOS.md`): the listen, the upstream, '
+                      'the page token (`*File`), `staticDir` and '
+                      '`solarConfig` ride the module — the static assets can '
+                      'ship straight from the store.'),
+                ('b', '**containers** — `docker/Dockerfile.dashboard`, the '
+                      'demo compose stack (the dashboard + prometheus + the '
+                      'scraper) and the prod split beside it '
+                      '(`docker/README.md`); the env file '
+                      '(`docker/env/dashboard.env.example`) carries the '
+                      'bind, the upstream and the page token.'),
+                ('b', '**static-only** — any web server works '
+                  '(`python3 -m http.server 8080 -d static`): set '
+                  '`prometheusUrl` to the direct Prometheus URL and allow '
+                  'the CORS — the control plane and the audit are a '
+                  '`dashboard.py` feature (the static face alone has '
+                  'neither).'),
+            ]),
+            ('Troubleshooting', [
+                ('b', '**the page says DEMO DATA** — Prometheus is '
+                      'unreachable from the server: check `--prom-url` / '
+                      '`PROM_URL` (the proxy targets it, not the browser — '
+                      'unless `config.js` names a direct URL, which then '
+                      'needs the CORS).'),
+                ('b', '**the page boots with defaults** — `/config.js` 404ed: '
+                      'the `--config-js` override file is missing (the '
+                      'section above); the fuzz pin guarantees a bogus '
+                      'override never crashes the server.'),
+                ('b', '**the auth dance fails** — the `?auth=<token>` '
+                      'exchange sets the session cookie once; a rejected '
+                      'exchange means the token mismatched (the audit trail '
+                      'carries the auth failure), scripts must send '
+                      '`Authorization: Bearer` on every request.'),
+                ('b', '**connections dropped** — the caps '
+                      '(`--max-clients`, `--max-conn-per-ip`) refuse and log '
+                      'beyond their limits; the /metrics pair has its own '
+                      'two.'),
+                ('b', '**deeper** — `--log-level DEBUG`, `SIGUSR2`\'s thread '
+                      'stacks, the audit trail chain-verifying with '
+                      '`dev/gates/audit_verify.py`.'),
+            ]),
+            ('The docs map', [
+                ('fam', 'docs'),
             ]),
             ('Configuration', [
                 ('b', 'the daemon\'s config file (`--config PATH`, env '
@@ -1558,12 +1711,12 @@ REF = {
             ]),
             ('Access control', [
                 ('b', 'the page and the proxy speak the family\'s F13 shape: '
-                  'a **bearer token is mandatory beyond loopback** — a '
-                  'token-less non-loopback bind refuses to start. The '
-                  'browser opens `http://host:8080/?auth=<token>` once — the '
-                  'exchange sets an HttpOnly session cookie — and scripts '
-                  'send `Authorization: Bearer <token>`; on the loopback '
-                  'bind the token is optional.'),
+                      'a **bearer token is mandatory beyond loopback** — a '
+                      'token-less non-loopback bind refuses to start. The '
+                      'browser opens `http://host:8080/?auth=<token>` once — the '
+                      'exchange sets an HttpOnly session cookie — and scripts '
+                      'send `Authorization: Bearer <token>`; on the loopback '
+                      'bind the token is optional.'),
                 ('b', 'the HTTP surface carries the family\'s connection caps '
                       '— `--max-clients` (64), `--max-conn-per-ip`, and the '
                       '`/metrics` pair (`--metrics-max-clients`, '
@@ -1586,19 +1739,7 @@ REF = {
                       'a forward spelled is the remote-only mode, and '
                       '`--no-audit-log` disables entirely. Rotation: '
                       '`--audit-max-mb`, `--audit-daily`, `--audit-files`.'),
-                ('b', '`--audit-forward` mirrors every line — the per-writer '
-                      'hash chain included — onward: `syslog`, '
-                      '`syslog:/path`, `udp://host[:514]` or '
-                      '`tcp://host[:514]` (the off-box copy, the F10 '
-                      'answer); the envelope rides `--audit-forward-format` '
-                      '(`rfc5424` the default, or `cef`).'),
-                ('b', 'the wire commands (with their peer and mac), the auth '
-                      'failures and the request accounting ride the trail; '
-                      'the 12-hex chained hash per entry is verified by '
-                      '`dev/gates/audit_verify.py` — any edit, deletion or '
-                      'reordering shows up as a chain break. The writer is '
-                      'named by `--audit-instance` (the control port when '
-                      'unset).'),
+                ('fam', 'audit_forward'),
             ]),
             ('Register maps', [
                 ('b', 'none — the dashboard owns no Modbus registers and no '
@@ -1647,6 +1788,13 @@ REF = {
         ],
     },
     'modbus-replay': {
+        'family': [
+            ('b', 'the replay is the debug sidecar: **it taps the chain\'s '
+                  'Modbus hops** (capture — the wire keeps flowing, the '
+                  'trace grows beside it) **or stands in for the device** '
+                  '(replay — the client debugs against the recorded '
+                  'hardware).'),
+        ],
         'run': [
             ('c', '# capture: the cache\'s polls to the real device, the wire '
                   'to a trace\n'
@@ -1924,12 +2072,42 @@ REF = {
                       'in the logs.'),
                 ('c', 'dev/battery/battery.py replay    # the replay profile: the regtest (the suites refuse\n'
                       '                            #   without the runner\'s PV_RUN_DIR)'),
-                ('b', 'the suites **always run through the battery runner** '
-                      '(`dev/battery/battery.py`) — it owns the run dir, the '
-                      'port slots and the tally, and a standalone suite run '
-                      'refuses (a hand-run collides across sessions). A new '
-                      'behavior ships with a check: a scenario that fails '
-                      'without it and names the registry rows it pins.'),
+                ('fam', 'runner'),
+            ]),
+            ('Deployment', [
+                ('b', 'none by design — the sidecar is a checkout tool: run '
+                  'it from a checkout (`apps/modbus-replay/dev` is the '
+                  'launcher) or a plain `python3` line, next to the tools '
+                  'it debugs. No container image, no Nix package, no '
+                  'NixOS module, no service unit — a deployment would '
+                  'defeat the sidecar (it debugs deployments, it is not '
+                  'one).'),
+            ]),
+            ('Troubleshooting', [
+                ('b', '**it will not start** — the bind failures and the '
+                      'flag refusals answer one clean line + exit 1 '
+                      '(capture and replay are mutually exclusive, a knob '
+                      'without its file refuses); `--help` and the man page '
+                      'carry the startup surface.'),
+                ('b', '**the trace looks torn** — a killed capture leaves a '
+                      'readable file: the walk keeps what parsed and notes '
+                      'the loss (the section above); a mid-file CRC failure '
+                      'resyncs at the next run header — the records between '
+                      'the tear and the re-anchor are lost with the tear.'),
+                ('b', '**replay answers exception 11** — a request the trace '
+                      'never recorded (the miss): the log spells the request '
+                      '— that is the poll-planning debug; `--replay-miss '
+                      'zero` keeps a changed poll plan running instead.'),
+                ('b', '**the dump shows nothing on the live view** — the feed '
+                      'socket path is the derived '
+                      '`/tmp/modbus-replay-<listen-port>.socket` (the cache\'s '
+                      'feed spells its own); a slow subscriber is dropped by '
+                      'design, the file keeps every record.'),
+                ('b', '**deeper** — `--log-level DEBUG` logs the framing '
+                      'decisions; `SIGUSR2` dumps the thread stacks.'),
+            ]),
+            ('The docs map', [
+                ('fam', 'docs'),
             ]),
             ('Configuration', [
                 ('b', 'there is no config file — the sidecar\'s posture is '
@@ -1996,6 +2174,120 @@ REF = {
 
 WIDTH = 76
 
+# the shipped shape, on every page: the composition map the front-page
+# split took off the READMEs (the docker topologies' plain rendering) —
+# the per-tool 'family' lead rides first, the map follows
+FAMILY_MAP = [
+    ('c', 'the device (the sun2000 — or the fake standing in)\n'
+          '     |  Modbus TCP :502\n'
+          '     v\n'
+          'modbus-cache :15502 ---- the one client slot, multiplexed\n'
+          '     |\n'
+          '     v\n'
+          'modbus-scraper :9350 /metrics\n'
+          '     |\n'
+          '     v\n'
+          'prometheus ---- the alert pack (extras/alerts/)\n'
+          '     |\n'
+          '     v\n'
+          'the dashboard :8080\n'
+          '\n'
+          'modbus-replay rides beside any Modbus hop: the tap in capture,\n'
+          'the recorded device in replay, the dump tool rendering.'),
+    ('b', 'every hop is optional: the scraper can poll the device straight '
+          '(no cache), the dashboard can read a collector you already run, '
+          'the fake can stand in for the device — and the suite auth can '
+          'run on either Modbus hop independently (the peers must speak '
+          'the same scheme with the same key).'),
+]
+
+# the audit-forward story, told once (the cache's wording, genericized —
+# the per-tool tails splice it; the F10 answer)
+FAMILY_AUDIT_FORWARD = [
+    ('b', '`--audit-forward` mirrors every line — the hash chain included — '
+          'onward: `syslog` (the local socket auto-scan), `syslog:/path` '
+          '(an explicit socket), `udp://host[:514]` (RFC5426, best-effort) '
+          'or `tcp://host[:514]` (RFC6587 octet-count framing) — the '
+          '**off-box copy**: an edited local trail breaks its chain, and a '
+          'scheduled search at the collector can chain-verify the extracted '
+          'prefix/chain fields and alert on a break; a line that left the '
+          'box before an attacker arrived cannot be touched from it.'),
+    ('b', 'the remote envelope rides `--audit-forward-format` (`rfc5424`, '
+          'the default, or `cef` — the local syslog forms keep the verbatim '
+          'send). A send failure notes once on stderr and the next event '
+          're-arms (the note carries the dropped count).'),
+    ('b', '`--audit-log none` turns the local file off: with a forward '
+          'spelled that is the **remote-only mode** (the collector is the '
+          'sole holder — no file, no XDG directory, the chain reseeds at '
+          'GENESIS per run), without one the audit is disabled (the state '
+          '`--no-audit-log` spells).'),
+    ('b', 'the line names its writer — the daemon the `tag=daemon` role, '
+          'the ctl and cli clients the shared `tag=cli` role — and carries '
+          'an `instance=<id>` word: the **control port** when '
+          '`--audit-instance` is unset (unique per host by construction), '
+          'the override when spelled. Keep an override unique among '
+          'everything that shares one collector; the chain groups by the '
+          '(application, writer, instance) triple.'),
+    ('b', 'the 12-hex token after the event name is the entry\'s **chained '
+          'hash** (the audit\'s F10): any edit, deletion or reordering '
+          'shows up as a chain break in `dev/gates/audit_verify.py` (run '
+          'it on a trail file, the family\'s XDG trails, or a journald '
+          'dump on stdin). **Every wire command is audited once, by the '
+          'server** (with the client peer, the role, and the frame\'s mac '
+          'when the wire is signed).'),
+]
+
+# the suites' runner rule, told once (the per-tool Testing sections splice it)
+FAMILY_RUNNER = [
+    ('b', 'the suites **always run through the battery runner** '
+          '(`dev/battery/battery.py`) — it owns the run dir, the port '
+          'slots and the tally, and a standalone suite run refuses (a '
+          'hand-run collides across sessions). A new behavior ships with '
+          'a check: a scenario that fails without it and names the '
+          'registry rows it pins.'),
+]
+
+# the suite's document map, told once — the F-numbers the pages cite live
+# in the security postures, the ACL grammar in its spec, the module
+# options in the NixOS map
+FAMILY_DOCS = [
+    ('t', ('document', 'what it carries'),
+     ('`docs/SECURITY.md`', 'the security posture and the F-findings the '
+      'pages cite (F9 the secrets, F10 the audit chain, F11 the '
+      'trusted-LAN test tool, F12 the secret files, F13 the token '
+      'floors, F16 the alert pack, F18 the dump split, F21 the web '
+      'face)'),
+     ('`docs/specs/ACL.md`', 'the ACL gate semantics — the rule chains, '
+      'the ip-prefix grammar, the standalone acl files, the tools, and '
+      'where each tool\'s support stops'),
+     ('`docs/specs/MODBUS.md`', 'the Modbus wire specs — the function-code '
+      'support maps, the suite and Waveshare auth handshakes, the '
+      'diagnostics block'),
+     ('`docs/NIXOS.md`', 'the NixOS option maps, rebuilt from '
+      '`module.nix`'),
+     ('`nixos/README.md`', 'the packaging side — the flake, the modules, '
+      'the packages'),
+     ('`docker/README.md`', 'the container side — the images, the compose '
+      'topologies (the demo and the prod split), the env examples'),
+     ('`shared/profiles/README.md`', 'the device profile format — the '
+      'schema, the semantics, the shipped devices'),
+     ('`extras/alerts/`', 'the alert rules pack — one rule file per '
+      'watched exporter, every alert naming the audit events it '
+      'correlates with'),
+     ('`docs/book/`', 'the assembled book (these manuals gathered, the '
+      'specs beside)'),
+     ('`docs/history/`', 'the wave records — how the suite got here, '
+      '`front-page-split.md` among them'),
+     ('`docs/TODO.md`', 'the open items'),
+      ('`CHANGELOG.md`', 'the unreleased changes and the current release')),
+]
+
+FAMILY_SPLICES = {
+    'audit_forward': FAMILY_AUDIT_FORWARD,
+    'runner': FAMILY_RUNNER,
+    'docs': FAMILY_DOCS,
+}
+
 # the reference sections' canonical ladder — every page walks it in this
 # order (the tool's own extras slot between by their keys; an unknown
 # title rides at the tail in its authored order). The one-ladder rule:
@@ -2017,13 +2309,18 @@ SECTION_ORDER = {
     'Served registers (the default profile)': 62,
     'Register maps (the register defaults)': 63,
     'Register maps and the metrics spec': 64,
+    'Diagnostics registers': 65,
     'Persistence': 70,
+    'Tuning': 45,
     'Trace feed': 80,
     'The trace format': 85,
     'Replay mode': 86,
     'The record feed and the dump tool': 87,
+    'Deployment': 88,
     'Chaos injection (`--chaos`)': 90,
+    'The docs map': 92,
     'Source layout': 95,
+    'Troubleshooting': 97,
     'Testing': 100,
 }
 
@@ -2270,9 +2567,14 @@ def show_section(shows):
 def render_items(out, items):
     """The REF items: ('b', text) a bullet, ('p', text) a wrapped
     paragraph, ('c', block) an indented code block, ('t', head, ...) a
-    table (the first tuple the headers, the rest the rows)."""
+    table (the first tuple the headers, the rest the rows), ('fam', key)
+    a family-wide splice (FAMILY_SPLICES — the story told once, rendered
+    in place)."""
     for item in items:
         kind = item[0]
+        if kind == 'fam':
+            render_items(out, FAMILY_SPLICES[item[1]])
+            continue
         if kind == 'b':
             out.append(bullet(item[1]))
         elif kind == 'p':
@@ -2324,6 +2626,14 @@ def speaking_section(cli, sock, port, example, token_mandatory, conf,
     out.append('')
     out.append(bullet('the one-shot spelling runs one command per invocation '
                       '(or a batch on stdin).'))
+    out.append('')
+    out.append(bullet('the wire is **JSON lines**: one request per line, one '
+                      'reply per line — the reply\'s `status` face speaks '
+                      '`ok` / `fail` / `bye` (the closing) with a `note` '
+                      'where the row says one; the `auth` verb carries the '
+                      'token, and a signed wire authenticates each frame '
+                      'with an HMAC mac (the audit lines carry it beside '
+                      'the command).'))
     out.append('')
     out.append(bullet('the **console** is the interactive session: `?` lists '
                       'the words, TAB completes, `help <setting>` describes '
@@ -2403,6 +2713,10 @@ def render(tool, daemon, daemon_bin, blurb, cli, sock, port, example,
     w(wrap('%s Part of the pv-suite family.' % blurb))
     w('')
     ref = REF[tool]
+    if 'family' in ref:
+        w('## The family')
+        w('')
+        render_items(out, list(ref['family']) + FAMILY_MAP)
     w('## Run it')
     w('')
     render_items(out, ref['run'])

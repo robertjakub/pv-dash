@@ -4,10 +4,38 @@ A dependency-free (Python stdlib only) Modbus TCP caching proxy for
 single-client devices: it polls the inverter once and serves every client
 from the cache. Part of the pv-suite family.
 
+## The family
+
+- the cache is the chain's multiplexer: **one client slot at the device** (the
+  inverter accepts one Modbus TCP client), any number of Modbus clients behind
+  it — the scraper polls through it, the write tools and the debug sessions
+  share the slot, the replay taps the hop.
+
+    the device (the sun2000 — or the fake standing in)
+         |  Modbus TCP :502
+         v
+    modbus-cache :15502 ---- the one client slot, multiplexed
+         |
+         v
+    modbus-scraper :9350 /metrics
+         |
+         v
+    prometheus ---- the alert pack (extras/alerts/)
+         |
+         v
+    the dashboard :8080
+
+    modbus-replay rides beside any Modbus hop: the tap in capture,
+    the recorded device in replay, the dump tool rendering.
+
+- every hop is optional: the scraper can poll the device straight (no cache),
+  the dashboard can read a collector you already run, the fake can stand in
+  for the device — and the suite auth can run on either Modbus hop
+  independently (the peers must speak the same scheme with the same key).
+
 ## Run it
 
     python3 apps/cache/bin/modbus-cache.py --upstream 192.168.1.100:5502
-    python3 apps/scraper/bin/modbus-scraper.py --upstream :15502
 
 - the proxy binds `127.0.0.1:15502` (loopback only) — `--listen 0.0.0.0:15502`
   serves the LAN.
@@ -87,6 +115,12 @@ from the cache. Part of the pv-suite family.
     python3 bin/modbus-cache-cli.py
 
 - the one-shot spelling runs one command per invocation (or a batch on stdin).
+
+- the wire is **JSON lines**: one request per line, one reply per line — the
+  reply's `status` face speaks `ok` / `fail` / `bye` (the closing) with a
+  `note` where the row says one; the `auth` verb carries the token, and a
+  signed wire authenticates each frame with an HMAC mac (the audit lines carry
+  it beside the command).
 
 - the **console** is the interactive session: `?` lists the words, TAB
   completes, `help <setting>` describes one, `help config` maps every knob to
@@ -463,6 +497,28 @@ the write gates: the forwarding toggle and the register ranges
   this endpoint's poll down, the age spikes and the write-refusal bursts — the
   cache-only install ships its half (`share/alerts.yml`).
 
+## Tuning
+
+- **the poll cadence** — `--modbus-interval` (the loop's sleep, the wall the
+  cache ages against) and `--modbus-timeout` (the per-transaction ceiling;
+  `timeout` above `interval` just means polls run back-to-back).
+
+- **the slow dongle** — `--modbus-merge-gap` widens the address gap that still
+  merges into one block read (fewer transactions, bigger replies),
+  `--modbus-read-delay` paces the blocks (the breathing room some RS485-to-TCP
+  gateways need); a block the device refuses splits in halves and retries —
+  the plan converges to the largest blocks the device actually answers (`show uplink`
+  renders the plan and its latency).
+
+- **the freshness budget** — `--cache-ttl` is the global staleness ceiling, an
+  entry's **`ttl`** field **replaces** it per register (a fast power word at
+  5s next to a nameplate word at 1h, one poll cadence for both); the
+  diagnostics block's 65002 tells the clients how old the words actually are.
+
+- **the clients** — `--max-clients` / `--max-conn-per-ip` cap the fan-out,
+  `--client-timeout` reaps the stalls (every refused or reaped connection is a
+  logged, audited event).
+
 ## Audit logging
 
 - the proxy logs every audit-relevant event to stdout/stderr with UTC
@@ -491,14 +547,13 @@ the write gates: the forwarding toggle and the register ranges
   with it). Rotation: `--audit-max-mb 10` (the default), `--audit-daily` (UTC
   midnight), `--audit-files 3`.
 
-- the F10 answer is opt-in: `--audit-forward` mirrors every line — the hash
-  chain included — onward: `syslog` (the local socket auto-scan),
-  `syslog:/path` (an explicit socket), `udp://host[:514]` (RFC5426,
-  best-effort) or `tcp://host[:514]` (RFC6587 octet-count framing) — the
-  **off-box copy**: an edited local trail breaks its chain, and a scheduled
-  search at the collector can chain-verify the extracted prefix/chain fields
-  and alert on a break; a line that left the box before an attacker arrived
-  cannot be touched from it.
+- `--audit-forward` mirrors every line — the hash chain included — onward:
+  `syslog` (the local socket auto-scan), `syslog:/path` (an explicit socket),
+  `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]` (RFC6587
+  octet-count framing) — the **off-box copy**: an edited local trail breaks
+  its chain, and a scheduled search at the collector can chain-verify the
+  extracted prefix/chain fields and alert on a break; a line that left the box
+  before an attacker arrived cannot be touched from it.
 
 - the remote envelope rides `--audit-forward-format` (`rfc5424`, the default,
   or `cef` — the local syslog forms keep the verbatim send). A send failure
@@ -510,29 +565,28 @@ the write gates: the forwarding toggle and the register ranges
   directory, the chain reseeds at GENESIS per run), without one the audit is
   disabled (the state `--no-audit-log` spells).
 
-- the line names its writer — the proxy `application=CACHE tag=daemon`, the
-  ctl and cli clients the shared `application=CACHE tag=cli` role — and
-  carries an `instance=<id>` word naming the writer daemon: the **control
-  port** when `--audit-instance` is unset (unique per host by construction),
-  the override when spelled. Keep an override unique among everything that
-  shares one collector: two caches on different hosts may share a name (the
-  RFC5424 envelope adds the hostname beside it), but the native line and CEF
-  carry no host — pooled there, name them apart. The chain groups by the
-  (application, writer, instance) triple.
+- the line names its writer — the daemon the `tag=daemon` role, the ctl and
+  cli clients the shared `tag=cli` role — and carries an `instance=<id>` word:
+  the **control port** when `--audit-instance` is unset (unique per host by
+  construction), the override when spelled. Keep an override unique among
+  everything that shares one collector; the chain groups by the (application,
+  writer, instance) triple.
+
+- the 12-hex token after the event name is the entry's **chained hash** (the
+  audit's F10): any edit, deletion or reordering shows up as a chain break in
+  `dev/gates/audit_verify.py` (run it on a trail file, the family's XDG
+  trails, or a journald dump on stdin). **Every wire command is audited once,
+  by the server** (with the client peer, the role, and the frame's mac when
+  the wire is signed).
 
     2026-11-04T07:16:40Z AUDIT application=CACHE tag=daemon instance=15502 type=start hash=4e1b92f0c7a3 version=0.5.1 upstream=192.168.1.100:5502 unit=1 listen=127.0.0.1:15502 control=unix:/tmp/modbus-cache-15502.socket profile=/nix/store/…-sun2000.json
     2026-11-04T07:16:43Z AUDIT application=CACHE tag=daemon instance=15502 type=write hash=b2c4e17f90d8 fc=6 register=47415 value=5 unit=1
     2026-11-04T07:17:12Z AUDIT application=CACHE tag=daemon instance=15502 type=command hash=09ab57d3f4e1 peer=127.0.0.1:54426 cmd='clear cache' result=ok
     2026-11-04T07:17:45Z AUDIT application=CACHE tag=daemon instance=15502 type=shutdown hash=d94a1f07c3e2 reason=SIGTERM-received uptime=65s clients=1 hits=412 misses=9
 
-- the 12-hex token after the event name is the entry's **chained hash** (the
-  audit's F10): any edit, deletion or reordering shows up as a chain break in
-  `dev/gates/audit_verify.py` (run it on this file, the family's XDG trails,
-  or a journald dump on stdin). **Every wire command is audited once, by the
-  server** (with the client peer, the role, and the frame's mac when the wire
-  is signed); the per-client **request accounting** rides the same trail (one
-  `REQUESTS` event per client per `--audit-requests` period, plus a final
-  tally on every disconnect). The trail is thread-safe and flushed per event.
+- the per-client **request accounting** rides the same trail (one `REQUESTS`
+  event per client per `--audit-requests` period, plus a final tally on every
+  disconnect). The trail is thread-safe and flushed per event.
 
     journalctl -u modbus-cache --since today | grep 'write:'      # all write attempts
     journalctl -u modbus-cache | grep -E 'SIGHUP|shutdown'        # lifecycle
@@ -576,6 +630,25 @@ the write gates: the forwarding toggle and the register ranges
   merged into one block read (never across a function-code boundary); a block
   that fails is split in halves and the pieces are retried — the plan
   converges to the largest blocks the device actually answers.
+
+## Diagnostics registers
+
+- the cache synthesizes a 4-register block at **65000** from live poller state
+  — answered instantly, never forwarded, never cached, never part of a profile
+  (FC3 only): the clients tell live data from cache-served values, and the
+  scraper auto-detects the block and exports it as the `scraper_cache_*`
+  gauges.
+
+| register | meaning |
+|---|---|
+| **65000** | magic `0xCAFE` (the validity check for clients) |
+| **65001** | `1` if the last completed poll cycle had at least one successful read, else `0` |
+| **65002** | seconds since the last successful device read (`65535` = none yet) |
+| **65003** | the cache process' uptime in seconds |
+
+- reads that straddle the block are rejected with exception `02` (illegal data
+  address) — read the four words whole. Reply unit ids are validated on every
+  forwarded request before anything is cached.
 
 ## Persistence
 
@@ -635,6 +708,41 @@ the write gates: the forwarding toggle and the register ranges
   auth handshake rides byte-less (`PVA1 handshake (bytes withheld)` — no
   proof, no password).
 
+## Deployment
+
+- **NixOS** — the module `nixos/modules/modbus-cache.nix` renders the daemon
+  as a hardened service (the options mapped in `docs/NIXOS.md`, the packaging
+  in `nixos/README.md`): the env file, the state dirs and the secret `*File`
+  options ride the module; the rendered config validates with `--dry-run`
+  before a switch.
+
+- **containers** — `docker/Dockerfile.modbus-cache` (stdlib-only, the
+  unprivileged user), the demo and prod compose stacks beside it
+  (`docker/README.md`); the image loads its bundled conf as the default
+  `--config` target — the env file (`docker/env/modbus-cache.env.example`) and
+  the CMD flags carry the deployment shape.
+
+- **systemd (plain)** — run it behind journald (`--audit-log -` rides the
+  NixOS module; journald stores, seals and rotates), the secrets as
+  `LoadCredential=` files passed as `file:<path>`.
+
+## The docs map
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
+| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
+
 ## Source layout
 
 - `bin/modbus-cache.py` — the daemon; `bin/modbus-cache-cli.py` — the
@@ -648,6 +756,26 @@ the write gates: the forwarding toggle and the register ranges
   spine, the Modbus client/server, the audit, the manpage generator) and
   `shared/` (the texts, the schemas, the profiles) — `lib/` imports it by
   path; nothing is packaged separately.
+
+## Troubleshooting
+
+- **it will not start** — every bind failure answers one `cannot bind` line +
+  exit 1 (the port taken? `ss -ltnp | grep 15502`); every configuration error
+  aborts with a clean one-line error before anything binds — `--dry-run`
+  prints the effective settings without touching the ports.
+
+- **clients refused** — the log names the gate: `not on the connect ACL`, the
+  client limit reached, the write gates' `WRITE-REFUSED` (the audit trail
+  carries the client, the frame, the gate per refusal).
+
+- **stale or dead data** — the diagnostics block's 65001/65002 and the
+  `modbus_cache_poll_up` / `modbus_cache_last_poll_age_seconds` gauges tell a
+  poll failure from a slow one; the log names the failing block and the
+  exception code per cycle.
+
+- **deeper** — `--log-level DEBUG` logs every frame both ways; `SIGUSR2` dumps
+  the thread stacks (the family's faulthandler hook); the audit trail
+  chain-verifies with `dev/gates/audit_verify.py`.
 
 ## Testing
 

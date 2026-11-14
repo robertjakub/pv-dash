@@ -317,6 +317,10 @@ class FeedSocket:
             self.sock.close()
         except OSError:
             pass
+        try:
+            os.unlink(self.path)   # the rebind's set-none leaves no stale file
+        except OSError:
+            pass
 
 
 class TraceWriter:

@@ -22,9 +22,28 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   `apps/*/README.md`, the sidecar included). The generated manuals
   experiment (`extras/manuals/<daemon>.md`, `dev/generators/manual.py`)
   landed and was dropped within this window — it never shipped in a
-  release; the record lives in docs/history/front-page-split.md.
+  release; the record lives in docs/history/front-page-split.md (the
+  pack re-landed hand-written later in the window — the Added entry
+  below).
 
 ### Added
+
+- **the manuals pack re-landed, hand-written (`extras/manuals/`)** — the
+  book-style operator documentation, one page per tool app:
+  `modbus-cache.md`, `modbus-scraper.md`, `modbus-fake-inverter.md`,
+  `dashboard.md`, `modbus-replay.md` (the ctl/cli binaries covered
+  inside each) and `pvsuite-cli.md` (the one client behind the four
+  installed `-cli` names), plus the pack README and the
+  `extras/README.md` index line. GitHub-flavored markdown, hard-wrapped
+  prose, one section ladder per page (the family, how it works,
+  installing, quick start, configuration with the full knob table mined
+  from the registry, runtime control, the control plane, access
+  control, metrics, the audit trail, tuning, deployment,
+  troubleshooting, testing, the docs map). Nothing generated and no
+  gate hooks: the reference stays the daemon's `--help` and the
+  generated man page (`<daemon> --man`) — the manuals distill them and
+  the man page wins a disagreement; the links gate reads the pages like
+  any hand-written doc.
 
 - **modbus-scraper: the Waveshare TCP auth on the device leg
   (`--modbus-auth waveshare`)** — the scraper now connects straight to a
@@ -262,6 +281,31 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   renamed file).
 
 ### Fixed
+
+- **The cache regtest's trace section runs green at full depth for the
+  first time** — the section sits past the quick profile's QuickDone and
+  had never executed until a full battery ran it: the trace drain wedged
+  forever (the poller voice emits a record every poll at
+  `--modbus-interval 1`, so the feed never goes quiet and the drain's
+  quiet-gap wait never ended — two full-battery runs died with minutes
+  of zero output at the same check). The drain now bounds itself at 4s
+  AND frames the stream block-by-block — the cumulative buffer always
+  ends on a record boundary, so the checks' flat-index arithmetic holds
+  (a torn tail used to hide records that later counted as new). The
+  checks meet the real record layout: the client/upstream records carry
+  the full MBAP frame (the FC at byte 7, the address at bytes 8:10 —
+  the landed indexes were off by one), the refusal check speaks the
+  ctl's `% error:` face, the sources-filter window takes one in-flight
+  poll cycle of grace (the apply is asynchronous), the rebind EOF checks
+  drain until the close (the accept loop's header may beat the rebind),
+  the TRA handshake marker re-triggers through the live
+  `modbus/auth-upstream` dance (the first upstream connect may ride
+  before the subscriber), and the forward block's `txn = ...` local no
+  longer shadows the global `txn()` helper (the flat module rebinds it
+  for good — armed the moment the forward check first passed). The
+  daemon side: `FeedSocket.close()` unlinks the socket file —
+  `set trace-socket none` leaves no stale inode behind (the rebind's
+  bind unlinked first, the close never did).
 
 - **The cache regtest's restore-precondition check no longer races the
   poller** — `request restore: the clear emptied the cache first`

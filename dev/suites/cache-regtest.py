@@ -2977,17 +2977,52 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     tr.connect(TR_SOCK)
     tr.settimeout(1.2)
 
+    tr_frame = {'done': False}   # the run header parsed and consumed once
+    tr_part = [b'']              # the bytes that do not frame a whole record yet
+
+    def tr_take():
+        """Every whole block out of tr_part (the run header first) — the
+        tail that frames nothing yet stays pending."""
+        out = b''
+        if not tr_frame['done']:
+            _h = parse_binary_header(tr_part[0], 0)
+            if _h is None:
+                return out   # the header still forming
+            tr_frame['done'] = True
+            out += tr_part[0][:_h[1]]
+            tr_part[0] = tr_part[0][_h[1]:]
+        p = tr_part[0]
+        while len(p) >= 4:
+            (bl,) = struct.unpack_from('>I', p, 0)
+            total = 4 + bl + 4
+            if len(p) < total:
+                break
+            out += p[:total]
+            p = p[total:]
+        tr_part[0] = p
+        return out
+
     def tr_drain():
-        buf = b''
-        try:
-            while True:
+        """The records so far, WHOLE records only: the feed never goes
+        quiet (the poller voice emits a record every poll at
+        --modbus-interval 1), so a pure quiet-gap drain would wedge the
+        suite — the drain bounds itself at 4s AND frames the stream
+        block-by-block, so the cumulative buffer always ends on a record
+        boundary and the checks' flat-index arithmetic holds. The 1.2s
+        quiet gap still ends a drain early where the feed truly
+        silences (the sources-filter windows)."""
+        out = b''
+        deadline = time.monotonic() + 4.0
+        while time.monotonic() < deadline:
+            try:
                 d = tr.recv(65536)
-                if not d:
-                    break
-                buf += d
-        except socket.timeout:
-            pass
-        return buf
+            except socket.timeout:
+                break   # the quiet gap
+            if not d:
+                break   # the daemon closed the stream (a rebind)
+            tr_part[0] += d
+            out += tr_take()
+        return out
 
     trbuf = tr_drain()
     _hdr = parse_binary_header(trbuf, 0)
@@ -2998,6 +3033,20 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
 
     def tr_walk():
         recs, off = [], tr_hlen
+        while off + 8 <= len(trbuf):
+            (bl,) = struct.unpack_from('>I', trbuf, off)
+            if off + 4 + bl + 4 > len(trbuf):
+                break
+            recs.append(decode_record(trbuf[off + 4:off + 4 + bl]))
+            off += 4 + bl + 4
+        return recs
+
+    def tr_walk_from(mark):
+        """The records from the byte offset mark (the boundary the caller
+        snapped before an action) — the new-records window the flat
+        upstream-count slice cannot express (client and upstream records
+        interleave in one buffer)."""
+        recs, off = [], max(mark, tr_hlen)
         while off + 8 <= len(trbuf):
             (bl,) = struct.unpack_from('>I', trbuf, off)
             if off + 4 + bl + 4 > len(trbuf):
@@ -3029,23 +3078,27 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     hit = [r for r in tr_client(tr_walk()) if r['note'] == 'served from cache']
     check('trace: the cache hit names its provenance', bool(hit), str(len(hit)))
     if hit:
+        # the served answer is the client's FC3 response (the full frame:
+        # txn proto len unit FC — the FC at byte 7)
         check('trace: the hit keeps the client as the peer on both records (the partner, not the producer)',
-              hit[-1]['peer'].startswith('127.0.0.1:') and hit[-1]['raw'][6] == 3, hit[-1]['peer'])
+              hit[-1]['peer'].startswith('127.0.0.1:') and hit[-1]['raw'][7] == 3, hit[-1]['peer'])
 
     # the forward voice: an uncached read forwards — the client's own txn rides upstream
     b = rd(3, 1, port=TR_CACHE)
     time.sleep(0.4)
     trbuf += tr_drain()
     recs = tr_walk()
-    fwd_req = [r for r in tr_client(recs) if r['kind'] == 0 and r['raw'][7:9] == b'\x00\x03']
+    # an FC3 request for address 3: the FC at byte 7, the address at bytes 8:10
+    fwd_req = [r for r in tr_client(recs) if r['kind'] == 0 and r['raw'][7] == 3
+               and r['raw'][8:10] == b'\x00\x03']
     check('trace: the uncached read forwards (the client face records the request)',
           bool(fwd_req), str(len(fwd_req)))
     if fwd_req:
-        txn = fwd_req[-1]['raw'][:2]
-        up_pair = [r for r in tr_upstream(recs) if r['raw'][:2] == txn]
+        ftxn = fwd_req[-1]['raw'][:2]   # NOT the global txn() helper's name — the flat module rebinds it for good
+        up_pair = [r for r in tr_upstream(recs) if r['raw'][:2] == ftxn]
         check('trace: the forward voice carries the client\'s own txn upstream',
               any(r['kind'] == 0 for r in up_pair) and any(r['kind'] == 1 for r in up_pair),
-              hex(int.from_bytes(txn, 'big')))
+              hex(int.from_bytes(ftxn, 'big')))
         fwd_rsp = [r for r in tr_client(recs) if r['note'] == 'forwarded — device reply']
         check('trace: the forwarded answer names the device as the producer', bool(fwd_rsp), str(len(fwd_rsp)))
 
@@ -3059,17 +3112,24 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     check('trace: the diagnostics read names itself', 'diag registers' in notes, str(notes[-6:]))
 
     # the sources filter: whole voices on/off, never sampling
-    n_up_before = len(tr_upstream(tr_walk()))
+    mark = len(trbuf)   # the byte boundary the set applies at
     check('trace: set trace-sources client accepts', tr_cli('set trace-sources client').startswith('ok'))
+    set_at = time.time()
     time.sleep(2.5)   # a poll cycle passes: the poller voice must go silent
     trbuf += tr_drain()
-    recs = tr_walk()
+    recs_new = tr_walk_from(mark)
+    # the filter applies asynchronously — at most the one in-flight poll
+    # cycle may ride past the set (its records carry earlier timestamps);
+    # a filter that did not apply keeps emitting every second and the
+    # drain catches the late ones
+    late_up = [r for r in recs_new if r['conn'] >= 100000 and r['ts'] > set_at + 1.5]
     check('trace: sources client silences the poller voice',
-          all(r['conn'] < 100000 for r in recs[n_up_before:]),
-          '%d new record(s)' % max(0, len(recs) - n_up_before))
+          not late_up, '%d new record(s), %d late upstream' % (len(recs_new), len(late_up)))
+    b1 = tr_cli('set trace-sources bogus')
+    b2 = tr_cli('set trace-sources bogus')
+    # the ctl's error face is '% error:' (the console spelling), the one-liner names the choices
     check('trace: set trace-sources bogus refuses with the one-liner',
-          tr_cli('set trace-sources bogus').startswith('err') and 'all, client or upstream'
-          in tr_cli('set trace-sources bogus'))
+          b1.startswith('% error:') and 'all, client or upstream' in b2, (b1 + ' | ' + b2)[:80])
     check('trace: set trace-sources upstream accepts', tr_cli('set trace-sources upstream').startswith('ok'))
     trbuf += tr_drain()
     n_client_before = len(tr_client(tr_walk()))
@@ -3088,8 +3148,19 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     time.sleep(0.3)
     check('trace: none closes the socket file', not os.path.exists(TR_SOCK), TR_SOCK)
     tr2.settimeout(1.5)
-    eof = tr2.recv(4096)
-    check('trace: the subscriber sees EOF on the rebind (it re-subscribes)', eof == b'', repr(eof[:16]))
+    saw_eof = False
+    tail2 = b''
+    end = time.monotonic() + 5.0
+    while time.monotonic() < end:
+        try:
+            d = tr2.recv(4096)
+        except socket.timeout:
+            continue
+        if not d:
+            saw_eof = True
+            break
+        tail2 = d[-8:]   # the feed's in-flight records ride past before the close lands
+    check('trace: the subscriber sees EOF on the rebind (it re-subscribes)', saw_eof, repr(tail2[-8:]))
     check('trace: set trace-socket default rebinds after none',
           tr_cli('set trace-socket default').startswith('ok') and os.path.exists(TR_SOCK))
     tr3 = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -3100,14 +3171,18 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
         head3 += tr3.recv(4096)
     check('trace: the rebound feed speaks the PVMB header again', head3[:4] == b'PVMB', head3[:6].hex())
     r = tr_cli('set trace-socket default')
-    time.sleep(0.3)
-    eof3 = b''
-    try:
-        eof3 = tr3.recv(4096)
-    except socket.timeout:
-        pass
+    saw_eof3 = False
+    end = time.monotonic() + 5.0
+    while time.monotonic() < end:
+        try:
+            d = tr3.recv(4096)
+        except socket.timeout:
+            continue
+        if not d:
+            saw_eof3 = True
+            break
     check('trace: the same-path set rebinds too (the subscriber sees EOF)',
-          r.startswith('ok') and eof3 == b'', repr(eof3[:16]))
+          r.startswith('ok') and saw_eof3, r[:24])
     tr.close()
     tr2.close()
     tr3.close()
@@ -3127,16 +3202,54 @@ print('mode 0600 ok; the keyed state file seals (version 2, opaque)')
     tra = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     tra.connect(TRA_SOCK)
     tra.settimeout(1.5)
-    trabuf = tra.recv(65536)
-    _h = parse_binary_header(trabuf, 0)
-    tra_off = _h[1] if _h else 0
+    tra_frame = {'done': False}   # the same block framing as tr_drain's
+    tra_part = [b'']
     tra_recs = []
-    while tra_off + 8 <= len(trabuf):
-        (bl,) = struct.unpack_from('>I', trabuf, tra_off)
-        if tra_off + 4 + bl + 4 > len(trabuf):
-            break
-        tra_recs.append(decode_record(trabuf[tra_off + 4:tra_off + 4 + bl]))
-        tra_off += 4 + bl + 4
+
+    def tra_take():
+        if not tra_frame['done']:
+            _h = parse_binary_header(tra_part[0], 0)
+            if _h is None:
+                return   # the header still forming
+            tra_frame['done'] = True
+            tra_part[0] = tra_part[0][_h[1]:]
+        p = tra_part[0]
+        while len(p) >= 4:
+            (bl,) = struct.unpack_from('>I', p, 0)
+            total = 4 + bl + 4
+            if len(p) < total:
+                break
+            tra_recs.append(decode_record(p[4:4 + bl]))
+            p = p[total:]
+        tra_part[0] = p
+
+    def tra_drain():
+        try:
+            d = tra.recv(65536)
+        except socket.timeout:
+            return
+        if not d:
+            return
+        tra_part[0] += d
+        tra_take()
+
+    tra_drain()
+    markers = [r for r in tra_recs if r['kind'] == 2 and r['note'] == 'PVA1 handshake (bytes withheld)']
+    if not markers:
+        # the first upstream connect (and its handshake) may have ridden
+        # before this subscriber — dance the live scheme to force a fresh
+        # upstream connect and a fresh marker
+        subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py'),
+                        '--control-port', '/tmp/modbus-cache-%d.socket' % TRA_CACHE,
+                        'set', 'modbus/auth-upstream', 'none'],
+                       capture_output=True, text=True, timeout=15)
+        subprocess.run([sys.executable, os.path.join(CACHE_DIR, 'bin', 'modbus-cache-cli.py'),
+                        '--control-port', '/tmp/modbus-cache-%d.socket' % TRA_CACHE,
+                        'set', 'modbus/auth-upstream', 'suite'],
+                       capture_output=True, text=True, timeout=15)
+        end = time.monotonic() + 8.0
+        while not markers and time.monotonic() < end:
+            tra_drain()
     markers = [r for r in tra_recs if r['kind'] == 2 and r['note'] == 'PVA1 handshake (bytes withheld)']
     check('trace: the upstream suite handshake rides as the byte-less marker', bool(markers), str(len(tra_recs)))
     check('trace: no PVA1 proof bytes ever ride the feed',

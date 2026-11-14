@@ -148,3 +148,19 @@ pre-split README) and added the operator sections the READMEs never had
 - The anchors other docs might cite into the old README sections
   (`README.md#alerting` shapes): the links gate cannot see fragments;
   a grep found none at the wave time.
+
+## Postscript — the manuals re-landed, hand-written (Nov 14 2026)
+
+The pack returned by the user's call, a different shape: **hand-written
+markdown, no generator and no gate hooks** — six book-style pages (one
+per tool app, the ctl/cli covered inside; `pvsuite-cli` gets its own),
+the pack README stating the contract (the reference stays the daemon's
+`--help` and the generated man page; the manuals are the narrative, the
+man page wins a disagreement), and the `extras/README.md` index line.
+The generated pack's machinery (`dev/generators/manual.py`, the gate
+hooks, the book include) stays retired — the ladders above were that
+pack's; the hand-written pages walk one ladder of their own (The family
+→ How it works → Installing → Quick start → Configuration → Runtime
+control → The control plane → Access control → Metrics → The audit
+trail → Tuning → Deployment → Troubleshooting → Testing → The docs
+map), and the links gate reads them like any hand-written doc.

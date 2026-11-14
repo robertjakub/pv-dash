@@ -19,6 +19,9 @@ grammar).
 - [examples/](examples/) — the suite-wide sample files, one copy each
   (the standalone acl pairs); every `package.nix` installs its packaged
   copy, no tool loads from here.
+- [manuals/](manuals/) — the book-style operator pages, one per tool
+  app, hand-written; the reference stays the daemons' `--help` and man
+  pages, the manuals distill them into the narrative.
 
 ## The fenced dirs (NOT candidates)
 

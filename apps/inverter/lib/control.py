@@ -32,7 +32,7 @@ from .options import OPTIONS, SETTING_NAMES, SETTING_BY_NAME, SET_BY_NAME, \
     SHOW_OPTIONS, NODE_BY_NAME, COMMANDS, COMMAND_HELP, COMMAND_GROUPS, COMMAND_HIDDEN
 from .simulator import CLOUD_MACHINES, format_clock
 from .statics import CONTROL_SOCKET_TEMPLATE, DEFAULT_LISTEN_PORT, \
-    LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, SCENARIOS, TIME_SCALE_MAX
+    LOG_LEVELS, MAX_REGISTERS, PEAK_RATIO, REGISTER_BUSY, SCENARIOS, TIME_SCALE_MAX
 
 logger = logging.getLogger('fake-inverter')
 
@@ -519,12 +519,25 @@ class ControlServer(_ControlServer):
             return 'err set %s needs an address and a value%s' % (
                 what, ' (0 or 1)' if what != 'register' else '')
         try:
-            addr, val = int(args[1]), int(args[2])
+            addr = int(args[1])
         except ValueError:
-            return 'err %s address and value must be integers' % what
+            return 'err %s address must be an integer' % what
+        if what == 'register' and args[2].lower() == REGISTER_BUSY:
+            if not 0 <= addr <= MAX_REGISTERS - 1:
+                return 'err register address out of range (0..%d)' % (MAX_REGISTERS - 1)
+            self.fake.overlay[addr] = REGISTER_BUSY
+            logger.info('control: set register %d=busy (reads answer exception 06)', addr)
+            return 'ok register %d=busy (reads of it answer exception 06; a value write or reset clears it)' % addr
+        try:
+            val = int(args[2])
+        except ValueError:
+            return 'err %s value must be an integer%s' % (
+                what, " (or 'busy' for registers)" if what == 'register' else '')
         if what == 'register':
-            if not 0 <= addr <= MAX_REGISTERS - 1 or not 0 <= val <= MAX_REGISTERS - 1:
-                return 'err register address/value out of range (0..%d)' % (MAX_REGISTERS - 1)
+            if not 0 <= addr <= MAX_REGISTERS - 1:
+                return 'err register address out of range (0..%d)' % (MAX_REGISTERS - 1)
+            if not 0 <= val <= MAX_REGISTERS - 1:
+                return 'err register value out of range (0..%d)' % (MAX_REGISTERS - 1)
             self.fake.overlay[addr] = val
             logger.info('control: set register %d=%d (write overlay)', addr, val)
             return 'ok register %d=%d (the write overlay, the scrapers read it)' % (addr, val)
@@ -567,7 +580,8 @@ class ControlServer(_ControlServer):
         rows = []
         for name, addr, typ, _scale, _fc in entries:
             if addr in overlay:
-                val = '%d *' % overlay[addr]   # a write overlay wins (set register/FC16)
+                raw = overlay[addr]            # a write overlay wins (set register/FC16)
+                val = ('%d *' % raw) if isinstance(raw, int) else ('%s *' % raw)
             elif vals.get(name) is None:
                 val = 'NaN'
             else:
@@ -605,7 +619,7 @@ class ControlServer(_ControlServer):
             'version   %s' % version_string(),
             'profile   %s' % sim.profile.description,
             'registers %d served, overlay %d: %s' % (len(sim.profile.entries), len(overlay),
-                ', '.join('%d=%d' % kv for kv in sorted(overlay.items())[:8]) or 'empty'),
+                ', '.join('%d=%s' % kv for kv in sorted(overlay.items())[:8]) or 'empty'),
             'bits      coils %d pinned, discrete inputs %d pinned: %s' % (
                 len(self.fake.coils) if self.fake else 0,
                 len(self.fake.discrete) if self.fake else 0,

@@ -36,7 +36,10 @@ entry's address space (FC3 holding / FC4 input registers, FC1 coils /
 FC2 discrete inputs for \fBbit\fR entries); writes land in overlays
 the scrapers read (FC06/FC16 the registers, FC05/FC15 the coils, plus
 \fBset coil\fR/\fBset discrete\fR on the control socket);
-\fB--chaos\fR answers a fraction of requests hostile.
+\fBset register ADDR busy\fR pins a holding register to answer
+exception 06 in band (the dongle's \(dqbusy\(dq, the connection stays \(em
+a value write or reset clears it); \fB--chaos\fR answers a fraction of
+requests hostile.
 .PP
 Modbus auth (\fB--modbus-auth\fR): with \fBsuite\fR the fake's clients prove
 a shared key (\fB--modbus-auth-key\fR, min 16 characters) with a crypt

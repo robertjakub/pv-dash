@@ -15,7 +15,7 @@ from common.modbus import (describe_fc, describe_write, exception_frame, write_k
                            frame, pack_bits, serve_modbus, unit_in_range,
                            unpack_bits)
 from common.serve.connlimit import ConnGate
-from .statics import MAX_BITS, MAX_COUNT, MAX_PDU
+from .statics import MAX_BITS, MAX_COUNT, MAX_PDU, REGISTER_BUSY
 from common.runtime.version import version_string
 
 logger = logging.getLogger('fake-inverter')
@@ -166,6 +166,14 @@ class FakeInverter:
                 regs = self.simulator.registers(func)
                 if func == 3:
                     regs.update(self.overlay)
+                    if any(isinstance(regs.get(addr_ + i), str) for i in range(count)):
+                        # the busy pin (set register ADDR busy): the dongle's
+                        # 'not now' — exception 06 answered in band, the
+                        # connection stays (that is the whole point)
+                        client.sendall(exception_frame(txn, 0, unit, func, 6))
+                        logger.info('fc3 read %d regs @%d from %s:%d -> exception 06 (busy pin)',
+                                    count, addr_, addr[0], addr[1])
+                        return
                 if self.strict and any(addr_ + i not in regs for i in range(count)):
                     client.sendall(exception_frame(txn, 0, unit, func, 2))
                     logger.debug('fc%d read %d regs @%d -> exception 02 (undefined register)', func, count, addr_)

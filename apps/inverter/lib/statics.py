@@ -17,6 +17,8 @@ MAX_REGISTERS = PROTOCOL['max_registers']      # the 16-bit register space
 MAX_COUNT = PROTOCOL['max_count']              # max registers per FC3/FC4 read (the cache's cap)
 MAX_BITS = PROTOCOL['max_bits']                # max bits per FC1/FC2 read (the Modbus spec's 0x7D0)
 UNIT_ID_RANGE = tuple(PROTOCOL['unit_id_range'])  # the migrated cache support: the unit check
+REGISTER_BUSY = 'busy'                          # the busy pin: `set register ADDR busy`
+                                                # — reads of it answer exception 06 in band
 
 DIAGNOSTICS = STATIC['diagnostics']
 DIAG_BASE = DIAGNOSTICS['base']                # the synthesized diagnostics block

@@ -10,6 +10,28 @@ This file keeps **Unreleased and the current release** only — the release
 history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHANGELOG.md).
 
 ## Unreleased
+### Changed
+
+- **the front-page split: the READMEs slim to the front page, the manuals
+  become the full reference** — every `apps/<tool>/README.md` now carries
+  the description, the quick how-to, Security and License and nothing
+  else (the active-development note rides the description); everything
+  the old READMEs referenced — how it works, the configuration ladder,
+  the signals, the metrics, the alerting, the ACLs, the auth schemes,
+  the persistence, the audit trails, the testing — moved into the
+  generated manuals (`extras/manuals/<daemon>.md`) as bullets and tables,
+  no big paragraphs of text. The manual generator renders the registry
+  tables with a `default` column now (the flags reference is the knobs
+  table — one source), carries the per-tool reference sections (the REF
+  data in `dev/generators/manual.py`), and renders a fifth page:
+  `modbus-replay.md` (the no-control-plane shape — the knobs table is
+  the flags table, no commands or show reports). The gates follow the
+  split: `dev/gates/readmes.py` pins the front-page canon (Usage ->
+  Security -> License, no other H2s, License closes; it globs
+  `apps/*/README.md`, the sidecar included), `check_options`' flag gate
+  reads the manual pages, the links gate skips the fifth generated page,
+  and the book's Manuals page gathers all five.
+
 ### Added
 
 - **modbus-scraper: the Waveshare TCP auth on the device leg

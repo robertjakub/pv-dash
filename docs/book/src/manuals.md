@@ -1,10 +1,12 @@
 # The manuals
 
-The four tools' generated command/knob references — each rendered from
-its registry by `dev/generators/manual.py` (`--check`-gated; edit
+The five tools' generated references — each rendered from its registry
+by `dev/generators/manual.py` (`--check`-gated; edit
 `apps/<tool>/lib/options.json` and re-run, never the markdown). The
-pages live in `extras/manuals/`, named for their daemons; the book
-gathers them for reading.
+front-page split (docs/history/front-page-split.md) made these pages the
+full reference — the READMEs carry the front page only. The pages live
+in `extras/manuals/`, named for their daemons; the book gathers them for
+reading.
 
 ## modbus-cache
 
@@ -21,3 +23,7 @@ gathers them for reading.
 ## the dashboard
 
 {{#include ../../../extras/manuals/dashboard.md}}
+
+## modbus-replay
+
+{{#include ../../../extras/manuals/modbus-replay.md}}

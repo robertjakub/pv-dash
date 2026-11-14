@@ -2554,8 +2554,12 @@ try:
                         pdu += chunk
                     fc, addr, count = struct.unpack('>BHH', pdu[:5])
                     if fc in (3, 4):
+                        # zero words: sane values (0 W / 0 V) — a canned
+                        # non-zero pattern decodes over the caps and the
+                        # suspect-sensor posture would 503 the exposition,
+                        # hiding scraper_up
                         conn.sendall(struct.pack('>HHHB', t, 0, 3 + count * 2, u)
-                                     + bytes([fc, count * 2]) + b'\x12\x34' * count)
+                                     + bytes([fc, count * 2]) + b'\x00\x00' * count)
                     else:
                         conn.sendall(struct.pack('>HHHB', t, 0, 3, u) + bytes([fc + 0x80, 1]))
             except OSError:

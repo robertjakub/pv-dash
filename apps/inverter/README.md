@@ -13,9 +13,8 @@ emulates different devices: the shipped default profile is the `sun2000`
 
 The full reference — the simulated machines, every knob with its flag and
 env twin, the runtime pins, the chaos injection, the served registers and
-the audit trail — is
-[the manual](../../extras/manuals/fake-inverter.md) (generated from the
-registry).
+the audit trail — is the daemon's `--help` and the man page
+(`modbus-fake-inverter --man`).
 
 ## Usage
 

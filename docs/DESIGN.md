@@ -40,9 +40,9 @@ and as a full pass whenever a wave landed doc ripples across tools.
 | the supply chain | [sbom/SBOM.md](sbom/SBOM.md) |
 | the operator packs | [extras/](../extras/README.md) — the [alert rules](../extras/alerts/README.md) (one file per watched exporter), the [shared sample files](../extras/examples/README.md) the `file:` acl gates point at, the [graylog pack](../extras/graylog/README.md) |
 
-The per-tool surfaces live in the tools' own READMEs and MANUALs; the
-book (`docs/book/`, built from `book/src/`) carries the reader tour —
-this page beside the index, the four manuals gathered on one page.
+The per-tool surfaces live in the tools' own READMEs, the man pages and
+the book (`docs/book/`, built from `book/src/`) — the reader tour: this
+page beside the index.
 
 The ledger rules (every doc family is TWO files — the current half
 answers "what is true now", the history half "how did we get here"):
@@ -80,7 +80,6 @@ release.
    python3 dev/gates/links.py --check
    python3 dev/gates/options.py --check
    python3 dev/gates/texts.py
-   python3 dev/generators/manual.py --check
    python3 dev/generators/examples.py --check
    python3 dev/generators/sbom.py --check
    python3 dev/generators/man.py && mandoc -Tlint apps/<tool>/man/*.1

@@ -20,12 +20,9 @@ stand-in gateway peer proves the password path, the wrong password's
 poll-down, the live scheme dance over a standing key and the dry-run
 floors.
 
-The manual moved to the operator packs: `apps/scraper/MANUAL.md` is
-`extras/manuals/modbus-scraper.md` now (the daemon-named page;
-`dev/generators/manual.py` renders it there, `--check` gates it — the
-docs redo's per-tool manuals-home ruling reversed). The README's link
-and the book's include re-pointed; the content is unchanged but the
-h1's `(MANUAL.md)` tail dropped.
+The manual moved to the operator packs, then retired (Nov 14): the
+page is gone — the reference is the daemon's `--help` and the man page
+(`modbus-scraper --man`); the README points there.
 
 pvsuite-cli: the tool's cli bin (`modbus-scraper-cli.py`) became a symlink to
 the family dispatcher `apps/pvsuite-cli.py` — the tool's SPEC half

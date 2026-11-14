@@ -12,48 +12,17 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 ## Unreleased
 ### Changed
 
-- **the front-page split: the READMEs slim to the front page, the manuals
-  become the full reference** — every `apps/<tool>/README.md` now carries
-  the description, the quick how-to, Security and License and nothing
-  else (the active-development note rides the description); everything
-  the old READMEs referenced — how it works, the configuration ladder,
-  the signals, the metrics, the alerting, the ACLs, the auth schemes,
-  the persistence, the audit trails, the testing — moved into the
-  generated manuals (`extras/manuals/<daemon>.md`) as bullets and tables,
-  no big paragraphs of text. The manual generator renders the registry
-  tables with a `default` column now (the flags reference is the knobs
-  table — one source), carries the per-tool reference sections (the REF
-  data in `dev/generators/manual.py`), and renders a fifth page:
-  `modbus-replay.md` (the no-control-plane shape — the knobs table is
-  the flags table, no commands or show reports). The gates follow the
-  split: `dev/gates/readmes.py` pins the front-page canon (Usage ->
-  Security -> License, no other H2s, License closes; it globs
-  `apps/*/README.md`, the sidecar included), `check_options`' flag gate
-  reads the manual pages, the links gate skips the fifth generated page,
-  and the book's Manuals page gathers all five. The manuals then became
-  FULL documentation: one canonical ladder per page (`SECTION_ORDER` in
-  the generator — The family, Run it, How it works, The control plane,
-  the Commands/Knobs/Show-reports tables, Signals, Configuration,
-  Runtime control, Access control, Metrics, Audit logging, Register
-  maps, Tuning, Diagnostics registers, Deployment, The docs map, Source
-  layout, Troubleshooting, Testing, the tool's own extras beside, an
-  honestly-absent topic its one-line absence) — the family-wide stories
-  (the audit forward, the runner rule, the docs map) spliced from one
-  source, the cache's Diagnostics registers table recovered from the
-  pre-split README, the composition map and the links into
-  `docs/SECURITY.md` / `docs/specs/ACL.md` / `docs/specs/MODBUS.md` /
-  `docs/NIXOS.md` / `docker/README.md` riding every page, and the wave
-  record's appendix carrying the five pages' full heading survey
-  (docs/history/front-page-split.md). The final pass scanned the code:
-  the source layouts render as annotated trees (the bin pair with the
-  pvsuite-cli symlink spelled, every lib module's role from its
-  docstring, the dev/dev-cli launcher contract), The control plane tells
-  the one-dispatcher story (`apps/pvsuite-cli.py` — the tool from the
-  name it was invoked as, the short aliases, the bare-spelling tool
-  word), The docs map is per-tool (the app's own documents first, the
-  family table beside — with `docs/DESIGN.md` joined and the phantom
-  `docs/NIXOS.md` corrected to `nixos/README.md`), and the How-it-works
-  sections open with a prose paragraph before the bullets.
+- **the front-page split: the READMEs slim to the front page** — every
+  `apps/<tool>/README.md` now carries the description, the quick how-to,
+  Security and License and nothing else (the active-development note
+  rides the description); the tool's full reference is the daemon's
+  `--help` and the generated man page (`<daemon> --man`), and the README
+  points there. `dev/gates/readmes.py` pins the front-page canon (Usage
+  -> Security -> License, no other H2s, License closes; it globs
+  `apps/*/README.md`, the sidecar included). The generated manuals
+  experiment (`extras/manuals/<daemon>.md`, `dev/generators/manual.py`)
+  landed and was dropped within this window — it never shipped in a
+  release; the record lives in docs/history/front-page-split.md.
 
 ### Added
 

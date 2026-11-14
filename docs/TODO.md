@@ -235,7 +235,7 @@ they name the wire.
   long on cache/scraper, short on inverter/dashboard; the inverter's
   `connect-acl` help says "the cache's connect-acl, mirrored" — a
   cross-tool reference in a user row (`apps/inverter/lib/options.json:139`,
-  it reached `apps/inverter/lib/man.py:117` and `extras/manuals/fake-inverter.md:119`).
+  it reached `apps/inverter/lib/man.py:117` and the fake's manual page).
   Outcome: one line per verb, per-tool brackets only.
 - **the knob descriptions, four voices** `[all]` — `control-port`
   alone has three dialects ("control server target..." /
@@ -258,8 +258,8 @@ they name the wire.
   `startup-only — pass it by flag/env/config (set/clear refuse)`
   (show knobs + help config via `control_command()`,
   `common/settings/options.py:390-408`),
-  `*(restart)*` / `startup-only (secret)` (the manual pages,
-  `dev/generators/manual.py:143-146`), `restart: true` + the wire phrase
+  `*(restart)*` / `startup-only (secret)` (the manual pages as they
+  then stood), `restart: true` + the wire phrase
   (only the cache's man carries the trio now, `apps/cache/lib/man.py:98-107`),
   and "restart to apply" (apps/inverter/README.md:204). Outcome: a
   two-phrase lexicon in `shared/suite/texts.json`, every surface renders it,
@@ -645,16 +645,13 @@ re-open — is the history half:
   mdBook form: the READMEs/audit/TODO/changelog included via
   `{{#include}}`); what remains is the publishing: build + deploy the
   book on GH Pages in the CI item's workflow.
-- *(landed — the manuals-home move, reversing the docs redo's per-tool
-  ruling)*: the four pages live in `extras/manuals/` under their daemon
-  names — `modbus-cache.md`, `modbus-scraper.md`, `fake-inverter.md`,
-  `dashboard.md`: the tool dirs hold the code and the registries, the
-  operator packs hold the reading (the earlier `extras/manuals/`
-  decline is overturned — the pages are loaded by no tool either way,
-  and the daemon-named pack reads as one). The browsing home is still
-  the book: the Manuals page includes all four by `{{#include}}` beside
-  a SUMMARY row; the per-tool READMEs' links re-point and stay
-  disk-true (the book page is the reader's route).
+- *(landed, then retired — the manuals-home move, the front-page
+  split, the Nov 14 drop)*: the generated manuals lived in the operator
+  packs under their daemon names, then the front-page split
+  made them the full reference, then the whole pack dropped the same
+  day: the tool dirs hold the code and the registries, the man pages
+  (`<daemon> --man`, generated from the live parsers) hold the
+  reference, the per-tool READMEs point there.
 
 ### CROSS-TOOL
 

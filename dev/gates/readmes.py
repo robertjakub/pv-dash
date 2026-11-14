@@ -16,8 +16,8 @@ The canon — every tool README:
 and NOTHING else: the README is the front page (the description, the quick
 how-to, the security posture, the license); the tool's reference material —
 how it works, the knobs, the signals, the metrics, the audit trail, the
-testing — lives in the generated manual (`extras/manuals/<daemon>.md`,
-`dev/generators/manual.py --check` gates it), and the README links to it.
+testing — lives in the daemon's `--help` and the generated man page
+(`<daemon> --man`), and the README points there.
 
 The rules: every canon section present exactly once and in canon order;
 no other `##` sections; `License` closes the page. Every apps/*/README.md
@@ -25,8 +25,7 @@ walks (the sidecar included — the gates glob the tree, not a tools list).
 
 Report only — the findings name the moves, the edits stay human (the
 READMEs are hand-wrapped prose; a mechanical re-order is not worth the hunk
-surgery). Run after any README rewrite, beside `check_options.py` (the
-flags-mention gate — its surface is the manual page now).
+surgery). Run after any README rewrite, beside `check_options.py`.
 `family_drift.py` prints the same verdict beside the `##` ladders it
 reports. Stdlib only."""
 import glob
@@ -76,13 +75,13 @@ def readme_findings(rel):
         seen = pos[want]
 
     # the front-page ruling: no other H2s — the reference material lives in
-    # the generated manual
+    # the daemon's --help and the man page
     for i, s in enumerate(secs):
         if s['title'] in CANON:
             continue
         found.append('"%s" is not front-page material (the canon leaves the'
                      ' H2s at Usage/Security/License only — the reference'
-                     ' lives in the generated manual)' % s['title'])
+                     " lives in the daemon's --help and the man page)" % s['title'])
 
     # License closes the page
     if 'License' in pos and pos['License'] != len(secs) - 1:

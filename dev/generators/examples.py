@@ -4,7 +4,7 @@ for both surfaces, one gate:
 
 - `docker/env/<tool>.env.example` — the four tools' env files: every env
   twin the registry declares, grouped by its namespace node (the
-  manuals' knobs tables' bucketing), the sample value the image itself
+  knobs tables' bucketing), the sample value the image itself
   runs (the CMD flag or an ENV where one pins it, the built-in default
   otherwise) and the docker-surface notes (the compose pins, the
   CMD/ENV pins) as comment lines.
@@ -14,7 +14,7 @@ for both surfaces, one gate:
   in their file:<path> form. The grammar is the control grammar
   (common/settings/options.py): every line is a `set <name> <value>` —
   the live path as words, the same line pastes into the console or a
-  ctl. The buckets follow the manuals' knobs tables' rule: the longest
+  ctl. The buckets follow the knobs tables' rule: the longest
   node naming the row's live path, the startup-only rows (no live path)
   in the general bucket. The fake's demo machines (pv, load, batt,
   grid, soc, mppt, cloud, scenario, battery-state, grid-outage) are
@@ -229,7 +229,7 @@ def comment(text):
 
 def bucket_key(live, nodes):
     """The row's bucket: the longest node naming its live path's prefix
-    (the manuals' knobs tables' rule); a knob without a live path (or
+    (the knobs tables' rule); a knob without a live path (or
     under no node) rides the general bucket."""
     best = ''
     for n in nodes:
@@ -378,7 +378,7 @@ def render_conf(tool, daemon, name, intro, demo, rows):
         if key not in {o.name for o in knobs}:
             raise SystemExit('examples: %s DEMO key %r is no knob'
                              % (tool, key))
-    # the manuals' knobs tables' bucketing: the longest node naming the
+    # the knobs tables' bucketing: the longest node naming the
     # row's live path's prefix; a row without a live path (startup-only)
     # rides the general bucket
     nodes = [o for o in rows if o.node]

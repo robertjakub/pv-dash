@@ -13,9 +13,8 @@ deployment: no container image, no Nix package, no service module — run
 it from a checkout next to the tools it debugs.
 
 The full reference — the modes, the trace format (both shapes), the dump
-tool, every flag with its env twin and default — is
-[the manual](../../extras/manuals/modbus-replay.md) (generated from the
-registry).
+tool, every flag with its env twin and default — is the daemon's `--help`
+and the man page (`modbus-replay --man`).
 
 ## Usage
 

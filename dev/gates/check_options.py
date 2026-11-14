@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The one-knob-one-source gate (docs/TODO.md): every knob must agree across
-the four surfaces it lives on — the argparse flags, the env twins, the
-NixOS module options and the generated manual's knob tables — against the
+the surfaces it lives on — the argparse flags, the env twins, the
+NixOS module options and the bundled config script — against the
 option registry (per-tool lib/options.py, the common Option rows). The bundled
 config script and the man pages ride the same check (the man OPTIONS render
 from the parser; the bundled config's `set` lines must name registry
@@ -72,17 +72,6 @@ def nix_options(module_nix):
     return set(re.findall(r'([A-Za-z][A-Za-z0-9]*)\s*=\s*(?:lib\.)?(?:mkOption|mkEnableOption|mkFileOption)\b', text))
 
 
-def readme_flags(readme):
-    """The flags named in the tool's generated manual page (`| \`--flag\``
-    rows and the prose) — the front-page split moved the flags reference out
-    of the READMEs (extras/manuals/<daemon>.md, rendered from the registry).
-    A knob is covered when the page mentions its flag at all — the tables
-    are documentation, not a registry dump; what the check enforces is that
-    every registry row is mentioned somewhere."""
-    text = open(os.path.join(REPO, readme)).read()
-    return text
-
-
 def bundled_config_names(config, options):
     """The registry names the bundled script's set lines resolve to — the
     CLI spelling (`set modbus upstream <value>`) via the same word-index
@@ -96,7 +85,7 @@ def bundled_config_names(config, options):
 def check_tool(tool):
     """One tool: returns [(ok, message)] rows."""
     rows = []
-    bin_script, module_nix, readme, config = SURFACES[tool]
+    bin_script, module_nix, config = SURFACES[tool]
     tool_dir = tool
     options, verbs, _shows, mod = load_registry(tool_dir)
     flags = {'--' + o.name for o in options if o.flag}   # control-only settings carry no flag
@@ -325,12 +314,6 @@ def check_tool(tool):
     extra = sorted(got - flags - {'--config', '--dry-run', '--man', '--version', '--help'})
     rows.append((not extra, '%s: every --help flag is in the registry%s'
                  % (tool, ' — undocumented: %s' % ', '.join(extra) if extra else '')))
-
-    # the manual page mentions every flag (the generated reference)
-    text = readme_flags(readme)
-    unmentioned = sorted(f for f in flags if f not in text)
-    rows.append((not unmentioned, '%s: the manual mentions every flag%s'
-                 % (tool, ' — unmentioned: %s' % ', '.join(unmentioned) if unmentioned else '')))
 
     if module_nix:
         nix = nix_options(module_nix)

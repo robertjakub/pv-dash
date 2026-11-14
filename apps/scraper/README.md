@@ -12,10 +12,9 @@ Deye hybrids; it can poll the inverter directly or through the
 be enabled on the inverter / SDongle / EMMA and reachable on TCP 502,
 unit id 1.
 
-The full reference — the control wire, every knob with its flag, env twin
-and default, the signals, the metrics, the alerting, the audit trail — is
-[the manual](../../extras/manuals/modbus-scraper.md) (generated from the
-registry).
+The full reference — every knob with its flag, env twin and default, the
+signals, the metrics, the alerting, the audit trail — is the daemon's
+`--help` and the man page (`modbus-scraper --man`).
 
 ## Usage
 

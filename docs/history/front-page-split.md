@@ -1,7 +1,12 @@
 # front-page-split — the READMEs' front page + the manuals as the reference
 
-Status: **landed** (Nov 14 2026, uncommitted at write time — the per-tool
-commits land on beam-it-up).
+Status: **landed** (Nov 14 2026) — and the manuals half **dropped the
+same day** (the pack `extras/manuals/`, the generator
+`dev/generators/manual.py`, the book's Manuals page and every gate hook
+retired; the reference went back to the daemon's `--help` and the man
+pages). The split itself stands: the READMEs speak the front-page canon
+(`dev/gates/readmes.py`), the reference lives elsewhere. This record
+keeps the story and the survey as history.
 
 The ruling: **the README is the front page, the manual is the reference.**
 Every `apps/<tool>/README.md` had grown into a 300–580-line reference —

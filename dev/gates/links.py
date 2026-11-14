@@ -17,13 +17,13 @@ The two checks have different homes:
   history records keep their landed spellings (the convention since
   the scripts split).
 
-The generated layer is excluded from both — docs/family-drift.md, the
-five extras/manuals/<daemon>.md pages and docs/sbom/SBOM.md speak their
-generators' constants (`dev/generators/{manual,sbom}.py --check`
-are their gates). Fenced code blocks are skipped (the tree diagrams and
-the build snippets cite nothing). Run after any docs rewrite, beside
-`check_options.py` and `lint/readmes.py` — the links rot the apps/ move
-left behind is the class this gate exists for. Stdlib only."""
+The generated layer is excluded from both — docs/family-drift.md and
+docs/sbom/SBOM.md speak their generators' constants
+(`dev/generators/sbom.py --check` is their gate). Fenced code blocks are
+skipped (the tree diagrams and the build snippets cite nothing). Run
+after any docs rewrite, beside `check_options.py` and
+`lint/readmes.py` — the links rot the apps/ move left behind is the
+class this gate exists for. Stdlib only."""
 import os
 import re
 import sys
@@ -36,10 +36,7 @@ INCLUDE = re.compile(r'\{\{#include\s+([^}]+?)\}\}')
 SPAN = re.compile(r'`([^`\n]+)`')
 ROOTED = re.compile(r'^(apps|docs|shared|common|extras|docker|nixos|scripts|tests)/'
                     r'[A-Za-z0-9][A-Za-z0-9_./-]*$')
-GENERATED = ('extras/manuals/modbus-cache.md', 'extras/manuals/modbus-scraper.md',
-             'extras/manuals/fake-inverter.md', 'extras/manuals/dashboard.md',
-             'extras/manuals/modbus-replay.md',
-             'docs/family-drift.md', 'docs/sbom/SBOM.md')
+GENERATED = ('docs/family-drift.md', 'docs/sbom/SBOM.md')
 RECORDS = ('CHANGELOG.md',)
 TOKEN_SKIP = ('docs/history/', )
 TOKEN_SKIP_FILES = ('CHANGELOG.md', 'docs/docs-redo.md')

@@ -10,8 +10,7 @@ Prometheus, so the browser never talks to Prometheus directly.
 
 The full reference — the `config.js` keys, the URL params, the reverse
 proxy recipes, the metrics source, the control wire and every knob — is
-[the manual](../../extras/manuals/dashboard.md) (generated from the
-registry).
+the server's `--help` and the man page (`dashboard --man`).
 
 ## Usage
 

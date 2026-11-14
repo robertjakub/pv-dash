@@ -5,12 +5,9 @@ The open items live in the family-wide [TODO](../../docs/TODO.md) (tagged
 
 ## Done (the highlights; the git history has the details)
 
-The manual moved to the operator packs: `apps/dashboard/MANUAL.md` is
-`extras/manuals/dashboard.md` now (the daemon-named page;
-`dev/generators/manual.py` renders it there, `--check` gates it — the
-docs redo's per-tool manuals-home ruling reversed). The README's link
-and the book's include re-pointed; the content is unchanged but the
-h1's `(MANUAL.md)` tail dropped.
+The manual moved to the operator packs, then retired (Nov 14): the
+page is gone — the reference is the daemon's `--help` and the man page
+(`dashboard --man`); the README points there.
 
 pvsuite-cli: the tool's cli bin (`dashboard-cli.py`) became a symlink to
 the family dispatcher `apps/pvsuite-cli.py` — the tool's SPEC half

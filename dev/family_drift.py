@@ -874,9 +874,9 @@ The findings:
 - **The README skeleton** is the front-page split's shape (the
   description under the H1, then usage -> security -> license, and
   nothing else) and `dev/gates/readmes.py --check` pins it: the canon
-  H2s in order, no other H2s — the tool's own reference material
-  moved into the generated manuals (`extras/manuals/<daemon>.md`),
-  which this sweep prints the gate's verdict beside."""
+  H2s in order, no other H2s — the tool's own reference material lives
+  in the daemon's --help and the generated man page, which this sweep
+  prints the gate's verdict beside."""
 
 NIXOS_FINDINGS = """\
 The findings:

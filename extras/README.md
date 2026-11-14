@@ -19,11 +19,6 @@ grammar).
 - [examples/](examples/) — the suite-wide sample files, one copy each
   (the standalone acl pairs); every `package.nix` installs its packaged
   copy, no tool loads from here.
-- [manuals/](manuals/) — the four daemons' generated control-wire
-  manuals (`modbus-cache.md`, `modbus-scraper.md`, `fake-inverter.md`,
-  `dashboard.md`), rendered from the registries by
-  `dev/generators/manual.py` (`--check`-gated); the book's Manuals page
-  gathers them, no tool loads them.
 
 ## The fenced dirs (NOT candidates)
 

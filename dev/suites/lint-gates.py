@@ -9,7 +9,6 @@ per gate:
   lint/readmes.py --check      the tool READMEs' front-page canon
   lint/texts.py                the rendered texts vs texts.json
   lint/profile.py --check      the shared device profiles
-  generators/manual.py --check   the five MANUAL pages
   generators/examples.py --check the env + conf examples
   generators/trace_example.py --check  the example trace
   generators/sbom.py --check     the SBOM pair
@@ -34,7 +33,6 @@ GATES = (
     ('lint/readmes --check', ('dev/gates/readmes.py', '--check')),
     ('lint/texts', ('dev/gates/texts.py',)),
     ('lint/profile --check', ('dev/gates/profile.py', '--check')),
-    ('generators/manual --check', ('dev/generators/manual.py', '--check')),
     ('generators/examples --check', ('dev/generators/examples.py', '--check')),
     ('generators/trace_example --check', ('dev/generators/trace_example.py', '--check')),
     ('generators/sbom --check', ('dev/generators/sbom.py', '--check')),

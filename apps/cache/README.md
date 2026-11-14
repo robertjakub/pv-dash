@@ -11,11 +11,10 @@ and its SDongle/EMMA radio allow one Modbus TCP connection, so the
 else. Point the scraper (or any other Modbus client) at the proxy instead
 of the inverter.
 
-The full reference — the control wire, every knob with its flag, env twin
-and default, the signals, the ACLs, the auth schemes, the persistence,
-the metrics and the audit trail — is
-[the manual](../../extras/manuals/modbus-cache.md) (generated from the
-registry).
+The full reference — every knob with its flag, env twin and default, the
+signals, the ACLs, the auth schemes, the persistence, the metrics and the
+audit trail — is the daemon's `--help` and the man page
+(`modbus-cache --man`).
 
 ## Usage
 

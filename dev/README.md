@@ -154,8 +154,6 @@ shipped-artifact renderers apart from the gates:
 - **`generators/man.py`** — the man pages from the live parsers + each
   tool's `lib/man.py` prose (`--man` renders through the bin; the
   shipped pages regenerate).
-- **`generators/manual.py`** — the four `extras/manuals/<daemon>.md`
-  pages from the registries: every command, knob and show report the
   tool's control wire answers, the kind of each (command, settable —
   set/clear — or show-only; the startup-only knobs marked), the
   flag/env twin, the value shape. `--check` fails a stale page.
@@ -178,7 +176,6 @@ edit to the rendered page dies at the next run):
 | Page | Generator | Gate |
 |---|---|---|
 | [docs/family-drift.md](../docs/family-drift.md) + the seed ledger | `family_drift.py` | `--check` |
-| `extras/manuals/<daemon>.md` (×4) | `generators/manual.py` | `--check` |
 | `docker/env/<tool>.env.example` (×4) + `<tool>/examples/*.conf` (×4) | `generators/examples.py` | `--check` |
 | `<tool>/man/*.1` (×4) | `generators/man.py` | `mandoc -Tlint` |
 | [docs/sbom/](../docs/sbom/SBOM.md) (the SBOM pair) | `generators/sbom.py` | `--check` |

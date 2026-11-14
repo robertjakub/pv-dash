@@ -6,8 +6,9 @@ import threading
 import time
 from collections import deque
 
-from common.modbus import (DeviceError, ModbusError, block_stat, describe_fc,
-                           describe_write, exception_frame, frame, pack_bits,
+from common.modbus import (DeviceError, ModbusError, ReplyTimeout, SLAVE_BUSY,
+                           block_stat, describe_fc, describe_write,
+                           exception_frame, frame, is_busy_error, pack_bits,
                            serve_modbus, unit_in_range, unpack_bits, write_kv,
                            write_shape_error, write_target)
 from common.modbus.trace import KIND_RAW_C2D, KIND_REQ, KIND_RSP
@@ -260,6 +261,7 @@ class Proxy:
         pending = deque(self.blocks)
         done = []
         ok = {}
+        retried = set()
         first = True
         paced = True   # the read delay paces a healthy device; failures sweep unpaced
         while pending:
@@ -282,9 +284,38 @@ class Proxy:
                 done.append((fc, start, count, leaves))
             except (ModbusError, OSError) as e:
                 paced = False
-                with self.upstream.lock:
-                    self.upstream.close()
-                if len(leaves) > 1:
+                soft = is_busy_error(e) or isinstance(e, ReplyTimeout)
+                if soft and (fc, start, count) not in retried:
+                    # the device is alive and the session is healthy — wait
+                    # a beat and retry the same query once per cycle ON THE
+                    # SAME CONNECTION (a reconnect would only buy another
+                    # lost first query): the dongle's 'not now' (exception
+                    # 06) or its lost first query (a fresh session's first
+                    # exchange draws silence — the mbpoll repro)
+                    retried.add((fc, start, count))
+                    if isinstance(e, ReplyTimeout):
+                        logger.info('the device timed out waiting to retry fc%d %s %d:%d',
+                                    fc, _space_name(fc), start, count)
+                    else:
+                        logger.info('the device is busy waiting to retry fc%d %s %d:%d',
+                                    fc, _space_name(fc), start, count)
+                    time.sleep(max(self.read_delay, 1.0))
+                    pending.appendleft((fc, start, count, leaves))
+                elif soft:
+                    # still away: not an error — the cached words stay
+                    # fresh (no leaf poisoning, no split; the device, not
+                    # the range, is the problem), the next cycle retries
+                    block_stat(self.block_stats, (fc, start, count), time.monotonic() - t0, e)
+                    logger.debug('the device is away fc%d %s %d:%d keeps last poll',
+                                 fc, _space_name(fc), start, count)
+                    done.append((fc, start, count, leaves))
+                elif isinstance(e, DeviceError) and len(leaves) > 1:
+                    # the device's own shape answer (illegal function/address/
+                    # value): the block straddles a map hole or exceeds the
+                    # device's count — split in half, the halves re-queue this
+                    # cycle. The split STAYS: it is the learned shape of the
+                    # device, re-probing the merged block would only buy the
+                    # same refusal (reload/restart rebuilds the plan).
                     mid = len(leaves) // 2
                     left, right = leaves[:mid], leaves[mid:]
                     logger.debug('splitting block %s%d:%d after failure (%s)',
@@ -292,9 +323,16 @@ class Proxy:
                     pending.appendleft((fc, right[0][1], span(right), right))
                     pending.appendleft((fc, left[0][1], span(left), left))
                 else:
+                    # transport, garbage or a shape refusal on a single leaf:
+                    # the leaves poison honestly (the wire shows the failure,
+                    # the cached words serve past their ttl) and the block
+                    # stays WHOLE in the plan — a connection-scoped failure
+                    # must not degrade the granularity, the next good cycle
+                    # re-polls the full block and the leaves recover
                     block_stat(self.block_stats, (fc, start, count), time.monotonic() - t0, e)
-                    self._leaf_fail(leaves[0], e)
-                    ok[leaves[0]] = False
+                    for lf in leaves:
+                        self._leaf_fail(lf, e)
+                        ok[lf] = False
                     done.append((fc, start, count, leaves))
         if generation == self.generation:
             self.blocks = done
@@ -668,8 +706,13 @@ class Proxy:
                     logger.info('read: fc%d %s %d:%d ok%s', fc, _space_name(fc), addr, count,
                                 '' if not self.no_cache else ' (not cached: selection none)')
                 elif body and body[0] == fc | 0x80:
-                    logger.warning('read: fc%d %s %d:%d rejected by the device (modbus exception %d)',
-                                   fc, _space_name(fc), addr, count, body[2] if len(body) > 2 else -1)
+                    code = body[1] if len(body) > 1 else -1
+                    if code == SLAVE_BUSY:
+                        logger.info('read: fc%d %s %d:%d the device is busy (modbus exception 06), answered in band',
+                                    fc, _space_name(fc), addr, count)
+                    else:
+                        logger.warning('read: fc%d %s %d:%d rejected by the device (modbus exception %d)',
+                                       fc, _space_name(fc), addr, count, code)
                 else:
                     logger.warning('read: fc%d %s %d:%d unexpected response',
                                    fc, _space_name(fc), addr, count)
@@ -692,8 +735,9 @@ class Proxy:
             self._local.fwd_note = 'forwarded — device reply'
             return resp
         except (ModbusError, OSError) as e:
-            with self.upstream.lock:
-                self.upstream.close()
+            # the close discipline lives in the client's _exchange: transport
+            # failures dropped the session there, an in-sync failure (a busy
+            # or rejected reply, a silent timeout) keeps the warm session
             self._local.fwd_note = 'forwarded — upstream failed'
             if desc:
                 logger.warning('write failed: %s (%s)', desc, e)

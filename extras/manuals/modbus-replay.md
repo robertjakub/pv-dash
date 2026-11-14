@@ -66,6 +66,9 @@ replay mode. Part of the pv-suite family.
 
 ## How it works
 
+The sidecar is two faces over one trace format: capture pipes and taps,
+replay indexes and answers — the raw frames the one truth either way.
+
 | mode | knobs | what happens |
 |---|---|---|
 | capture | `--upstream HOST:PORT` (+ `--capture FILE`) | every client is piped to the device; the wire dumps to the trace |
@@ -331,8 +334,32 @@ resolver's last rung after flag > env > config); the namespaces group them.
 | `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
 | `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
 | `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
-| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
-| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docs/DESIGN.md` | the design — the architecture, the decisions, the postures the tools share |
+| `nixos/README.md` | the NixOS side — the option maps rebuilt from `module.nix`, the flake, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
+
+## The docs map
+
+| this tool's documents | what they carry |
+|---|---|
+| `apps/modbus-replay/README.md` | the front page — the description, the quick how-to, Security, License |
+| `apps/modbus-replay/lib/options.json` | the registry — the one row per knob (the knobs table renders from it) |
+| `apps/modbus-replay/man/` | the generated man pages (`modbus-replay --man`, `modbus-replay-dump --man`) |
+| `extras/examples/modbus-replay-trace.pvmb` | the worked example trace — two sessions, both handshakes, the refused write (rendered by the dump tool) |
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/DESIGN.md` | the design — the architecture, the decisions, the postures the tools share |
+| `nixos/README.md` | the NixOS side — the option maps rebuilt from `module.nix`, the flake, the packages |
 | `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
 | `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
 | `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
@@ -343,15 +370,34 @@ resolver's last rung after flag > env > config); the namespaces group them.
 
 ## Source layout
 
-- `bin/modbus-replay.py` — the daemon (capture, pass-through, replay);
-  `bin/modbus-replay-dump.py` — the reader face (the views, the converter, the
-  live view, the recorder); `lib/` — the sidecar's modules (`capture.py`,
-  `replay.py`, `trace.py`, `statics.py`, the registry wiring); `man/` — the
-  generated man pages; `dev` — the checkout launcher.
+the sidecar is flat and stdlib-only — two bins, one lib package, the
+generated man pages beside; the checkout launcher (`dev`) runs it straight
+from the tree. No container image, no Nix package, no NixOS module — a
+deployment would defeat the sidecar (it debugs deployments, it is not one).
 
-- the sidecar is stdlib-only and shares no service packaging — no container
-  image, no Nix package, no NixOS module; the family's `common/` package (the
-  trace writer, the record encoding) is imported by path from the checkout.
+    apps/modbus-replay/
+    ├── bin/
+    │   ├── modbus-replay.py          # the daemon: capture, pass-through, replay — the
+    │   │                            #   CLI, the tap wiring, the signal handling
+    │   └── modbus-replay-dump.py     # the reader face: the views, the converter, the
+    │                                #   live view, the recorder
+    ├── lib/
+    │   ├── capture.py                # the capture face: the pipe + the shadow copy
+    │   ├── replay.py                 # the replay face: the answer index, the miss
+    │   │                            #   policies, the recorded latencies
+    │   ├── trace.py                  # the trace face: the FrameTap (the MBAP
+    │   │                            #   reassembler), the PVMB writer, the walk
+    │   ├── statics.py                # the trace format's identity, the miss codes
+    │   │                            #   (lib/defaults.json)
+    │   ├── options.py + options.json # the registry: the one row per knob
+    │   ├── config.py                 # the env layer + the flags (no config file)
+    │   └── man.py                    # the generated man pages
+    ├── man/                          # the generated man pages (the daemon + the dump)
+    └── dev                           # the checkout launcher
+
+the family's `common/` package (the trace writer, the record encoding) is
+imported by path from the checkout — the sidecar shares no service packaging
+with the tools it debugs.
 
 ## Troubleshooting
 

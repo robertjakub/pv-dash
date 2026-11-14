@@ -69,6 +69,10 @@ family.
 
 ## How it works
 
+The scraper is a loop and a page: the poller walks the device profile, the
+exposition answers Prometheus — and `metrics.json` names everything that
+appears.
+
 - a poll loop reads the device profile's registers every `--modbus-interval`
   seconds; the source ranges merge into as few **block reads** as the
   `--modbus-merge-gap` allows (a failed block splits to its sources — `show uplink`
@@ -87,6 +91,12 @@ family.
 - the cli ships beside the daemon (`bin/modbus-scraper-cli.py`, its own man
   page via `--man`) — the same client the suites drive; every word below is
   its spelling.
+
+- it is one script for the family: the installed client names are **symlinks
+  to `apps/pvsuite-cli.py`** and the tool comes from the name it was invoked
+  as; a bare `pvsuite-cli` takes the tool as the first word (the daemon name
+  or the short alias — `cache`, `scraper`, `inverter`; `dashboard` is its own
+  alias), and a word that disagrees with the invocation name is refused.
 
 - the control server is a JSON-lines listener: a unix socket (the default
   `/tmp/modbus-scraper-9350.socket`) or a TCP port on 127.0.0.1 — the
@@ -602,7 +612,7 @@ the state dump: the live overrides' file, the restore-on-start
 ## Deployment
 
 - **NixOS** — the module `nixos/modules/modbus-scraper.nix` renders the
-  exporter as a hardened service (the options mapped in `docs/NIXOS.md`, the
+  exporter as a hardened service (the options mapped in `nixos/README.md`, the
   packaging in `nixos/README.md`); the rendered config validates with
   `--dry-run` before a switch.
 
@@ -622,8 +632,36 @@ the state dump: the live overrides' file, the restore-on-start
 | `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
 | `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
 | `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
-| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
-| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docs/DESIGN.md` | the design — the architecture, the decisions, the postures the tools share |
+| `nixos/README.md` | the NixOS side — the option maps rebuilt from `module.nix`, the flake, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
+
+## The docs map
+
+| this tool's documents | what they carry |
+|---|---|
+| `apps/scraper/README.md` | the front page — the description, the quick how-to, Security, License |
+| `apps/scraper/lib/options.json` | the registry — the one row per knob (the tables above render from it) |
+| `apps/scraper/lib/metrics.json` + `apps/scraper/metrics.json` | the shipped self-observability spec and the checkout's configurable spec (the loader merges it over the lib half) |
+| `apps/scraper/schema/` | the JSON Schemas for the metrics spec (draft 2020-12) |
+| `apps/scraper/examples/` | the GENERATED conf + the example metrics spec |
+| `apps/scraper/man/` | the generated man page (`modbus-scraper --man` renders it) |
+| `nixos/modules/modbus-scraper.nix` | the NixOS service module (the options mapped in `nixos/README.md`) |
+| `docker/Dockerfile.modbus-scraper` + `docker/env/modbus-scraper.env.example` | the image and the deployment env (the topologies: `docker/README.md`) |
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/DESIGN.md` | the design — the architecture, the decisions, the postures the tools share |
+| `nixos/README.md` | the NixOS side — the option maps rebuilt from `module.nix`, the flake, the packages |
 | `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
 | `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
 | `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
@@ -634,18 +672,44 @@ the state dump: the live overrides' file, the restore-on-start
 
 ## Source layout
 
-- `bin/modbus-scraper.py` — the exporter; `bin/modbus-scraper-cli.py` — the
-  one-shot/interactive client; `lib/` — the daemon's modules (the poll loop,
-  the metrics assembly, the config/registry wiring); `metrics.json` — the
-  shipped self-observability spec (merged over the configured spec);
-  `examples/` — the generated conf and the example metrics spec; `schema/` —
-  the JSON Schemas; `man/` — the generated man page; `dev` / `dev-cli` — the
-  checkout launchers.
+the subproject is flat and stdlib-only — one bin pair, one lib package, the
+generated surfaces beside. The checkout launchers (`dev`, `dev-cli`) run the
+exporter and the console straight from the tree against the shipped sample
+config.
 
-- the shared machinery lives in the suite's `common/` package (the control
-  spine, the Modbus client, the audit, the compute-expression evaluator) and
-  `shared/` (the texts, the schemas, the profiles) — `lib/` imports it by
-  path; nothing is packaged separately.
+    apps/scraper/
+    ├── bin/
+    │   ├── modbus-scraper.py         # the daemon: the CLI, the logging, the
+    │   │                            #   signal handling, the control wiring
+    │   └── modbus-scraper-cli.py -> ../../pvsuite-cli.py
+    │                                # the family client dispatcher: the tool
+    │                                #   from the name it was invoked as
+    ├── lib/
+    │   ├── poller.py                 # the poll loop: the block reads, the sanity
+    │   │                             #   caps, the store
+    │   ├── protocol.py               # the Modbus TCP wire format, the limits
+    │   ├── expr.py                   # the compute-expression evaluator (the
+    │   │                             #   metrics spec's expr/when entries)
+    │   ├── metrics.py                # the metrics spec (metrics.json), sectioned
+    │   ├── server.py                 # the Prometheus exposition endpoint
+    │   ├── control.py                # the JSON-lines control server
+    │   ├── config.py                 # the set grammar: the config script, the
+    │   │                             #   env, the flags
+    │   ├── statics.py                # the protocol limits, the diag block it reads
+    │   ├── options.py + options.json # the registry: the one row per knob
+    │   ├── cli_spec.py               # the client SPEC (pvsuite-cli's per-tool half)
+    │   └── man.py                    # the generated man pages
+    ├── metrics.json                  # the shipped self-observability spec
+    ├── schema/                       # the JSON Schemas (draft 2020-12)
+    ├── examples/                     # the GENERATED conf + the example metrics spec
+    ├── man/                          # the generated man page
+    └── dev, dev-cli                  # the checkout launchers
+
+the shared machinery lives in the suite's `common/` package (the control
+spine, the Modbus client, the audit, the compute-expression evaluator) and
+`shared/` (the texts, the schemas, the profiles) — `lib/` imports it by
+path; the client dispatcher is the suite's `apps/pvsuite-cli.py`, one script
+for all four ctl tools.
 
 ## Troubleshooting
 

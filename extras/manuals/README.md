@@ -13,13 +13,15 @@ How it works, The control plane, the Commands/Knobs/Show-reports tables,
 Signals, Configuration, Runtime control, Access control, Metrics, Audit
 logging, Register maps, Tuning, Diagnostics registers, Deployment, The
 docs map (the links into `docs/SECURITY.md`, `docs/specs/ACL.md`,
-`docs/NIXOS.md` and the rest), Source layout, Troubleshooting, Testing —
+`docs/DESIGN.md`, `nixos/README.md` and the rest), Source layout,
+Troubleshooting, Testing —
 with the tool's own extras (the persistence, the trace feed, the
 alerting, the chaos, the reverse proxy, the page configuration) slotted
 beside; a topic a tool honestly lacks renders as its one-line absence.
-The family-wide stories (the audit forward, the runner rule, the docs
-map) are spliced from one source in the generator — told once, rendered
-everywhere. Bullets and tables, no big paragraphs of text. The replay
+Prose where it reads, bullets where they scan, tables where they pin —
+and the source layout is an annotated tree. The family-wide stories (the
+audit forward, the runner rule, the docs map) are spliced from one
+source in the generator — told once, rendered everywhere. The replay
 page is the no-control-plane shape: the registry knobs as the flags
 table, no commands or show reports.
 

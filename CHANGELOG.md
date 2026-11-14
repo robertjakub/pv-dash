@@ -44,7 +44,16 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   `docs/SECURITY.md` / `docs/specs/ACL.md` / `docs/specs/MODBUS.md` /
   `docs/NIXOS.md` / `docker/README.md` riding every page, and the wave
   record's appendix carrying the five pages' full heading survey
-  (docs/history/front-page-split.md).
+  (docs/history/front-page-split.md). The final pass scanned the code:
+  the source layouts render as annotated trees (the bin pair with the
+  pvsuite-cli symlink spelled, every lib module's role from its
+  docstring, the dev/dev-cli launcher contract), The control plane tells
+  the one-dispatcher story (`apps/pvsuite-cli.py` — the tool from the
+  name it was invoked as, the short aliases, the bare-spelling tool
+  word), The docs map is per-tool (the app's own documents first, the
+  family table beside — with `docs/DESIGN.md` joined and the phantom
+  `docs/NIXOS.md` corrected to `nixos/README.md`), and the How-it-works
+  sections open with a prose paragraph before the bullets.
 
 ### Added
 

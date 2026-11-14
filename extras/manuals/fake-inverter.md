@@ -70,6 +70,11 @@ develop and test against. Part of the pv-suite family.
 
 ## How it works
 
+The fake is a simulator behind a Modbus server: the machines compute named
+physical values over a simulated clock, the profile maps them onto
+registers, the control wire pins and steers — and the chaos layer makes it a
+sparring partner instead of a punching bag.
+
 - everything integrates with a **simulated clock: UTC by default**
   (`--timezone local` / `set timezone local` for the host wall clock) that can
   run at **N× real speed** (`--time-scale N` / `set time-scale N`) — every
@@ -131,6 +136,12 @@ develop and test against. Part of the pv-suite family.
 - the cli ships beside the daemon (`bin/modbus-fake-cli.py`, its own man page
   via `--man`) — the same client the suites drive; every word below is its
   spelling.
+
+- it is one script for the family: the installed client names are **symlinks
+  to `apps/pvsuite-cli.py`** and the tool comes from the name it was invoked
+  as; a bare `pvsuite-cli` takes the tool as the first word (the daemon name
+  or the short alias — `cache`, `scraper`, `inverter`; `dashboard` is its own
+  alias), and a word that disagrees with the invocation name is refused.
 
 - the control server is a JSON-lines listener: a unix socket (the default
   `/tmp/fake-inverter-5502.socket`) or a TCP port on 127.0.0.1 — the
@@ -565,8 +576,34 @@ the state dump: the live overrides' file, the restore-on-start
 | `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
 | `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
 | `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
-| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
-| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docs/DESIGN.md` | the design — the architecture, the decisions, the postures the tools share |
+| `nixos/README.md` | the NixOS side — the option maps rebuilt from `module.nix`, the flake, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
+
+## The docs map
+
+| this tool's documents | what they carry |
+|---|---|
+| `apps/inverter/README.md` | the front page — the description, the quick how-to, Security, License |
+| `apps/inverter/lib/options.json` | the registry — the one row per knob (the tables above render from it) |
+| `apps/inverter/examples/modbus-fake-inverter.conf` | the GENERATED sample configuration |
+| `apps/inverter/man/` | the generated man page (`modbus-fake-inverter --man` renders it) |
+| `shared/profiles/` | the device profiles the fake serves (the format: `shared/profiles/README.md`) |
+| `docker/Dockerfile.modbus-fake-inverter` + `docker/env/modbus-fake-inverter.env.example` | the image and the deployment env (the topologies: `docker/README.md`) |
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/DESIGN.md` | the design — the architecture, the decisions, the postures the tools share |
+| `nixos/README.md` | the NixOS side — the option maps rebuilt from `module.nix`, the flake, the packages |
 | `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
 | `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
 | `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
@@ -577,16 +614,49 @@ the state dump: the live overrides' file, the restore-on-start
 
 ## Source layout
 
-- `bin/modbus-fake-inverter.py` — the daemon; `bin/modbus-fake-cli.py` — the
-  one-shot/interactive client; `lib/` — the simulator's modules (`battery.py`,
-  `chaos.py`, the machines, the config/registry wiring);
-  `examples/modbus-fake-inverter.conf` — the generated sample; `man/` — the
-  generated man page; `dev` / `dev-cli` — the checkout launchers.
+the subproject is flat and stdlib-only — one bin pair, one lib package, the
+generated surfaces beside. The checkout launchers (`dev`, `dev-cli`) run the
+fake and the console straight from the tree.
 
-- the shared machinery lives in the suite's `common/` package (the control
-  spine, the Modbus server, the audit, the manpage generator) and `shared/`
-  (the texts, the schemas, the profiles) — `lib/` imports it by path; nothing
-  is packaged separately.
+    apps/inverter/
+    ├── bin/
+    │   ├── modbus-fake-inverter.py    # the daemon: the CLI, the simulator wiring, the
+    │   │                             #   signal handling, the control server
+    │   └── modbus-fake-cli.py -> ../../pvsuite-cli.py
+    │                                # the family client dispatcher: the tool
+    │                                #   from the name it was invoked as
+    ├── lib/
+    │   ├── simulator.py               # the simulated day (or frozen/static): the curves,
+    │   │                             #   the runtime overrides, the pins
+    │   ├── inverter.py                # the Modbus TCP server: FC3/FC4 + FC1/FC2 from the
+    │   │                             #   simulator, the write overlays
+    │   ├── profile.py                 # the register-map profiles: the named value ->
+    │   │                             #   the address + encoding
+    │   ├── battery.py                 # the battery state machine (the surplus, the
+    │   │                             #   deficit, the SoC integration)
+    │   ├── chaos.py                   # the seeded chaos layer (garbage, stalls, drops)
+    │   ├── signals.py                 # the family signal handling (SIGHUP the env layer,
+    │   │                             #   SIGUSR1 the reset, SIGUSR2 the stacks)
+    │   ├── metrics.py                 # the fake's own /metrics (off by default)
+    │   ├── control.py                 # the JSON-lines control server (the pins, the
+    │   │                             #   machines, the reset)
+    │   ├── config.py                  # the set grammar: the config script, the env, the
+    │   │                             #   flags
+    │   ├── statics.py                 # the demo device's born-with numbers
+    │   │                             #   (lib/defaults.json)
+    │   ├── options.py + options.json  # the registry: the one row per knob
+    │   ├── cli_spec.py                # the client SPEC (pvsuite-cli's per-tool half)
+    │   └── man.py                     # the generated man pages
+    ├── examples/modbus-fake-inverter.conf
+    │                                 # the GENERATED sample (every knob, commented)
+    ├── man/                           # the generated man page
+    └── dev, dev-cli                   # the checkout launchers
+
+the shared machinery lives in the suite's `common/` package (the control
+spine, the Modbus server, the audit, the manpage generator) and `shared/`
+(the texts, the schemas, the profiles) — `lib/` imports it by path; the
+client dispatcher is the suite's `apps/pvsuite-cli.py`, one script for all
+four ctl tools.
 
 ## Troubleshooting
 

@@ -68,6 +68,11 @@ from the cache. Part of the pv-suite family.
 
 ## How it works
 
+The proxy is a background poller in front of a dictionary: one thread polls
+the device on the configured cadence, every client is answered from memory,
+writes cut through with the cache invalidation behind them — and the whole
+story survives a hostile peer on either side.
+
 - a background loop **polls the configured register ranges** at a fixed
   interval into an in-memory cache.
 
@@ -106,6 +111,12 @@ from the cache. Part of the pv-suite family.
 - the cli ships beside the daemon (`bin/modbus-cache-cli.py`, its own man page
   via `--man`) — the same client the suites drive; every word below is its
   spelling.
+
+- it is one script for the family: the installed client names are **symlinks
+  to `apps/pvsuite-cli.py`** and the tool comes from the name it was invoked
+  as; a bare `pvsuite-cli` takes the tool as the first word (the daemon name
+  or the short alias — `cache`, `scraper`, `inverter`; `dashboard` is its own
+  alias), and a word that disagrees with the invocation name is refused.
 
 - the control server is a JSON-lines listener: a unix socket (the default
   `/tmp/modbus-cache-15502.socket`) or a TCP port on 127.0.0.1 — the
@@ -711,10 +722,10 @@ the write gates: the forwarding toggle and the register ranges
 ## Deployment
 
 - **NixOS** — the module `nixos/modules/modbus-cache.nix` renders the daemon
-  as a hardened service (the options mapped in `docs/NIXOS.md`, the packaging
-  in `nixos/README.md`): the env file, the state dirs and the secret `*File`
-  options ride the module; the rendered config validates with `--dry-run`
-  before a switch.
+  as a hardened service (the options mapped in `nixos/README.md`, the
+  packaging in `nixos/README.md`): the env file, the state dirs and the secret
+  `*File` options ride the module; the rendered config validates with
+  `--dry-run` before a switch.
 
 - **containers** — `docker/Dockerfile.modbus-cache` (stdlib-only, the
   unprivileged user), the demo and prod compose stacks beside it
@@ -733,8 +744,34 @@ the write gates: the forwarding toggle and the register ranges
 | `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
 | `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
 | `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
-| `docs/NIXOS.md` | the NixOS option maps, rebuilt from `module.nix` |
-| `nixos/README.md` | the packaging side — the flake, the modules, the packages |
+| `docs/DESIGN.md` | the design — the architecture, the decisions, the postures the tools share |
+| `nixos/README.md` | the NixOS side — the option maps rebuilt from `module.nix`, the flake, the packages |
+| `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
+| `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
+| `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
+| `docs/book/` | the assembled book (these manuals gathered, the specs beside) |
+| `docs/history/` | the wave records — how the suite got here, `front-page-split.md` among them |
+| `docs/TODO.md` | the open items |
+| `CHANGELOG.md` | the unreleased changes and the current release |
+
+## The docs map
+
+| this tool's documents | what they carry |
+|---|---|
+| `apps/cache/README.md` | the front page — the description, the quick how-to, Security, License |
+| `apps/cache/lib/options.json` | the registry — the one row per knob (the tables above render from it) |
+| `apps/cache/examples/modbus-cache.conf` | the GENERATED sample configuration (the Configuration section quotes it) |
+| `apps/cache/man/` | the generated man page (`modbus-cache --man` renders it) |
+| `nixos/modules/modbus-cache.nix` | the NixOS service module (the options mapped in `nixos/README.md`) |
+| `docker/Dockerfile.modbus-cache` + `docker/env/modbus-cache.env.example` | the image and the deployment env (the topologies: `docker/README.md`) |
+
+| document | what it carries |
+|---|---|
+| `docs/SECURITY.md` | the security posture and the F-findings the pages cite (F9 the secrets, F10 the audit chain, F11 the trusted-LAN test tool, F12 the secret files, F13 the token floors, F16 the alert pack, F18 the dump split, F21 the web face) |
+| `docs/specs/ACL.md` | the ACL gate semantics — the rule chains, the ip-prefix grammar, the standalone acl files, the tools, and where each tool's support stops |
+| `docs/specs/MODBUS.md` | the Modbus wire specs — the function-code support maps, the suite and Waveshare auth handshakes, the diagnostics block |
+| `docs/DESIGN.md` | the design — the architecture, the decisions, the postures the tools share |
+| `nixos/README.md` | the NixOS side — the option maps rebuilt from `module.nix`, the flake, the packages |
 | `docker/README.md` | the container side — the images, the compose topologies (the demo and the prod split), the env examples |
 | `shared/profiles/README.md` | the device profile format — the schema, the semantics, the shipped devices |
 | `extras/alerts/` | the alert rules pack — one rule file per watched exporter, every alert naming the audit events it correlates with |
@@ -745,17 +782,47 @@ the write gates: the forwarding toggle and the register ranges
 
 ## Source layout
 
-- `bin/modbus-cache.py` — the daemon; `bin/modbus-cache-cli.py` — the
-  one-shot/interactive client; `lib/` — the daemon's modules (the cache core,
-  the control server, the config/registry wiring);
-  `examples/modbus-cache.conf` — the generated sample; `man/` — the generated
-  man page; `dev` / `dev-cli` — the checkout launchers (the sys.path and the
-  default `--config` target).
+the subproject is flat and stdlib-only — one bin pair, one lib package, the
+generated surfaces beside. The checkout launchers (`dev`, `dev-cli`) run the
+daemon and the console straight from the tree against the shipped sample
+config (the packaged-root defaults do not exist in a source tree — the
+loader never reaches into examples/ on its own; the audit rides stdout so
+the dev terminal streams it).
 
-- the shared machinery lives in the suite's `common/` package (the control
-  spine, the Modbus client/server, the audit, the manpage generator) and
-  `shared/` (the texts, the schemas, the profiles) — `lib/` imports it by
-  path; nothing is packaged separately.
+    apps/cache/
+    ├── bin/
+    │   ├── modbus-cache.py           # the daemon: the CLI, the logging, the
+    │   │                            #   signal handling, the control wiring
+    │   └── modbus-cache-cli.py -> ../../pvsuite-cli.py
+    │                                # the family client dispatcher: the tool
+    │                                #   from the name it was invoked as
+    ├── lib/
+    │   ├── proxy.py                  # the poller thread, the client handling,
+    │   │                             #   the forwarding, the reload
+    │   ├── cache.py                  # the in-memory cache, the poll block planner
+    │   │                             #   (the four address spaces)
+    │   ├── upstream.py               # the ONE Modbus upstream connection, shared
+    │   ├── config.py                 # the set grammar: the config script, the env,
+    │   │                             #   the flags, the register map
+    │   ├── control.py                # the JSON-lines control server
+    │   ├── metrics.py                # the /metrics endpoint (the F13 gate)
+    │   ├── persist.py                # the state dumps (the write-behind)
+    │   ├── tracefeed.py              # the record feed's hub (trace-socket/-sources)
+    │   ├── statics.py                # the protocol limits, the diag block
+    │   │                             #   (lib/defaults.json)
+    │   ├── options.py + options.json # the registry: the one row per knob
+    │   ├── cli_spec.py               # the client SPEC (pvsuite-cli's per-tool half)
+    │   └── man.py                    # the generated man pages
+    ├── examples/modbus-cache.conf    # the GENERATED sample (every knob, commented)
+    ├── man/                          # the generated man page
+    └── dev, dev-cli                  # the checkout launchers (the daemon + the
+                                     #   console against the example conf)
+
+the shared machinery lives in the suite's `common/` package (the control
+spine, the Modbus client/server, the audit, the manpage generator) and
+`shared/` (the texts, the schemas, the profiles) — `lib/` imports it by
+path; nothing is packaged separately. The client dispatcher is the suite's
+`apps/pvsuite-cli.py`, one script for all four ctl tools.
 
 ## Troubleshooting
 

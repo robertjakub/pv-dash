@@ -127,6 +127,11 @@ REF = {
                   'command.'),
         ],
         'how': [
+            ('p', 'The proxy is a background poller in front of a dictionary: '
+                  'one thread polls the device on the configured cadence, '
+                  'every client is answered from memory, writes cut through '
+                  'with the cache invalidation behind them — and the whole '
+                  'story survives a hostile peer on either side.'),
             ('b', 'a background loop **polls the configured register ranges** at '
                   'a fixed interval into an in-memory cache.'),
             ('b', 'any number of clients are **served from the cache** (FC3/FC4 '
@@ -505,7 +510,7 @@ REF = {
             ('Deployment', [
                 ('b', '**NixOS** — the module `nixos/modules/modbus-cache.nix` '
                       'renders the daemon as a hardened service (the options '
-                      'mapped in `docs/NIXOS.md`, the packaging in '
+                      'mapped in `nixos/README.md`, the packaging in '
                       '`nixos/README.md`): the env file, the state dirs and '
                       'the secret `*File` options ride the module; the '
                       'rendered config validates with `--dry-run` before a '
@@ -579,19 +584,66 @@ REF = {
                       'line of an owner-only `0600` file).'),
             ]),
             ('Source layout', [
-                ('b', '`bin/modbus-cache.py` — the daemon; '
-                      '`bin/modbus-cache-cli.py` — the one-shot/interactive '
-                      'client; `lib/` — the daemon\'s modules (the cache '
-                      'core, the control server, the config/registry '
-                      'wiring); `examples/modbus-cache.conf` — the generated '
-                      'sample; `man/` — the generated man page; `dev` / '
-                      '`dev-cli` — the checkout launchers (the sys.path and '
-                      'the default `--config` target).'),
-                ('b', 'the shared machinery lives in the suite\'s `common/` '
+                ('p', 'the subproject is flat and stdlib-only — one bin pair, '
+                      'one lib package, the generated surfaces beside. The '
+                      'checkout launchers (`dev`, `dev-cli`) run the daemon '
+                      'and the console straight from the tree against the '
+                      'shipped sample config (the packaged-root defaults do '
+                      'not exist in a source tree — the loader never reaches '
+                      'into examples/ on its own; the audit rides stdout so '
+                      'the dev terminal streams it).'),
+                ('c', 'apps/cache/\n'
+                      '├── bin/\n'
+                      '│   ├── modbus-cache.py           # the daemon: the CLI, the logging, the\n'
+                      '│   │                            #   signal handling, the control wiring\n'
+                      '│   └── modbus-cache-cli.py -> ../../pvsuite-cli.py\n'
+                      '│                                # the family client dispatcher: the tool\n'
+                      '│                                #   from the name it was invoked as\n'
+                      '├── lib/\n'
+                      '│   ├── proxy.py                  # the poller thread, the client handling,\n'
+                      '│   │                             #   the forwarding, the reload\n'
+                      '│   ├── cache.py                  # the in-memory cache, the poll block planner\n'
+                      '│   │                             #   (the four address spaces)\n'
+                      '│   ├── upstream.py               # the ONE Modbus upstream connection, shared\n'
+                      '│   ├── config.py                 # the set grammar: the config script, the env,\n'
+                      '│   │                             #   the flags, the register map\n'
+                      '│   ├── control.py                # the JSON-lines control server\n'
+                      '│   ├── metrics.py                # the /metrics endpoint (the F13 gate)\n'
+                      '│   ├── persist.py                # the state dumps (the write-behind)\n'
+                      '│   ├── tracefeed.py              # the record feed\'s hub (trace-socket/-sources)\n'
+                      '│   ├── statics.py                # the protocol limits, the diag block\n'
+                      '│   │                             #   (lib/defaults.json)\n'
+                      '│   ├── options.py + options.json # the registry: the one row per knob\n'
+                      '│   ├── cli_spec.py               # the client SPEC (pvsuite-cli\'s per-tool half)\n'
+                      '│   └── man.py                    # the generated man pages\n'
+                      '├── examples/modbus-cache.conf    # the GENERATED sample (every knob, commented)\n'
+                      '├── man/                          # the generated man page\n'
+                      '└── dev, dev-cli                  # the checkout launchers (the daemon + the\n'
+                      '                                 #   console against the example conf)'),
+                ('p', 'the shared machinery lives in the suite\'s `common/` '
                       'package (the control spine, the Modbus client/server, '
                       'the audit, the manpage generator) and `shared/` (the '
                       'texts, the schemas, the profiles) — `lib/` imports it '
-                      'by path; nothing is packaged separately.'),
+                      'by path; nothing is packaged separately. The client '
+                      'dispatcher is the suite\'s `apps/pvsuite-cli.py`, one '
+                      'script for all four ctl tools.'),
+            ]),
+            ('The docs map', [
+                ('t', ('this tool\'s documents', 'what they carry'),
+                 ('`apps/cache/README.md`', 'the front page — the description, '
+                  'the quick how-to, Security, License'),
+                 ('`apps/cache/lib/options.json`', 'the registry — the one row '
+                  'per knob (the tables above render from it)'),
+                 ('`apps/cache/examples/modbus-cache.conf`', 'the GENERATED '
+                  'sample configuration (the Configuration section quotes it)'),
+                 ('`apps/cache/man/`', 'the generated man page (`modbus-cache '
+                  '--man` renders it)'),
+                 ('`nixos/modules/modbus-cache.nix`', 'the NixOS service module '
+                  '(the options mapped in `nixos/README.md`)'),
+                 ('`docker/Dockerfile.modbus-cache` + '
+                  '`docker/env/modbus-cache.env.example`', 'the image and the '
+                  'deployment env (the topologies: `docker/README.md`)')),
+                ('fam', 'docs'),
             ]),
             ('Runtime control', [
                 ('b', 'the live layer: every `settable` row applies at once '
@@ -668,6 +720,9 @@ REF = {
                   'register override knobs.'),
         ],
         'how': [
+            ('p', 'The scraper is a loop and a page: the poller walks the '
+                  'device profile, the exposition answers Prometheus — and '
+                  '`metrics.json` names everything that appears.'),
             ('b', 'a poll loop reads the device profile\'s registers every '
                   '`--modbus-interval` seconds; the source ranges merge into '
                   'as few **block reads** as the `--modbus-merge-gap` allows '
@@ -953,7 +1008,7 @@ REF = {
             ('Deployment', [
                 ('b', '**NixOS** — the module `nixos/modules/modbus-scraper.nix` '
                       'renders the exporter as a hardened service (the '
-                      'options mapped in `docs/NIXOS.md`, the packaging in '
+                      'options mapped in `nixos/README.md`, the packaging in '
                       '`nixos/README.md`); the rendered config validates with '
                       '`--dry-run` before a switch.'),
                 ('b', '**containers** — `docker/Dockerfile.modbus-scraper`, '
@@ -1038,20 +1093,67 @@ REF = {
                       'password refuses at start and on the wire.'),
             ]),
             ('Source layout', [
-                ('b', '`bin/modbus-scraper.py` — the exporter; '
-                      '`bin/modbus-scraper-cli.py` — the one-shot/interactive '
-                      'client; `lib/` — the daemon\'s modules (the poll loop, '
-                      'the metrics assembly, the config/registry wiring); '
-                      '`metrics.json` — the shipped self-observability spec '
-                      '(merged over the configured spec); `examples/` — the '
-                      'generated conf and the example metrics spec; `schema/` '
-                      '— the JSON Schemas; `man/` — the generated man page; '
-                      '`dev` / `dev-cli` — the checkout launchers.'),
-                ('b', 'the shared machinery lives in the suite\'s `common/` '
+                ('p', 'the subproject is flat and stdlib-only — one bin pair, '
+                      'one lib package, the generated surfaces beside. The '
+                      'checkout launchers (`dev`, `dev-cli`) run the exporter '
+                      'and the console straight from the tree against the '
+                      'shipped sample config.'),
+                ('c', 'apps/scraper/\n'
+                      '├── bin/\n'
+                      '│   ├── modbus-scraper.py         # the daemon: the CLI, the logging, the\n'
+                      '│   │                            #   signal handling, the control wiring\n'
+                      '│   └── modbus-scraper-cli.py -> ../../pvsuite-cli.py\n'
+                      '│                                # the family client dispatcher: the tool\n'
+                      '│                                #   from the name it was invoked as\n'
+                      '├── lib/\n'
+                      '│   ├── poller.py                 # the poll loop: the block reads, the sanity\n'
+                      '│   │                             #   caps, the store\n'
+                      '│   ├── protocol.py               # the Modbus TCP wire format, the limits\n'
+                      '│   ├── expr.py                   # the compute-expression evaluator (the\n'
+                      '│   │                             #   metrics spec\'s expr/when entries)\n'
+                      '│   ├── metrics.py                # the metrics spec (metrics.json), sectioned\n'
+                      '│   ├── server.py                 # the Prometheus exposition endpoint\n'
+                      '│   ├── control.py                # the JSON-lines control server\n'
+                      '│   ├── config.py                 # the set grammar: the config script, the\n'
+                      '│   │                             #   env, the flags\n'
+                      '│   ├── statics.py                # the protocol limits, the diag block it reads\n'
+                      '│   ├── options.py + options.json # the registry: the one row per knob\n'
+                      '│   ├── cli_spec.py               # the client SPEC (pvsuite-cli\'s per-tool half)\n'
+                      '│   └── man.py                    # the generated man pages\n'
+                      '├── metrics.json                  # the shipped self-observability spec\n'
+                      '├── schema/                       # the JSON Schemas (draft 2020-12)\n'
+                      '├── examples/                     # the GENERATED conf + the example metrics spec\n'
+                      '├── man/                          # the generated man page\n'
+                      '└── dev, dev-cli                  # the checkout launchers'),
+                ('p', 'the shared machinery lives in the suite\'s `common/` '
                       'package (the control spine, the Modbus client, the '
                       'audit, the compute-expression evaluator) and `shared/` '
                       '(the texts, the schemas, the profiles) — `lib/` '
-                      'imports it by path; nothing is packaged separately.'),
+                      'imports it by path; the client dispatcher is the '
+                      'suite\'s `apps/pvsuite-cli.py`, one script for all '
+                      'four ctl tools.'),
+            ]),
+            ('The docs map', [
+                ('t', ('this tool\'s documents', 'what they carry'),
+                 ('`apps/scraper/README.md`', 'the front page — the description, '
+                  'the quick how-to, Security, License'),
+                 ('`apps/scraper/lib/options.json`', 'the registry — the one row '
+                  'per knob (the tables above render from it)'),
+                 ('`apps/scraper/lib/metrics.json` + `apps/scraper/metrics.json`',
+                  'the shipped self-observability spec and the checkout\'s '
+                  'configurable spec (the loader merges it over the lib half)'),
+                 ('`apps/scraper/schema/`', 'the JSON Schemas for the metrics '
+                  'spec (draft 2020-12)'),
+                 ('`apps/scraper/examples/`', 'the GENERATED conf + the example '
+                  'metrics spec'),
+                 ('`apps/scraper/man/`', 'the generated man page '
+                  '(`modbus-scraper --man` renders it)'),
+                 ('`nixos/modules/modbus-scraper.nix`', 'the NixOS service module '
+                  '(the options mapped in `nixos/README.md`)'),
+                 ('`docker/Dockerfile.modbus-scraper` + '
+                  '`docker/env/modbus-scraper.env.example`', 'the image and the '
+                  'deployment env (the topologies: `docker/README.md`)')),
+                ('fam', 'docs'),
             ]),
             ('Runtime control', [
                 ('b', 'the live layer: `set modbus profile <name|path>` swaps '
@@ -1133,6 +1235,11 @@ REF = {
                   '`0.5.1-<short git>`).'),
         ],
         'how': [
+            ('p', 'The fake is a simulator behind a Modbus server: the '
+                  'machines compute named physical values over a simulated '
+                  'clock, the profile maps them onto registers, the control '
+                  'wire pins and steers — and the chaos layer makes it a '
+                  'sparring partner instead of a punching bag.'),
             ('b', 'everything integrates with a **simulated clock: UTC by '
                   'default** (`--timezone local` / `set timezone local` for '
                   'the host wall clock) that can run at **N× real speed** '
@@ -1414,19 +1521,67 @@ REF = {
                       'the ACL ride as in Access control.'),
             ]),
             ('Source layout', [
-                ('b', '`bin/modbus-fake-inverter.py` — the daemon; '
-                      '`bin/modbus-fake-cli.py` — the one-shot/interactive '
-                      'client; `lib/` — the simulator\'s modules '
-                      '(`battery.py`, `chaos.py`, the machines, the '
-                      'config/registry wiring); '
-                      '`examples/modbus-fake-inverter.conf` — the generated '
-                      'sample; `man/` — the generated man page; `dev` / '
-                      '`dev-cli` — the checkout launchers.'),
-                ('b', 'the shared machinery lives in the suite\'s `common/` '
+                ('p', 'the subproject is flat and stdlib-only — one bin pair, '
+                      'one lib package, the generated surfaces beside. The '
+                      'checkout launchers (`dev`, `dev-cli`) run the fake and '
+                      'the console straight from the tree.'),
+                ('c', 'apps/inverter/\n'
+                      '├── bin/\n'
+                      '│   ├── modbus-fake-inverter.py    # the daemon: the CLI, the simulator wiring, the\n'
+                      '│   │                             #   signal handling, the control server\n'
+                      '│   └── modbus-fake-cli.py -> ../../pvsuite-cli.py\n'
+                      '│                                # the family client dispatcher: the tool\n'
+                      '│                                #   from the name it was invoked as\n'
+                      '├── lib/\n'
+                      '│   ├── simulator.py               # the simulated day (or frozen/static): the curves,\n'
+                      '│   │                             #   the runtime overrides, the pins\n'
+                      '│   ├── inverter.py                # the Modbus TCP server: FC3/FC4 + FC1/FC2 from the\n'
+                      '│   │                             #   simulator, the write overlays\n'
+                      '│   ├── profile.py                 # the register-map profiles: the named value ->\n'
+                      '│   │                             #   the address + encoding\n'
+                      '│   ├── battery.py                 # the battery state machine (the surplus, the\n'
+                      '│   │                             #   deficit, the SoC integration)\n'
+                      '│   ├── chaos.py                   # the seeded chaos layer (garbage, stalls, drops)\n'
+                      '│   ├── signals.py                 # the family signal handling (SIGHUP the env layer,\n'
+                      '│   │                             #   SIGUSR1 the reset, SIGUSR2 the stacks)\n'
+                      '│   ├── metrics.py                 # the fake\'s own /metrics (off by default)\n'
+                      '│   ├── control.py                 # the JSON-lines control server (the pins, the\n'
+                      '│   │                             #   machines, the reset)\n'
+                      '│   ├── config.py                  # the set grammar: the config script, the env, the\n'
+                      '│   │                             #   flags\n'
+                      '│   ├── statics.py                 # the demo device\'s born-with numbers\n'
+                      '│   │                             #   (lib/defaults.json)\n'
+                      '│   ├── options.py + options.json  # the registry: the one row per knob\n'
+                      '│   ├── cli_spec.py                # the client SPEC (pvsuite-cli\'s per-tool half)\n'
+                      '│   └── man.py                     # the generated man pages\n'
+                      '├── examples/modbus-fake-inverter.conf\n'
+                      '│                                 # the GENERATED sample (every knob, commented)\n'
+                      '├── man/                           # the generated man page\n'
+                      '└── dev, dev-cli                   # the checkout launchers'),
+                ('p', 'the shared machinery lives in the suite\'s `common/` '
                       'package (the control spine, the Modbus server, the '
                       'audit, the manpage generator) and `shared/` (the '
                       'texts, the schemas, the profiles) — `lib/` imports it '
-                      'by path; nothing is packaged separately.'),
+                      'by path; the client dispatcher is the suite\'s '
+                      '`apps/pvsuite-cli.py`, one script for all four ctl '
+                      'tools.'),
+            ]),
+            ('The docs map', [
+                ('t', ('this tool\'s documents', 'what they carry'),
+                 ('`apps/inverter/README.md`', 'the front page — the description, '
+                  'the quick how-to, Security, License'),
+                 ('`apps/inverter/lib/options.json`', 'the registry — the one row '
+                  'per knob (the tables above render from it)'),
+                 ('`apps/inverter/examples/modbus-fake-inverter.conf`', 'the '
+                  'GENERATED sample configuration'),
+                 ('`apps/inverter/man/`', 'the generated man page '
+                  '(`modbus-fake-inverter --man` renders it)'),
+                 ('`shared/profiles/`', 'the device profiles the fake serves '
+                  '(the format: `shared/profiles/README.md`)'),
+                 ('`docker/Dockerfile.modbus-fake-inverter` + '
+                  '`docker/env/modbus-fake-inverter.env.example`', 'the image '
+                  'and the deployment env (the topologies: `docker/README.md`)')),
+                ('fam', 'docs'),
             ]),
             ('Runtime control', [
                 ('b', 'the fake IS runtime control — the demo machines are '
@@ -1497,6 +1652,10 @@ REF = {
                   'control server.'),
         ],
         'how': [
+            ('p', 'The page is one HTML document served by a small Python '
+                  'server that also proxies Prometheus — the flow diagram, '
+                  'the energy math and the CSV export live in the browser; '
+                  'the server adds the auth, the caps and the control wire.'),
             ('b', '**flow diagram** — live PV / Load / Grid nodes with '
                   'animated energy particles (orange = solar, violet = grid '
                   'import; speed and particle rate follow the power). Grid '
@@ -1648,7 +1807,7 @@ REF = {
             ('Deployment', [
                 ('b', '**NixOS** — the module `nixos/modules/dashboard.nix` '
                       'renders the server as a hardened service (the options '
-                      'mapped in `docs/NIXOS.md`): the listen, the upstream, '
+                      'mapped in `nixos/README.md`): the listen, the upstream, '
                       'the page token (`*File`), `staticDir` and '
                       '`solarConfig` ride the module — the static assets can '
                       'ship straight from the store.'),
@@ -1749,22 +1908,61 @@ REF = {
                       'and the cache\'s business.'),
             ]),
             ('Source layout', [
-                ('b', '`bin/dashboard.py` — the server (the page host, the '
-                      'Prometheus proxy, the control server); '
-                      '`bin/dashboard-cli.py` — the one-shot/interactive '
-                      'client; `static/` — the page itself (`index.html`, '
-                      '`app.js`, `boot.js`, `i18n.js`, `style.css`, the '
-                      'vendored ECharts); `lib/` — the server\'s modules '
-                      '(the config/registry wiring); `examples/` — the '
-                      'generated `dashboard.conf` and the example '
-                      '`config.js`; `screenshots/` — the README\'s captures; '
-                      '`man/` — the generated man page; `dev` / `dev-cli` — '
-                      'the checkout launchers.'),
-                ('b', 'the shared machinery lives in the suite\'s `common/` '
+                ('p', 'the subproject is flat and stdlib-only — the page '
+                      'itself is static files, the server is one lib package, '
+                      'the generated surfaces beside. The checkout launchers '
+                      '(`dev`, `dev-cli`) run the server and the console '
+                      'straight from the tree.'),
+                ('c', 'apps/dashboard/\n'
+                      '├── bin/\n'
+                      '│   ├── dashboard.py               # the server: the page host, the Prometheus\n'
+                      '│   │                             #   proxy, the /metrics, the control wiring, the\n'
+                      '│   │                             #   signal handling\n'
+                      '│   └── dashboard-cli.py -> ../../pvsuite-cli.py\n'
+                      '│                                # the family client dispatcher: the tool\n'
+                      '│                                #   from the name it was invoked as\n'
+                      '├── static/                       # the page: index.html, app.js, boot.js,\n'
+                      '│                                #   i18n.js, style.css, the vendored ECharts\n'
+                      '├── lib/\n'
+                      '│   ├── control.py                 # the JSON-lines control server\n'
+                      '│   ├── metrics.py                 # the server\'s own /metrics (the F13 gate)\n'
+                      '│   ├── config.py                  # the set grammar: the config script, the env,\n'
+                      '│   │                              #   the flags\n'
+                      '│   ├── statics.py                 # the static server + proxy defaults\n'
+                      '│   │                              #   (lib/defaults.json)\n'
+                      '│   ├── options.py + options.json  # the registry: the one row per knob\n'
+                      '│   ├── cli_spec.py                # the client SPEC (pvsuite-cli\'s per-tool half)\n'
+                      '│   └── man.py                     # the generated man pages\n'
+                      '├── examples/                      # the GENERATED dashboard.conf + the example config.js\n'
+                      '├── screenshots/                   # the README\'s captures\n'
+                      '├── man/                           # the generated man page\n'
+                      '└── dev, dev-cli                   # the checkout launchers'),
+                ('p', 'the shared machinery lives in the suite\'s `common/` '
                       'package (the control spine, the audit, the manpage '
                       'generator) and `shared/` (the texts, the schemas) — '
-                      '`lib/` imports it by path; nothing is packaged '
-                      'separately.'),
+                      '`lib/` imports it by path; the client dispatcher is '
+                      'the suite\'s `apps/pvsuite-cli.py`, one script for all '
+                      'four ctl tools.'),
+            ]),
+            ('The docs map', [
+                ('t', ('this tool\'s documents', 'what they carry'),
+                 ('`apps/dashboard/README.md`', 'the front page — the description, '
+                  'the quick how-to, Security, License'),
+                 ('`apps/dashboard/lib/options.json`', 'the registry — the one row '
+                  'per knob (the tables above render from it)'),
+                 ('`apps/dashboard/static/`', 'the page itself (the UI, the '
+                  'i18n, the charts)'),
+                 ('`apps/dashboard/examples/`', 'the GENERATED dashboard.conf + '
+                  'the example config.js (the Page configuration section '
+                  'quotes it)'),
+                 ('`apps/dashboard/man/`', 'the generated man page '
+                  '(`dashboard --man` renders it)'),
+                 ('`nixos/modules/dashboard.nix`', 'the NixOS service module '
+                  '(the options mapped in `nixos/README.md`)'),
+                 ('`docker/Dockerfile.dashboard` + `docker/env/dashboard.env.'
+                  'example`', 'the image and the deployment env (the '
+                  'topologies: `docker/README.md`)')),
+                ('fam', 'docs'),
             ]),
             ('Runtime control', [
                 ('b', 'the live layer: the connection caps (`set max-clients`, '
@@ -1842,6 +2040,9 @@ REF = {
                   'table.'),
         ],
         'how': [
+            ('p', 'The sidecar is two faces over one trace format: capture '
+                  'pipes and taps, replay indexes and answers — the raw '
+                  'frames the one truth either way.'),
             ('t', ('mode', 'knobs', 'what happens'),
              ('capture', '`--upstream HOST:PORT` (+ `--capture FILE`)',
               'every client is piped to the device; the wire dumps to the '
@@ -2147,18 +2348,48 @@ REF = {
                       'one truth. The dump tool decodes for reading only.'),
             ]),
             ('Source layout', [
-                ('b', '`bin/modbus-replay.py` — the daemon (capture, '
-                      'pass-through, replay); `bin/modbus-replay-dump.py` — '
-                      'the reader face (the views, the converter, the live '
-                      'view, the recorder); `lib/` — the sidecar\'s modules '
-                      '(`capture.py`, `replay.py`, `trace.py`, `statics.py`, '
-                      'the registry wiring); `man/` — the generated man '
-                      'pages; `dev` — the checkout launcher.'),
-                ('b', 'the sidecar is stdlib-only and shares no service '
-                      'packaging — no container image, no Nix package, no '
-                      'NixOS module; the family\'s `common/` package (the '
-                      'trace writer, the record encoding) is imported by '
-                      'path from the checkout.'),
+                ('p', 'the sidecar is flat and stdlib-only — two bins, one '
+                      'lib package, the generated man pages beside; the '
+                      'checkout launcher (`dev`) runs it straight from the '
+                      'tree. No container image, no Nix package, no NixOS '
+                      'module — a deployment would defeat the sidecar (it '
+                      'debugs deployments, it is not one).'),
+                ('c', 'apps/modbus-replay/\n'
+                      '├── bin/\n'
+                      '│   ├── modbus-replay.py          # the daemon: capture, pass-through, replay — the\n'
+                      '│   │                            #   CLI, the tap wiring, the signal handling\n'
+                      '│   └── modbus-replay-dump.py     # the reader face: the views, the converter, the\n'
+                      '│                                #   live view, the recorder\n'
+                      '├── lib/\n'
+                      '│   ├── capture.py                # the capture face: the pipe + the shadow copy\n'
+                      '│   ├── replay.py                 # the replay face: the answer index, the miss\n'
+                      '│   │                            #   policies, the recorded latencies\n'
+                      '│   ├── trace.py                  # the trace face: the FrameTap (the MBAP\n'
+                      '│   │                            #   reassembler), the PVMB writer, the walk\n'
+                      '│   ├── statics.py                # the trace format\'s identity, the miss codes\n'
+                      '│   │                            #   (lib/defaults.json)\n'
+                      '│   ├── options.py + options.json # the registry: the one row per knob\n'
+                      '│   ├── config.py                 # the env layer + the flags (no config file)\n'
+                      '│   └── man.py                    # the generated man pages\n'
+                      '├── man/                          # the generated man pages (the daemon + the dump)\n'
+                      '└── dev                           # the checkout launcher'),
+                ('p', 'the family\'s `common/` package (the trace writer, the '
+                      'record encoding) is imported by path from the '
+                      'checkout — the sidecar shares no service packaging '
+                      'with the tools it debugs.'),
+            ]),
+            ('The docs map', [
+                ('t', ('this tool\'s documents', 'what they carry'),
+                 ('`apps/modbus-replay/README.md`', 'the front page — the description, '
+                  'the quick how-to, Security, License'),
+                 ('`apps/modbus-replay/lib/options.json`', 'the registry — the one row '
+                  'per knob (the knobs table renders from it)'),
+                 ('`apps/modbus-replay/man/`', 'the generated man pages '
+                  '(`modbus-replay --man`, `modbus-replay-dump --man`)'),
+                 ('`extras/examples/modbus-replay-trace.pvmb`', 'the worked '
+                  'example trace — two sessions, both handshakes, the '
+                  'refused write (rendered by the dump tool)')),
+                ('fam', 'docs'),
             ]),
             ('Runtime control', [
                 ('b', 'none — the no-control-plane ruling: no control server, '
@@ -2263,10 +2494,10 @@ FAMILY_DOCS = [
      ('`docs/specs/MODBUS.md`', 'the Modbus wire specs — the function-code '
       'support maps, the suite and Waveshare auth handshakes, the '
       'diagnostics block'),
-     ('`docs/NIXOS.md`', 'the NixOS option maps, rebuilt from '
-      '`module.nix`'),
-     ('`nixos/README.md`', 'the packaging side — the flake, the modules, '
-      'the packages'),
+     ('`docs/DESIGN.md`', 'the design — the architecture, the decisions, '
+      'the postures the tools share'),
+     ('`nixos/README.md`', 'the NixOS side — the option maps rebuilt from '
+      '`module.nix`, the flake, the packages'),
      ('`docker/README.md`', 'the container side — the images, the compose '
       'topologies (the demo and the prod split), the env examples'),
      ('`shared/profiles/README.md`', 'the device profile format — the '
@@ -2616,6 +2847,15 @@ def speaking_section(cli, sock, port, example, token_mandatory, conf,
     out.append(bullet('the cli ships beside the daemon (`bin/%s.py`, its own '
                       'man page via `--man`) — the same client the suites '
                       'drive; every word below is its spelling.' % cli))
+    out.append('')
+    out.append(bullet('it is one script for the family: the installed client '
+                      'names are **symlinks to `apps/pvsuite-cli.py`** and '
+                      'the tool comes from the name it was invoked as; a '
+                      'bare `pvsuite-cli` takes the tool as the first word '
+                      '(the daemon name or the short alias — `cache`, '
+                      '`scraper`, `inverter`; `dashboard` is its own alias), '
+                      'and a word that disagrees with the invocation name is '
+                      'refused.'))
     out.append('')
     out.append(bullet('the control server is a JSON-lines listener: a unix '
                       'socket (the default `%s`) or a TCP port on 127.0.0.1 — '

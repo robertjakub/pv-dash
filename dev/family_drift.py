@@ -90,6 +90,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 
 from lib import REPO, TOOLS   # the scripts' common lib
 from lib.emit import emit as emit_page
@@ -160,11 +161,19 @@ def code_exact():
 def code_similar(min_ratio=0.72):
     """The similarity pass: cross-file pairs over the ratio floor."""
     funcs = [f for f in _funcs() if len(f[5]) >= 6]
+    counts = [Counter(f[5]) for f in funcs]
     pairs = []
     for i in range(len(funcs)):
         for j in range(i + 1, len(funcs)):
             a, b = funcs[i], funcs[j]
             if a[1] == b[1]:
+                continue
+            # the multiset upper bound on the ratio (M <= the token
+            # intersection): pairs that cannot reach the floor skip
+            # difflib — its matching is O(n*m) and the pair sweep is
+            # O(F^2), the bound keeps the pass in seconds
+            common = sum((counts[i] & counts[j]).values())
+            if 2.0 * common / (len(a[5]) + len(b[5])) < min_ratio:
                 continue
             r = difflib.SequenceMatcher(None, a[5], b[5]).ratio()
             if r >= min_ratio and max(a[4], b[4]) >= 10:

@@ -62,7 +62,8 @@ class EvilUpstream:
     REGS = {32064: 0, 32065: 4000}
 
     def __init__(self, port):
-        self.mode = 'fine'  # fine | garbage | short | lying | txn | unit | stall | garbage_after
+        self.mode = 'fine'  # fine | garbage | short | lying | txn | unit | stall | dropout | garbage_after | busy
+        self.accepts = 0
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind(('127.0.0.1', port))
@@ -80,11 +81,13 @@ class EvilUpstream:
                 continue
             except OSError:
                 return
+            self.accepts += 1
             threading.Thread(target=self._client, args=(conn,), daemon=True).start()
 
     def _client(self, conn):
         try:
             conn.settimeout(15)
+            first = True   # dropfirst: the fresh session's first query
             while True:
                 tid, _pid, length = struct.unpack('>HHH', recvn(conn, 6))
                 rest = recvn(conn, length)
@@ -95,6 +98,12 @@ class EvilUpstream:
                 payload = bytes([count * 2]) + b''.join(
                     struct.pack('>H', self.REGS.get(a, 0)) for a in range(start, start + count))
                 mode = self.mode
+                if mode == 'dropfirst' and first:
+                    # the sun2000 dongle's habit (the mbpoll repro): the
+                    # first query of a FRESH session draws silence — the
+                    # connection STAYS, the next query on it is answered
+                    first = False
+                    continue
                 if mode == 'garbage':
                     conn.sendall(b'\xde\xad\xbe\xef' * 8)
                     raise ConnectionError('garbage sent')
@@ -112,6 +121,11 @@ class EvilUpstream:
                                  + bytes([uid + 1, 3]) + payload)
                 elif mode == 'stall':
                     time.sleep(12)  # the cache's upstream timeout must fire first
+                elif mode == 'busy':
+                    # the dongle's 'not now': exception 06 answered in band,
+                    # the connection STAYS (that is the whole point)
+                    conn.sendall(struct.pack('>HHH', tid, 0, 3) + bytes([uid, fc | 0x80, 6]))
+                    continue
                 elif mode == 'garbage_after':
                     conn.sendall(struct.pack('>HHH', tid, 0, 2 + len(payload))
                                  + bytes([uid, 3]) + payload + b'\xde\xad' * 4)
@@ -310,7 +324,7 @@ try:
     evil.mode = 'garbage'  # cold from the start: no fine-mode poll can fill the cache
     start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15509 + BASE),
            '--listen', '127.0.0.1:%d' % (15508 + BASE), '--modbus-interval', '1', '--cache-ttl', '3',
-           '--modbus-profile', R], log=os.path.join(SCRATCH, 'reg_evil.log'))
+           '--modbus-profile', R, '--log-level', 'DEBUG'], log=os.path.join(SCRATCH, 'reg_evil.log'))
     time.sleep(2)
     for mode in ('garbage', 'short', 'lying', 'txn', 'unit', 'stall'):
         evil.mode = mode
@@ -333,7 +347,53 @@ try:
     evil_log = open(os.path.join(SCRATCH, 'reg_evil.log')).read()
     check('evil upstream: zero tracebacks, failures are one-liners',
           'Traceback' not in evil_log and 'poll of' in evil_log)
+    check('hostile failures never split the plan (shape answers only)',
+          'splitting block' not in evil_log)
+
+    # 4b. the dongle's busy: exception 06 in band, the session STAYS — the
+    #     poller waits a beat and retries on the warm connection (no
+    #     reconnect churn), the client sees the device's 06, no leaf poison
+    evil.accepts = 0
+    evil.mode = 'busy'
+    time.sleep(3.5)   # two poll cycles over the warm session
+    acc_busy = evil.accepts
+    b = rd(32064, 2, port=15508 + BASE)
+    check('evil upstream busy -> client sees the device exception 06',
+          b[0] == 0x83 and b[1] == 6, b.hex())
+    check('busy keeps the session (no reconnect churn)', acc_busy <= 1, 'accepts=%d' % acc_busy)
+    busy_log = open(os.path.join(SCRATCH, 'reg_evil.log')).read()
+    check('busy is info, not an error: the retry line, no leaf poisoning',
+          'the device is busy waiting to retry fc' in busy_log
+          and 'the device is away fc' in busy_log
+          and 'rejected by the device (modbus exception 6)' not in busy_log
+          and 'device rejects' not in busy_log)
+    evil.mode = 'fine'
+    time.sleep(2.5)
+    b = rd(32064, 2, port=15508 + BASE)
+    check('evil upstream: recovers after busy', b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
     evil.stop()
+
+    # 4c. the dongle's lost first query (the mbpoll repro): a FRESH
+    #     session's first exchange draws silence — the poller keeps the
+    #     session, re-sends the same query on the warm connection and the
+    #     cycle recovers (reconnecting would only buy another lost first
+    #     query)
+    evil2 = EvilUpstream(15511 + BASE)
+    evil2.mode = 'dropfirst'   # cold from birth: the very first query is lost
+    start([sys.executable, P, '--upstream', '127.0.0.1:%d' % (15511 + BASE),
+           '--listen', '127.0.0.1:%d' % (15510 + BASE), '--modbus-interval', '1', '--cache-ttl', '3',
+           '--modbus-profile', R], log=os.path.join(SCRATCH, 'reg_evil2.log'))
+    time.sleep(12)
+    check('dropfirst: one connect, the session kept (no reconnect churn)',
+          evil2.accepts == 1, 'accepts=%d' % evil2.accepts)
+    b = rd(32064, 2, port=15510 + BASE)
+    check('dropfirst: the cycle recovers on the warm session',
+          b[0] == 3 and struct.unpack('>i', b[2:6])[0] == 4000, b.hex())
+    df_log = open(os.path.join(SCRATCH, 'reg_evil2.log')).read()
+    check('the lost first query retries in place (the same connection)',
+          'the device timed out waiting to retry fc' in df_log)
+    evil2.mode = 'fine'
+    evil2.stop()
 
     # 5. control server: show config/connections/cache, request flush cache,
     #    request restart,

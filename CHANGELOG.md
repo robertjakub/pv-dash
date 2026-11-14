@@ -284,6 +284,49 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
 
 ### Fixed
 
+- **The upstream close race that logged Bad file descriptor on unrelated
+  registers is gone, and the shared client now keeps a session through a
+  silent dongle** — every upstream exchange ran under the cache's
+  `upstream.lock`, but four `close()` sites sat outside it (the poller's
+  and the client-forward failure paths, the control thread's
+  `set modbus-unit` / `set modbus-auth-upstream` rebinds): a failing
+  exchange released the lock, the next thread entered its exchange on the
+  still-set socket, and the first thread's unlocked close ripped the fd
+  out of the blocked recv — `[Errno 9] Bad file descriptor` on registers
+  that had done nothing wrong, where the device's own `timed out` belonged.
+  The failed exchange now closes its own connection inside
+  `_exchange` while it still holds the caller's serialization, and every
+  remaining close takes the lock. On top, the field lesson from a real
+  SDongle (TCP accepts, the first query on every fresh session is lost,
+  `exception 06 — busy` in bursts): a zero-byte reply timeout is now
+  `ReplyTimeout` — the stream is still in sync, so the session STAYS and
+  the next exchange rides the warm connection instead of a fresh one (no
+  more reconnect churn, the ephemeral source port stops flapping), while
+  a partial frame's timeout still drops it (the catch spells
+  `socket.timeout` — on Python 3.9 the socket's timeout class is not the
+  builtin `TimeoutError`, and the first spelling never fired).
+  `exception 06` is not an
+  error anymore: the poller waits a beat (`modbus/read-delay`, 1s floor)
+  and retries the same query once per cycle, then keeps the cached words
+  fresh — no leaf poisoning, no block splitting, the client's forwarded
+  read answered in band with the device's 06 (the read-reject log's
+  off-by-one code fixed on the way: it always printed -1). The silent
+  timeout joins the same ladder — the dongle loses the first query of
+  almost every fresh session (the mbpoll repro), so re-sending the same
+  query on the warm connection recovers the cycle where a reconnect would
+  only buy another lost first query. The block split learned the same
+  restraint: only the device's own shape answers (exceptions 01/02/03)
+  split a failing block — a transport or garbage failure is
+  connection-scoped, so the plan keeps its granularity, the leaves poison
+  honestly for the cycle and recover on the next good one, where the old
+  split lingered forever and one outage left the poller crawling in
+  single-register exchanges. The scraper's
+  poller carries the same ladder; the fake grows `set register ADDR busy`
+  (reads of it answer exception 06 in band, a value write or reset
+  clears it) and the cache regtest drives both (the evil upstream's
+  `busy` and `dropfirst` modes — the fresh session's first query lost,
+  one connect, the warm session recovers it).
+
 - **The cache regtest's trace section runs green at full depth for the
   first time** — the section sits past the quick profile's QuickDone and
   had never executed until a full battery ran it: the trace drain wedged

@@ -8,38 +8,10 @@
    "suite": "dashboard-control-fuzz.py"
   },
   {
-   "id": "phrase:8c882b22",
-   "kind": "canon-phrase",
-   "tool": "cache, inverter",
-   "name": "cannot serve on",
-   "suite": "the emitting tool's regtest"
-  },
-  {
    "id": "phrase:4e544048",
    "kind": "canon-phrase",
    "tool": "common, scraper",
    "name": "connection rejected:",
-   "suite": "the emitting tool's regtest"
-  },
-  {
-   "id": "phrase:8debd3e9",
-   "kind": "canon-phrase",
-   "tool": "common, inverter",
-   "name": "control client connected from",
-   "suite": "the emitting tool's regtest"
-  },
-  {
-   "id": "phrase:5998c18f",
-   "kind": "canon-phrase",
-   "tool": "common, inverter",
-   "name": "control client from",
-   "suite": "the emitting tool's regtest"
-  },
-  {
-   "id": "phrase:6a6d8b2a",
-   "kind": "canon-phrase",
-   "tool": "common, inverter",
-   "name": "control handler crashed ",
    "suite": "the emitting tool's regtest"
   },
   {
@@ -99,20 +71,6 @@
    "suite": "the emitting tool's regtest"
   },
   {
-   "id": "phrase:deddf647",
-   "kind": "canon-phrase",
-   "tool": "cache, inverter",
-   "name": "the ops token must differ from the admin token t",
-   "suite": "the emitting tool's regtest"
-  },
-  {
-   "id": "phrase:c3a89ae6",
-   "kind": "canon-phrase",
-   "tool": "cache, inverter",
-   "name": "the read-only ops token supplements the admin to",
-   "suite": "the emitting tool's regtest"
-  },
-  {
    "id": "phrase:d76e6b22",
    "kind": "canon-phrase",
    "tool": "cache, common",
@@ -128,9 +86,9 @@
   }
  ],
  "counts": {
-  "total": 18,
+  "total": 12,
   "knob": 1,
   "command": 0,
-  "canon-phrase": 17
+  "canon-phrase": 11
  }
 }

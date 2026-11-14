@@ -258,8 +258,8 @@ canon the operators grep for.
 | dashboard | `ACL-FILE`, `RELOAD`, `SHUTDOWN`, `START` |
 | common | `AUTH-FAIL`, `COMMAND`, `CONNECT`, `DISCONNECT`, `RECONNECT`, `RELOAD` |
 
-**The phrase canon**: 25 log phrase(s) shared by >= 2 tools;
-90 tool-local. The canon (the lead clause, the tools that speak it):
+**The phrase canon**: 28 log phrase(s) shared by >= 2 tools;
+91 tool-local. The canon (the lead clause, the tools that speak it):
 
 | the lead clause | tools |
 |---|---|
@@ -283,11 +283,11 @@ canon the operators grep for.
 | `poll plan:` | cache, scraper |
 | `sighup: reloaded` | cache, inverter |
 | `poll cycle crashed ` | cache, scraper |
+| `the device timed out waiting to retry fc` | cache, scraper |
+| `the device is busy waiting to retry fc` | cache, scraper |
+| `the device is away fc` | cache, scraper |
 | `state dumps:` | cache, common |
 | `the shutdown dump to` | cache, common |
-| `the periodic dump to` | cache, common |
-| `rejected` | common, inverter |
-| `sighup: reload failed ` | common, inverter |
 
 The findings:
 
@@ -334,6 +334,7 @@ The refusal texts (the literal SystemExit args, sorted):
 - `the metrics endpoint serves the request counters: refusing to expose /metrics beyond loopback without a token (F13 in docs/SECURITY.md) — pass metrics-token by flag/env/config and restart, or bind metrics-listen on 127.0.0.1`
 - `the ops token must differ from the admin token (the same secret would hand every holder the role the server picks first)`
 - `time out of range (00:00-23:59)`
+- `timed out`
 - `timezone must be utc|local`
 - `transaction id mismatch`
 

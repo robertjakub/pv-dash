@@ -71,7 +71,12 @@ class ClientBase:
     def _exchange(self, out, want_txn):
         """One wire exchange with the session accounting: send + the two
         recvs count the bytes, a txn/proto mismatch raises, any failure
-        lands in errors/last_error and re-raises. `out` is the READY frame
+        lands in errors/last_error and closes the session socket before
+        re-raising — the failed exchange drops its own connection while it
+        still holds the caller's serialization (the cache's upstream.lock;
+        the scraper's single poll thread), so no other thread can be mid-
+        exchange on the dying socket and no later close can land on a
+        reconnect another thread won. `out` is the READY frame
         (the caller packs — the cache forwards client frames verbatim);
         returns (txn, proto, length, unit, body)."""
         try:
@@ -92,6 +97,7 @@ class ClientBase:
             self.errors += 1
             self.last_error = str(e)
             self.last_error_at = time.monotonic()
+            self.close()
             raise
         self.exchanges += 1
         return txn, proto, length, unit, body

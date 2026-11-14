@@ -4,13 +4,6 @@ A dependency-free (Python stdlib only) Modbus TCP capture/replay sidecar: it
 pipes the wire to a trace file in capture mode and serves the trace in
 replay mode. Part of the pv-suite family.
 
-- the daemon's own `--help` and the man page (`modbus-replay --man`) carry the
-  startup surface; this page carries the full reference.
-
-- **generated** from `lib/options.json` (the one-knob-one-source rows) by
-  `dev/generators/manual.py` — edit the registry (or the REF data in the
-  generator) and re-run, never this file.
-
 ## Run it
 
     # capture: the cache's polls to the real device, the wire to a trace
@@ -90,6 +83,57 @@ resolver's last rung after flag > env > config); the namespaces group them.
 | `modbus-timeout` | — | startup-only | 3.0 | `s` | `--modbus-timeout` / `MODBUS_TIMEOUT` | Modbus connect/read timeout in seconds |
 | `local-time` | — | startup-only | off | `on\|off` | `--local-time` / `LOCAL_TIME` | log timestamps in the system time zone instead of UTC |
 | `log-level` | — | startup-only | INFO | `DEBUG\|INFO\|WARNING\|ERROR` | `--log-level` / `LOG_LEVEL` | log verbosity |
+## Signals
+
+| signal | effect |
+|---|---|
+| `SIGHUP` | logged and ignored — there is no live layer to re-apply; restart to change the posture |
+| `SIGTERM` / `SIGINT` | graceful shutdown with a session summary (connections piped, frames both ways, bytes, undecoded flushes — or sessions served, answered, misses) |
+| `SIGUSR2` | dumps the thread stacks (the family's faulthandler hook) |
+
+## Configuration
+
+- there is no config file — the sidecar's posture is fixed at start: **flag >
+  env (the bare upper-snake twins) > the built-in defaults**, the knobs table
+  below IS the flags table. A wrapper script (or the `apps/modbus-replay/dev`
+  launcher) is where a standing posture lives.
+
+## Runtime control
+
+- none — the no-control-plane ruling: no control server, no cli, no
+  set/show/clear, nothing to reload. The posture is fixed at start; a change
+  is a restart with different flags (`SIGHUP` is logged and ignored). The
+  observability face is `modbus-replay-dump` — the views, the live feed, the
+  recorder.
+
+## Access control
+
+- nothing to gate, by design: the Modbus port forwards bytes between client
+  and device, and the record feed is a read-only binary push — no verbs, no
+  tokens, nothing a command could ride (the no-control-plane ruling). The
+  trace file is created `0600` and belongs with the secrets — a Waveshare
+  capture carries the connection password raw, and a leaked trace can replay a
+  PVA1 proof at any server holding the key.
+
+## Metrics
+
+- none — the sidecar publishes no `/metrics`; the dump tool is the
+  observability face (the summary, the answer index, the conversations, the
+  live view).
+
+## Audit logging
+
+- no audit file, no hash chain — the sidecar takes no commands, so there is
+  nothing to repudiate: the trace IS the record (every frame verbatim,
+  `0600`), and the lifecycle rides the log (the startup posture line, the
+  shutdown's session summary, `SIGUSR2`'s thread stacks).
+
+## Register maps
+
+- register-agnostic — no profile, no types, no gains: the replay serves
+  recorded bytes by request identity (unit + function code + PDU), the raw
+  frames are the one truth. The dump tool decodes for reading only.
+
 ## The trace format
 
 - the trace is 0600 at rest (the wire carries values — and a Waveshare capture
@@ -244,13 +288,17 @@ resolver's last rung after flag > env > config); the namespaces group them.
   subscribes the same way, so the cache's live wire records to a file with
   `--socket /tmp/modbus-cache-<listen-port>-trace.socket --record …`.
 
-## Signals
+## Source layout
 
-| signal | effect |
-|---|---|
-| `SIGHUP` | logged and ignored — there is no live layer to re-apply; restart to change the posture |
-| `SIGTERM` / `SIGINT` | graceful shutdown with a session summary (connections piped, frames both ways, bytes, undecoded flushes — or sessions served, answered, misses) |
-| `SIGUSR2` | dumps the thread stacks (the family's faulthandler hook) |
+- `bin/modbus-replay.py` — the daemon (capture, pass-through, replay);
+  `bin/modbus-replay-dump.py` — the reader face (the views, the converter, the
+  live view, the recorder); `lib/` — the sidecar's modules (`capture.py`,
+  `replay.py`, `trace.py`, `statics.py`, the registry wiring); `man/` — the
+  generated man pages; `dev` — the checkout launcher.
+
+- the sidecar is stdlib-only and shares no service packaging — no container
+  image, no Nix package, no NixOS module; the family's `common/` package (the
+  trace writer, the record encoding) is imported by path from the checkout.
 
 ## Testing
 
@@ -262,6 +310,12 @@ resolver's last rung after flag > env > config); the namespaces group them.
 
     dev/battery/battery.py replay    # the replay profile: the regtest (the suites refuse
                                 #   without the runner's PV_RUN_DIR)
+
+- the suites **always run through the battery runner**
+  (`dev/battery/battery.py`) — it owns the run dir, the port slots and the
+  tally, and a standalone suite run refuses (a hand-run collides across
+  sessions). A new behavior ships with a check: a scenario that fails without
+  it and names the registry rows it pins.
 
 The ?/TAB pools, `show knobs` and `help config` all render from the same
 rows this page was generated from.

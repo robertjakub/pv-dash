@@ -3,13 +3,6 @@
 A single-page dashboard for home PV monitoring, fed by Prometheus: it serves
 the page and proxies the upstream queries. Part of the pv-suite family.
 
-- the daemon's own `--help` and the man page (`dashboard --man`) carry the
-  startup surface; this page carries the full reference.
-
-- **generated** from `lib/options.json` (the one-knob-one-source rows) by
-  `dev/generators/manual.py` — edit the registry (or the REF data in the
-  generator) and re-run, never this file.
-
 ## Run it
 
     python3 bin/dashboard.py                          # upstream http://localhost:9090
@@ -78,7 +71,11 @@ the page and proxies the upstream queries. Part of the pv-suite family.
 - if Prometheus is unreachable, the page switches to **DEMO DATA** so you can
   preview the layout.
 
-## Speaking to the daemon
+## The control plane
+
+- the cli ships beside the daemon (`bin/dashboard-cli.py`, its own man page
+  via `--man`) — the same client the suites drive; every word below is its
+  spelling.
 
 - the control server is a JSON-lines listener: a unix socket (the default
   `/tmp/dashboard-8080.socket`) or a TCP port on 127.0.0.1 — the
@@ -257,6 +254,24 @@ the state dump: the live overrides' file, the restore-on-start
 | `show version` | show-only | the suite version |
 | `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
 | `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
+## Configuration
+
+- the daemon's config file (`--config PATH`, env `CONFIG`) speaks the **set
+  grammar** — one `set <name> <value>` per line, the control CLI's own
+  spelling; a value resolves CLI > env (the bare upper-snake twins) > this
+  file > the row's default.
+
+- the bundled `apps/dashboard/examples/dashboard.conf` is GENERATED from the
+  registry (`dev/generators/examples.py`): every knob declared, every line
+  commented at its default — copy it, uncomment what you change, point
+  `--config` at it. The docker image rides it as its default `--config`
+  target; the caps and the listen address are live-settable through the
+  control server.
+
+- the PAGE has its own config — `config.js`, served at `/config.js` and
+  covered in its own section below: the daemon conf configures the server,
+  `config.js` configures what the browser renders.
+
 ## Page configuration (config.js)
 
 - all settings live in `config.js` (the shipped example is
@@ -301,6 +316,45 @@ the state dump: the live overrides' file, the restore-on-start
   are configurable (`?config=<path>` / `?i18n=<path>`); a failed load falls
   back to the files next to the page, then to the built-in defaults.
 
+## Runtime control
+
+- the live layer: the connection caps (`set max-clients`, `set max-conn-per-ip`),
+  the metrics ACL, the audit sinks and the rotation are settable rows applying
+  at once; `clear <name>` returns the configured value, `show <name>` prints
+  the live one.
+
+- the restart-marked rows (the listen address) record a pending `set` and fold
+  in on `request reload` (or a restart); the secrets are startup-only — they
+  never render back, a restart applies them.
+
+- every command is audited once, by the server (the peer, the role, the mac);
+  the ops-token sessions ride the read-only verb policy (no set/clear, no
+  `request reload`, no shutdown).
+
+    # live: widen the door, re-read the file
+    set max-clients 128
+    set max-conn-per-ip 8
+    request reload
+
+## Access control
+
+- the page and the proxy speak the family's F13 shape: a **bearer token is
+  mandatory beyond loopback** — a token-less non-loopback bind refuses to
+  start. The browser opens `http://host:8080/?auth=<token>` once — the
+  exchange sets an HttpOnly session cookie — and scripts send `Authorization: Bearer <token>`;
+  on the loopback bind the token is optional.
+
+- the HTTP surface carries the family's connection caps — `--max-clients`
+  (64), `--max-conn-per-ip`, and the `/metrics` pair (`--metrics-max-clients`,
+  `--metrics-max-conn-per-ip`) — all live-settable through the control server.
+
+- the dashboard's own `/metrics` (the scraper-feeding stack) carries the same
+  posture: the token (`--metrics-token`) and the metrics ACL (`--metrics-acl`,
+  live `set metrics acl`) beyond loopback.
+
+- beyond localhost, still terminate TLS at an authenticating proxy — see
+  `Behind a reverse proxy` below.
+
 ## Behind a reverse proxy
 
 - the dashboard only makes same-origin GET requests — any proxy works.
@@ -321,7 +375,7 @@ the state dump: the live overrides' file, the restore-on-start
 - `prometheusUrl: '/prom'` works in both cases. Mount at the root (or strip
   the prefix); add auth at the proxy if exposed to the internet.
 
-## Metrics source
+## Metrics
 
 - the page expects PV inverter metrics in Prometheus (`huawei_*_watts` — the
   scraper's `--metrics-prefix` default). The `scraper/` subproject ships a
@@ -341,6 +395,46 @@ the state dump: the live overrides' file, the restore-on-start
   an **experimental** caching proxy that multiplexes that one connection so
   the scraper can share it with other tools (`../cache/README.md`).
 
+## Audit logging
+
+- the dashboard writes the family's audit trail — one line per event,
+  who/when/what/result, on by default at the XDG state home; `--audit-log <file>`
+  renames it, `-` sends it to stdout (the journald way), `none` with a forward
+  spelled is the remote-only mode, and `--no-audit-log` disables entirely.
+  Rotation: `--audit-max-mb`, `--audit-daily`, `--audit-files`.
+
+- `--audit-forward` mirrors every line — the per-writer hash chain included —
+  onward: `syslog`, `syslog:/path`, `udp://host[:514]` or `tcp://host[:514]`
+  (the off-box copy, the F10 answer); the envelope rides
+  `--audit-forward-format` (`rfc5424` the default, or `cef`).
+
+- the wire commands (with their peer and mac), the auth failures and the
+  request accounting ride the trail; the 12-hex chained hash per entry is
+  verified by `dev/gates/audit_verify.py` — any edit, deletion or reordering
+  shows up as a chain break. The writer is named by `--audit-instance` (the
+  control port when unset).
+
+## Register maps
+
+- none — the dashboard owns no Modbus registers and no device profile: it
+  renders Prometheus series. The metric selectors live in `config.js` (its own
+  section below); the registers themselves are the scraper's and the cache's
+  business.
+
+## Source layout
+
+- `bin/dashboard.py` — the server (the page host, the Prometheus proxy, the
+  control server); `bin/dashboard-cli.py` — the one-shot/interactive client;
+  `static/` — the page itself (`index.html`, `app.js`, `boot.js`, `i18n.js`,
+  `style.css`, the vendored ECharts); `lib/` — the server's modules (the
+  config/registry wiring); `examples/` — the generated `dashboard.conf` and
+  the example `config.js`; `screenshots/` — the README's captures; `man/` —
+  the generated man page; `dev` / `dev-cli` — the checkout launchers.
+
+- the shared machinery lives in the suite's `common/` package (the control
+  spine, the audit, the manpage generator) and `shared/` (the texts, the
+  schemas) — `lib/` imports it by path; nothing is packaged separately.
+
 ## Testing
 
 - the dashboard profile rides the battery runner; the `/config.js` fuzz pin
@@ -350,6 +444,12 @@ the state dump: the live overrides' file, the restore-on-start
     dev/battery/battery.py dashboard             # the dashboard profile: the control fuzz +
                                            #   the audit chain (the suites refuse without
                                            #   the runner's PV_RUN_DIR)
+
+- the suites **always run through the battery runner**
+  (`dev/battery/battery.py`) — it owns the run dir, the port slots and the
+  tally, and a standalone suite run refuses (a hand-run collides across
+  sessions). A new behavior ships with a check: a scenario that fails without
+  it and names the registry rows it pins.
 
 The ?/TAB pools, `show knobs` and `help config` all render from the same
 rows this page was generated from.

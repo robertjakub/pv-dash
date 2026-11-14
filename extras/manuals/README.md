@@ -8,10 +8,15 @@ reference — the READMEs carry the front page only (description, quick
 how-to, security, license) — so each page tables the registry surface
 (every command, knob and show report the control wire answers, the kind
 of each, the flag and the env twin, the default, the value shape) and
-renders the reference sections: Run it, How it works, Signals, the
-metrics, the audit trail, the testing — bullets and tables, no big
-paragraphs of text. The replay page is the no-control-plane shape: the
-registry knobs as the flags table, no commands or show reports.
+walks one canonical ladder of reference sections — Run it, How it
+works, The control plane, the Commands/Knobs/Show-reports tables,
+Signals, Configuration, Runtime control, Access control, Metrics, Audit
+logging, Register maps, Source layout, Testing — with the tool's own
+extras (the persistence, the trace feed, the alerting, the chaos)
+slotted beside; a topic a tool honestly lacks renders as its one-line
+absence. Bullets and tables, no big paragraphs of text. The replay page
+is the no-control-plane shape: the registry knobs as the flags table,
+no commands or show reports.
 
 The pages are **generated** by `dev/generators/manual.py` from the
 per-tool registries (`apps/<tool>/lib/options.json`, the

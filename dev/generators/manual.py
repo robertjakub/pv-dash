@@ -170,7 +170,7 @@ REF = {
                   'poller repopulates immediately'),
                  ('`SIGTERM` / `SIGINT`', 'graceful shutdown')),
             ]),
-            ('Register map (device profile)', [
+            ('Register maps', [
                 ('b', 'the proxy caches the registers listed in the **device '
                       'profile** — the same shared schema the fake inverter '
                       'serves and the scraper scrapes; the shipped profiles live '
@@ -229,8 +229,6 @@ REF = {
                 ('b', 'a worked write-gate example ships as '
                       '`extras/examples/acl-write-registers.json` (the deye '
                       'policy, worked out).'),
-            ]),
-            ('Modbus auth', [
                 ('b', 'beyond the address-based ACLs the cache speaks the '
                       'family\'s **`suite`** Modbus auth — a proof-of-key '
                       'handshake on the Modbus TCP wire itself (the wire shape '
@@ -368,7 +366,7 @@ REF = {
                       'spikes and the write-refusal bursts — the cache-only '
                       'install ships its half (`share/alerts.yml`).'),
             ]),
-            ('Audit trail', [
+            ('Audit logging', [
                 ('b', 'the proxy logs every audit-relevant event to stdout/'
                       'stderr with UTC timestamps by default (`--local-time` '
                       'switches). Under systemd, journald stores, seals and '
@@ -489,6 +487,88 @@ REF = {
                       '                                    #   the audit chain (the stress suite rides quick/full)\n'
                       'dev/battery/battery.py cache-regtest      # one suite — every run needs the runner (the suites\n'
                       '                                    #   refuse without the runner\'s PV_RUN_DIR)'),
+                ('b', 'the suites **always run through the battery runner** '
+                      '(`dev/battery/battery.py`) — it owns the run dir, the '
+                      'port slots and the tally, and a standalone suite run '
+                      'refuses (a hand-run collides across sessions). A new '
+                      'behavior ships with a check: a scenario that fails '
+                      'without it and names the registry rows it pins.'),
+            ]),
+            ('Configuration', [
+                ('b', 'the config file (`--config PATH`, env `CONFIG`) speaks '
+                      'the **set grammar** — one `set <name> <value>` per '
+                      'line, the control CLI\'s own spelling, the same line '
+                      'pastes into the console or a ctl; a value resolves '
+                      'flag > env > this file > the row\'s default, anything '
+                      'left commented falls to the default the line spells.'),
+                ('b', 'the bundled `apps/cache/examples/modbus-cache.conf` is '
+                      'GENERATED from the registry (`dev/generators/examples.'
+                      'py`): every knob declared, every line commented at its '
+                      'default — copy it, uncomment what you change, point '
+                      '`--config` at it. The dev wrapper (`apps/cache/dev`) '
+                      'and the docker image both ride it as their default '
+                      '`--config` target.'),
+                ('c', '# per-register cache TTL: older entries are refetched\n'
+                      '# set cache ttl 30\n'
+                      '\n'
+                      '# the inverter Modbus TCP endpoint HOST:PORT (`:5502` '
+                      '= 127.0.0.1:5502)\n'
+                      '# set modbus upstream 127.0.0.1:5502'),
+                ('b', 'a live daemon re-reads the file on `SIGHUP` / `request '
+                      'reload-config` — a broken file keeps the previous '
+                      'settings; the restart-marked knobs record a pending '
+                      '`set` and fold into the restarted process. `show '
+                      'config` regenerates the script from the running daemon '
+                      '(secrets hidden) and `--dry-run` prints the effective '
+                      'settings without binding anything.'),
+                ('b', 'the secrets never live in the file: every secret row '
+                      'carries the `*** SECRET REMOVED ***` placeholder — '
+                      'pass them by flag, env, or `file:<path>` (the first '
+                      'line of an owner-only `0600` file).'),
+            ]),
+            ('Source layout', [
+                ('b', '`bin/modbus-cache.py` — the daemon; '
+                      '`bin/modbus-cache-cli.py` — the one-shot/interactive '
+                      'client; `lib/` — the daemon\'s modules (the cache '
+                      'core, the control server, the config/registry '
+                      'wiring); `examples/modbus-cache.conf` — the generated '
+                      'sample; `man/` — the generated man page; `dev` / '
+                      '`dev-cli` — the checkout launchers (the sys.path and '
+                      'the default `--config` target).'),
+                ('b', 'the shared machinery lives in the suite\'s `common/` '
+                      'package (the control spine, the Modbus client/server, '
+                      'the audit, the manpage generator) and `shared/` (the '
+                      'texts, the schemas, the profiles) — `lib/` imports it '
+                      'by path; nothing is packaged separately.'),
+            ]),
+            ('Runtime control', [
+                ('b', 'the live layer: every `settable` row applies at once '
+                      '(`set <name> <value>`), `clear <name>` returns the '
+                      'configured value, `show <name>` prints the live one — '
+                      'the caps, the ACLs, the trace socket, the audit sinks '
+                      'and the poll plan rotate live; the console completes '
+                      'the row\'s live/alias path spellings.'),
+                ('b', 'the **restart-marked** rows record a pending `set` and '
+                      'fold into the restarted process on `request reload` '
+                      '(or a plain restart); the **startup-only** rows (every '
+                      'secret, the listen address) answer a restart only. '
+                      '`show config` spells each row\'s shape, and '
+                      'regenerates the config script from the running daemon '
+                      '(secrets hidden).'),
+                ('b', 'the request verbs: `request reload-config` re-reads '
+                      'the config file (the `SIGHUP` twin), `request dump` / '
+                      '`request dump with-cache` write the state dump, '
+                      '`request restore` loads it, `clear cache` is the '
+                      '`SIGUSR1` twin, `restart` restarts the daemon in '
+                      'place.'),
+                ('b', 'every command is audited once, by the server (the '
+                      'peer, the role, the frame\'s mac when the wire is '
+                      'signed); the ops-token sessions ride the read-only '
+                      'verb policy.'),
+                ('c', '# live: retune, inspect, re-read the file\n'
+                      'set cache ttl 30\n'
+                      'show cache-all\n'
+                      'request reload-config'),
             ]),
         ],
     },
@@ -556,7 +636,7 @@ REF = {
                  ('`SIGTERM` / `SIGINT`', 'graceful shutdown with a session '
                   'summary (duration + poll-error count)')),
             ]),
-            ('Register defaults', [
+            ('Register maps (the register defaults)', [
                 ('b', 'register defaults follow Huawei\'s official *Solar '
                       'Inverter Modbus Interface Definitions* (Issue 04, '
                       '2023-01-10) — they live in the device profile, not in '
@@ -673,7 +753,7 @@ REF = {
                       'Thresholds assume the default 10 s poll interval — tune '
                       'them to yours.'),
             ]),
-            ('Device profile and metrics spec', [
+            ('Register maps and the metrics spec', [
                 ('b', '*where* the primary values live comes from a **device '
                       'profile** — the same shared schema the fake inverter '
                       'serves and the cache polls; the shipped profiles live '
@@ -753,7 +833,7 @@ REF = {
                 ('b', 'the fake inverter emulates the battery for testing: '
                       '`python3 apps/inverter/bin/modbus-fake-inverter.py`.'),
             ]),
-            ('Logging and audit trail', [
+            ('Audit logging', [
                 ('b', 'logging is `logging`-based with **UTC timestamps by '
                       'default** (`--local-time` switches): one startup line '
                       'with the effective settings, reachability changes and '
@@ -806,6 +886,101 @@ REF = {
                 ('c', 'dev/battery/battery.py scraper        # the scraper profile: the regtest, the fuzz, the\n'
                       '                                #   audit chain (the suites refuse without the\n'
                       '                                #   runner\'s PV_RUN_DIR)'),
+                ('b', 'the suites **always run through the battery runner** '
+                      '(`dev/battery/battery.py`) — it owns the run dir, the '
+                      'port slots and the tally, and a standalone suite run '
+                      'refuses (a hand-run collides across sessions). A new '
+                      'behavior ships with a check: a scenario that fails '
+                      'without it and names the registry rows it pins.'),
+            ]),
+            ('Configuration', [
+                ('b', 'the config file (`--config` picks it; the default hunt: '
+                      '`$CONFIG`, then `modbus-scraper.conf` next to the '
+                      'script, then the subproject root\'s sample — a missing '
+                      'file is fine) speaks the **set grammar** — one '
+                      '`set <name> <value>` per line, the control CLI\'s own '
+                      'spelling; a value resolves flag > env > this file > '
+                      'the row\'s default.'),
+                ('b', 'the bundled `apps/scraper/examples/modbus-scraper.conf` '
+                      'is GENERATED from the registry (`dev/generators/'
+                      'examples.py`): every knob declared, every line '
+                      'commented at its default — copy it, uncomment what you '
+                      'change, point `--config` at it. The env-twin set rides '
+                      'the generated `docker/env/modbus-scraper.env.example`.'),
+                ('b', 'a live scraper re-reads the file on `SIGHUP` (a broken '
+                      'file keeps the previous settings; the auth token\'s '
+                      '`file:` form re-reads too — that is the rotation '
+                      'story); `show config` regenerates the script from the '
+                      'running daemon (secrets hidden) and `--dry-run` prints '
+                      'the effective settings without binding anything.'),
+            ]),
+            ('Access control', [
+                ('b', 'the `/metrics` endpoint: **beyond loopback a token is '
+                      'mandatory** — a non-loopback listen without '
+                      '`--auth-token` refuses to start (one clean line, no '
+                      'traceback — the F13 floor); beside the token the '
+                      '**metrics ACL** (`--metrics-acl`, live `set metrics '
+                      'acl`) gates the accept — `any`, `none`, a '
+                      'comma-separated IP/CIDR list, or `file:<path>` (the '
+                      'ip-prefix acl file; `show metrics-acl-table` renders '
+                      'the chain). An unauthenticated read answers 401.'),
+                ('b', 'the control plane: TCP control demands the token '
+                      '(`--control-token`, the wire\'s `auth` verb); the '
+                      'optional ops token (`--control-ops-token`) scopes a '
+                      'session to the read-only verbs — the ops shift against '
+                      'the admin key, both audited.'),
+                ('b', 'the device leg: `--modbus-auth` picks what the scraper '
+                      '*speaks to the device* — `suite` (the PVA1 proof-of-key '
+                      'handshake, the key floor 16 characters) or `waveshare` '
+                      '(the key presented as a Waveshare RS485-to-TCP '
+                      'gateway\'s connection password, non-empty ASCII) — and '
+                      '`--modbus-auth-key` carries the shared secret '
+                      '(`file:<path>` the shipped spelling). Scheme and key '
+                      'are live-settable; a key set with no scheme stays '
+                      'dormant, and going `suite` over a short standing '
+                      'password refuses at start and on the wire.'),
+            ]),
+            ('Source layout', [
+                ('b', '`bin/modbus-scraper.py` — the exporter; '
+                      '`bin/modbus-scraper-cli.py` — the one-shot/interactive '
+                      'client; `lib/` — the daemon\'s modules (the poll loop, '
+                      'the metrics assembly, the config/registry wiring); '
+                      '`metrics.json` — the shipped self-observability spec '
+                      '(merged over the configured spec); `examples/` — the '
+                      'generated conf and the example metrics spec; `schema/` '
+                      '— the JSON Schemas; `man/` — the generated man page; '
+                      '`dev` / `dev-cli` — the checkout launchers.'),
+                ('b', 'the shared machinery lives in the suite\'s `common/` '
+                      'package (the control spine, the Modbus client, the '
+                      'audit, the compute-expression evaluator) and `shared/` '
+                      '(the texts, the schemas, the profiles) — `lib/` '
+                      'imports it by path; nothing is packaged separately.'),
+            ]),
+            ('Runtime control', [
+                ('b', 'the live layer: `set modbus profile <name|path>` swaps '
+                      'the register map at runtime (the metric sources '
+                      'rebuild, a profile lacking the power math\'s inputs '
+                      'rolls back cleanly), `set system log-level` is live; '
+                      '`clear <name>` returns the configured value, '
+                      '`show <name>` prints the live one, `show inputs` / '
+                      '`show inputs-metrics` render the spec.'),
+                ('b', 'the poll cadence and the caps ride the config reload: '
+                      '`request reload-config` re-reads the file (the '
+                      '`SIGHUP` twin — interval, caps, the auth token\'s '
+                      '`file:` re-read, the upstream); the restart-marked '
+                      'rows (the listen address, the metrics spec) record a '
+                      'pending `set` and fold in on `request reload` or a '
+                      'restart.'),
+                ('b', '`request poll now` forces a poll off-schedule; '
+                      '`restart` restarts the exporter in place. Every '
+                      'command is audited once, by the server — the '
+                      'ops-token sessions ride the read-only verb policy '
+                      '(no set/clear, no `request poll now`, no reload, no '
+                      'restart, no shutdown).'),
+                ('c', '# live: swap the map, re-read the file, force a poll\n'
+                      'set modbus profile sun2000_full\n'
+                      'request reload-config\n'
+                      'request poll now'),
             ]),
         ],
     },
@@ -919,7 +1094,7 @@ REF = {
                   'differ; the inverter injection stays balanced.'),
         ],
         'tail': [
-            ('Inverter profiles', [
+            ('Register maps (the profile)', [
                 ('b', 'the fake doesn\'t hardcode any device layout: the '
                       'simulator computes **named physical values** '
                       '(`pv-power`, `grid-power`, `battery-soc`, …) and the '
@@ -991,7 +1166,7 @@ REF = {
                       '`scraper_up` flips, with the fake never dying. Tune or '
                       'disable live (`set chaos off`).'),
             ]),
-            ('Audit trail', [
+            ('Audit logging', [
                 ('b', 'the fake itself and both clients append to the **audit '
                       'log** — on by default at the **XDG state home** '
                       '(`~/.local/state/fake-inverter/audit.log`); '
@@ -1066,6 +1241,110 @@ REF = {
                 ('c', 'dev/battery/battery.py inverter        # the inverter profile: the fake\'s regtest, the\n'
                       '                                  #   control fuzz, the audit chain (the suites refuse\n'
                       '                                  #   without the runner\'s PV_RUN_DIR)'),
+                ('b', 'the suites **always run through the battery runner** '
+                      '(`dev/battery/battery.py`) — it owns the run dir, the '
+                      'port slots and the tally, and a standalone suite run '
+                      'refuses (a hand-run collides across sessions). A new '
+                      'behavior ships with a check: a scenario that fails '
+                      'without it and names the registry rows it pins.'),
+            ]),
+            ('Configuration', [
+                ('b', 'the config file (`--config PATH`, `$CONFIG`, then '
+                      '`modbus-fake-inverter.conf` next to the script) speaks '
+                      'the **set grammar** — every line a `set <name> <value>` '
+                      'in the CLI spelling, the same line pastes into the '
+                      'console or `modbus-fake-cli`; a value resolves flag > '
+                      'env > this file > the row\'s default, and `--dry-run` '
+                      'prints the effective settings.'),
+                ('b', 'the bundled `apps/inverter/examples/modbus-fake-inverter'
+                      '.conf` is GENERATED from the registry '
+                      '(`dev/generators/examples.py`): every knob declared, '
+                      'every line commented at its default — copy it, '
+                      'uncomment what you change, point `--config` at it.'),
+                ('b', 'the pins and the machines (`set pv`, `set load`, '
+                      '`set batt`, `set grid`, `set soc`, `set mppt`, '
+                      '`set cloud`, `set scenario`, `set battery-state`, '
+                      '`set grid-outage`) are runtime set words — no flag, no '
+                      'env twin, no config line: the file names one and the '
+                      'start refuses. They exist to be driven live.'),
+                ('b', '`SIGHUP` re-applies the **environment layer** '
+                      '(all-or-nothing — flags are startup-only): a config '
+                      'change to a knob rides the reload; the machine pins '
+                      'never do (they are runtime state by design).'),
+            ]),
+            ('Access control', [
+                ('b', 'the fake is the family\'s **trusted-LAN test tool '
+                      '(F11)**: control works over TCP without a token too '
+                      '(`--control-token` is still honored when the wire is '
+                      'not yours); over the unix socket a trusted peer (root, '
+                      'the daemon\'s own user or `--control-trust-uids` — '
+                      'SO_PEERCRED) always speaks without one. Bind it to '
+                      'loopback when in doubt.'),
+                ('b', 'the Modbus leg: `--connect-acl` (`any` / `none` / a '
+                      'comma-separated IP/CIDR list / `file:<path>`) gates '
+                      'which Modbus clients may connect at all, and '
+                      '`--modbus-auth suite` (+ `--modbus-auth-key`, min 16 '
+                      'characters, `file:<path>` the shipped spelling) makes '
+                      'the fake the **server side** of the suite handshake — '
+                      'a client that cannot prove the key never sees a '
+                      'frame.'),
+                ('b', 'writes are the point: the register/coil overlay is the '
+                      'feature, so there is no write ACL — every write the '
+                      'overlay takes lands in the audit trail instead '
+                      '(`type=command` / the `reset` events).'),
+                ('b', 'the fake\'s own `/metrics` (`--metrics-server`) carries '
+                      'the family posture: a bearer token beyond loopback '
+                      '(`--metrics-token`) and the metrics ACL '
+                      '(`--metrics-acl`).'),
+            ]),
+            ('Metrics', [
+                ('b', 'the power numbers are **not** metrics here — they are '
+                      'Modbus registers (the profile above) the scraper '
+                      'exports; point the scraper at the fake and the '
+                      'dashboard at the scraper.'),
+                ('b', 'the fake does carry the family\'s own `/metrics` stack '
+                      '(`--metrics-server` / `--metrics-listen`, off by '
+                      'default) for its self-observability — the token and '
+                      'the ACL ride as in Access control.'),
+            ]),
+            ('Source layout', [
+                ('b', '`bin/modbus-fake-inverter.py` — the daemon; '
+                      '`bin/modbus-fake-cli.py` — the one-shot/interactive '
+                      'client; `lib/` — the simulator\'s modules '
+                      '(`battery.py`, `chaos.py`, the machines, the '
+                      'config/registry wiring); '
+                      '`examples/modbus-fake-inverter.conf` — the generated '
+                      'sample; `man/` — the generated man page; `dev` / '
+                      '`dev-cli` — the checkout launchers.'),
+                ('b', 'the shared machinery lives in the suite\'s `common/` '
+                      'package (the control spine, the Modbus server, the '
+                      'audit, the manpage generator) and `shared/` (the '
+                      'texts, the schemas, the profiles) — `lib/` imports it '
+                      'by path; nothing is packaged separately.'),
+            ]),
+            ('Runtime control', [
+                ('b', 'the fake IS runtime control — the demo machines are '
+                      'runtime set words with no startup surface: '
+                      '`set pv|load|batt|grid|soc|mppt|cloud|scenario|'
+                      'battery-state|grid-outage` pin the simulation live, '
+                      '`auto` / `clear <pin>` hands the decision back to the '
+                      'day, `set time 18:00` is time-lapse control, '
+                      '`set time-scale N` runs the clock N× real speed.'),
+                ('b', 'the write emulation is runtime too: '
+                      '`set register <addr> <value>` plants a holding-register '
+                      'value, `set coil <addr> <0|1>` a coil — reads answer '
+                      'the overlay until `reset` (or `SIGUSR1`) drops every '
+                      'pin, the cloud machine and the overlay together.'),
+                ('b', 'the registry knobs ride the family ladder: the '
+                      'settable rows apply at once, the restart-marked record '
+                      'a pending `set` and fold in on `request reload`, the '
+                      'secrets never render back; every command is audited '
+                      'once, by the server.'),
+                ('c', '# live: freeze the evening, cloud it over, seed the SoC\n'
+                      'set time 18:00\n'
+                      'set cloud 0.7\n'
+                      'set soc 40\n'
+                      'reset'),
             ]),
         ],
     },
@@ -1219,7 +1498,7 @@ REF = {
                       'at the root (or strip the prefix); add auth at the '
                       'proxy if exposed to the internet.'),
             ]),
-            ('Metrics source', [
+            ('Metrics', [
                 ('b', 'the page expects PV inverter metrics in Prometheus '
                       '(`huawei_*_watts` — the scraper\'s `--metrics-prefix` '
                       'default). The `scraper/` subproject ships a '
@@ -1252,6 +1531,118 @@ REF = {
                 ('c', 'dev/battery/battery.py dashboard             # the dashboard profile: the control fuzz +\n'
                       '                                       #   the audit chain (the suites refuse without\n'
                       '                                       #   the runner\'s PV_RUN_DIR)'),
+                ('b', 'the suites **always run through the battery runner** '
+                      '(`dev/battery/battery.py`) — it owns the run dir, the '
+                      'port slots and the tally, and a standalone suite run '
+                      'refuses (a hand-run collides across sessions). A new '
+                      'behavior ships with a check: a scenario that fails '
+                      'without it and names the registry rows it pins.'),
+            ]),
+            ('Configuration', [
+                ('b', 'the daemon\'s config file (`--config PATH`, env '
+                      '`CONFIG`) speaks the **set grammar** — one '
+                      '`set <name> <value>` per line, the control CLI\'s own '
+                      'spelling; a value resolves CLI > env (the bare '
+                      'upper-snake twins) > this file > the row\'s default.'),
+                ('b', 'the bundled `apps/dashboard/examples/dashboard.conf` is '
+                      'GENERATED from the registry (`dev/generators/examples.'
+                      'py`): every knob declared, every line commented at its '
+                      'default — copy it, uncomment what you change, point '
+                      '`--config` at it. The docker image rides it as its '
+                      'default `--config` target; the caps and the listen '
+                      'address are live-settable through the control server.'),
+                ('b', 'the PAGE has its own config — `config.js`, served at '
+                      '`/config.js` and covered in its own section below: the '
+                      'daemon conf configures the server, `config.js` '
+                      'configures what the browser renders.'),
+            ]),
+            ('Access control', [
+                ('b', 'the page and the proxy speak the family\'s F13 shape: '
+                  'a **bearer token is mandatory beyond loopback** — a '
+                  'token-less non-loopback bind refuses to start. The '
+                  'browser opens `http://host:8080/?auth=<token>` once — the '
+                  'exchange sets an HttpOnly session cookie — and scripts '
+                  'send `Authorization: Bearer <token>`; on the loopback '
+                  'bind the token is optional.'),
+                ('b', 'the HTTP surface carries the family\'s connection caps '
+                      '— `--max-clients` (64), `--max-conn-per-ip`, and the '
+                      '`/metrics` pair (`--metrics-max-clients`, '
+                      '`--metrics-max-conn-per-ip`) — all live-settable '
+                      'through the control server.'),
+                ('b', 'the dashboard\'s own `/metrics` (the scraper-feeding '
+                      'stack) carries the same posture: the token '
+                      '(`--metrics-token`) and the metrics ACL '
+                      '(`--metrics-acl`, live `set metrics acl`) beyond '
+                      'loopback.'),
+                ('b', 'beyond localhost, still terminate TLS at an '
+                      'authenticating proxy — see `Behind a reverse proxy` '
+                      'below.'),
+            ]),
+            ('Audit logging', [
+                ('b', 'the dashboard writes the family\'s audit trail — one '
+                      'line per event, who/when/what/result, on by default at '
+                      'the XDG state home; `--audit-log <file>` renames it, '
+                      '`-` sends it to stdout (the journald way), `none` with '
+                      'a forward spelled is the remote-only mode, and '
+                      '`--no-audit-log` disables entirely. Rotation: '
+                      '`--audit-max-mb`, `--audit-daily`, `--audit-files`.'),
+                ('b', '`--audit-forward` mirrors every line — the per-writer '
+                      'hash chain included — onward: `syslog`, '
+                      '`syslog:/path`, `udp://host[:514]` or '
+                      '`tcp://host[:514]` (the off-box copy, the F10 '
+                      'answer); the envelope rides `--audit-forward-format` '
+                      '(`rfc5424` the default, or `cef`).'),
+                ('b', 'the wire commands (with their peer and mac), the auth '
+                      'failures and the request accounting ride the trail; '
+                      'the 12-hex chained hash per entry is verified by '
+                      '`dev/gates/audit_verify.py` — any edit, deletion or '
+                      'reordering shows up as a chain break. The writer is '
+                      'named by `--audit-instance` (the control port when '
+                      'unset).'),
+            ]),
+            ('Register maps', [
+                ('b', 'none — the dashboard owns no Modbus registers and no '
+                      'device profile: it renders Prometheus series. The '
+                      'metric selectors live in `config.js` (its own section '
+                      'below); the registers themselves are the scraper\'s '
+                      'and the cache\'s business.'),
+            ]),
+            ('Source layout', [
+                ('b', '`bin/dashboard.py` — the server (the page host, the '
+                      'Prometheus proxy, the control server); '
+                      '`bin/dashboard-cli.py` — the one-shot/interactive '
+                      'client; `static/` — the page itself (`index.html`, '
+                      '`app.js`, `boot.js`, `i18n.js`, `style.css`, the '
+                      'vendored ECharts); `lib/` — the server\'s modules '
+                      '(the config/registry wiring); `examples/` — the '
+                      'generated `dashboard.conf` and the example '
+                      '`config.js`; `screenshots/` — the README\'s captures; '
+                      '`man/` — the generated man page; `dev` / `dev-cli` — '
+                      'the checkout launchers.'),
+                ('b', 'the shared machinery lives in the suite\'s `common/` '
+                      'package (the control spine, the audit, the manpage '
+                      'generator) and `shared/` (the texts, the schemas) — '
+                      '`lib/` imports it by path; nothing is packaged '
+                      'separately.'),
+            ]),
+            ('Runtime control', [
+                ('b', 'the live layer: the connection caps (`set max-clients`, '
+                      '`set max-conn-per-ip`), the metrics ACL, the audit '
+                      'sinks and the rotation are settable rows applying at '
+                      'once; `clear <name>` returns the configured value, '
+                      '`show <name>` prints the live one.'),
+                ('b', 'the restart-marked rows (the listen address) record a '
+                      'pending `set` and fold in on `request reload` (or a '
+                      'restart); the secrets are startup-only — they never '
+                      'render back, a restart applies them.'),
+                ('b', 'every command is audited once, by the server (the '
+                      'peer, the role, the mac); the ops-token sessions ride '
+                      'the read-only verb policy (no set/clear, no '
+                      '`request reload`, no shutdown).'),
+                ('c', '# live: widen the door, re-read the file\n'
+                      'set max-clients 128\n'
+                      'set max-conn-per-ip 8\n'
+                      'request reload'),
             ]),
         ],
     },
@@ -1533,12 +1924,108 @@ REF = {
                       'in the logs.'),
                 ('c', 'dev/battery/battery.py replay    # the replay profile: the regtest (the suites refuse\n'
                       '                            #   without the runner\'s PV_RUN_DIR)'),
+                ('b', 'the suites **always run through the battery runner** '
+                      '(`dev/battery/battery.py`) — it owns the run dir, the '
+                      'port slots and the tally, and a standalone suite run '
+                      'refuses (a hand-run collides across sessions). A new '
+                      'behavior ships with a check: a scenario that fails '
+                      'without it and names the registry rows it pins.'),
+            ]),
+            ('Configuration', [
+                ('b', 'there is no config file — the sidecar\'s posture is '
+                      'fixed at start: **flag > env (the bare upper-snake '
+                      'twins) > the built-in defaults**, the knobs table '
+                      'below IS the flags table. A wrapper script (or the '
+                      '`apps/modbus-replay/dev` launcher) is where a standing '
+                      'posture lives.'),
+            ]),
+            ('Access control', [
+                ('b', 'nothing to gate, by design: the Modbus port forwards '
+                      'bytes between client and device, and the record feed '
+                      'is a read-only binary push — no verbs, no tokens, '
+                      'nothing a command could ride (the no-control-plane '
+                      'ruling). The trace file is created `0600` and belongs '
+                      'with the secrets — a Waveshare capture carries the '
+                      'connection password raw, and a leaked trace can '
+                      'replay a PVA1 proof at any server holding the key.'),
+            ]),
+            ('Metrics', [
+                ('b', 'none — the sidecar publishes no `/metrics`; the dump '
+                      'tool is the observability face (the summary, the '
+                      'answer index, the conversations, the live view).'),
+            ]),
+            ('Audit logging', [
+                ('b', 'no audit file, no hash chain — the sidecar takes no '
+                      'commands, so there is nothing to repudiate: the trace '
+                      'IS the record (every frame verbatim, `0600`), and the '
+                      'lifecycle rides the log (the startup posture line, '
+                      'the shutdown\'s session summary, `SIGUSR2`\'s thread '
+                      'stacks).'),
+            ]),
+            ('Register maps', [
+                ('b', 'register-agnostic — no profile, no types, no gains: '
+                      'the replay serves recorded bytes by request identity '
+                      '(unit + function code + PDU), the raw frames are the '
+                      'one truth. The dump tool decodes for reading only.'),
+            ]),
+            ('Source layout', [
+                ('b', '`bin/modbus-replay.py` — the daemon (capture, '
+                      'pass-through, replay); `bin/modbus-replay-dump.py` — '
+                      'the reader face (the views, the converter, the live '
+                      'view, the recorder); `lib/` — the sidecar\'s modules '
+                      '(`capture.py`, `replay.py`, `trace.py`, `statics.py`, '
+                      'the registry wiring); `man/` — the generated man '
+                      'pages; `dev` — the checkout launcher.'),
+                ('b', 'the sidecar is stdlib-only and shares no service '
+                      'packaging — no container image, no Nix package, no '
+                      'NixOS module; the family\'s `common/` package (the '
+                      'trace writer, the record encoding) is imported by '
+                      'path from the checkout.'),
+            ]),
+            ('Runtime control', [
+                ('b', 'none — the no-control-plane ruling: no control server, '
+                      'no cli, no set/show/clear, nothing to reload. The '
+                      'posture is fixed at start; a change is a restart with '
+                      'different flags (`SIGHUP` is logged and ignored). The '
+                      'observability face is `modbus-replay-dump` — the views, '
+                      'the live feed, the recorder.'),
             ]),
         ],
     },
 }
 
 WIDTH = 76
+
+# the reference sections' canonical ladder — every page walks it in this
+# order (the tool's own extras slot between by their keys; an unknown
+# title rides at the tail in its authored order). The one-ladder rule:
+# the same topics in the same order on every page, present or honestly
+# absent.
+SECTION_ORDER = {
+    'Signals': 0,
+    'Configuration': 10,
+    'Page configuration (config.js)': 12,
+    'Runtime control': 15,
+    'Access control': 20,
+    'Behind a reverse proxy': 25,
+    'Metrics': 30,
+    'Alerting': 35,
+    'Battery': 40,
+    'Audit logging': 50,
+    'Register maps': 60,
+    'Register maps (the profile)': 61,
+    'Served registers (the default profile)': 62,
+    'Register maps (the register defaults)': 63,
+    'Register maps and the metrics spec': 64,
+    'Persistence': 70,
+    'Trace feed': 80,
+    'The trace format': 85,
+    'Replay mode': 86,
+    'The record feed and the dump tool': 87,
+    'Chaos injection (`--chaos`)': 90,
+    'Source layout': 95,
+    'Testing': 100,
+}
 
 
 def load(tool_dir):
@@ -1820,10 +2307,14 @@ def tidy(lines):
 
 def speaking_section(cli, sock, port, example, token_mandatory, conf,
                      ops_default):
-    """The `Speaking to the daemon` section: the control target, the one
+    """The `The control plane` section: the control target, the one
     client's three modes, the token rules, the ops role and the config
     ladder — bullets (the front-page split's no-big-paragraphs ruling)."""
-    out = ['## Speaking to the daemon', '']
+    out = ['## The control plane', '']
+    out.append(bullet('the cli ships beside the daemon (`bin/%s.py`, its own '
+                      'man page via `--man`) — the same client the suites '
+                      'drive; every word below is its spelling.' % cli))
+    out.append('')
     out.append(bullet('the control server is a JSON-lines listener: a unix '
                       'socket (the default `%s`) or a TCP port on 127.0.0.1 — '
                       'the `--control-port` flag, env `CTL`, `0` = off.' % sock))
@@ -1898,23 +2389,18 @@ def speaking_section(cli, sock, port, example, token_mandatory, conf,
 
 def render(tool, daemon, daemon_bin, blurb, cli, sock, port, example,
            token_mandatory, conf, rows, shows, meta):
-    """The page: the intro (the blurb, the generated note), then Run it,
-    How it works, [Speaking to the daemon], the registry tables —
-    commands, knobs, show reports — then the tool's reference sections
-    (the front-page split's README material, bullets and tables)."""
+    """The page: the intro (the blurb), then Run it, How it works, The
+    control plane, the registry tables — commands, knobs, show reports —
+    then the reference sections: the canonical ladder (Configuration,
+    Access control, Metrics, Audit logging, Register maps, Source layout,
+    Testing) with the tool's own extras riding beside, bullets and
+    tables — the one-ladder rule enforced here, in the render, not per
+    hand."""
     out = []
     w = out.append
     w('# The %s manual' % daemon)
     w('')
     w(wrap('%s Part of the pv-suite family.' % blurb))
-    w('')
-    w(bullet("the daemon's own `--help` and the man page (`%s --man`) carry "
-             'the startup surface; this page carries the full reference.'
-             % daemon_bin))
-    w('')
-    w(bullet('**generated** from `lib/options.json` (the one-knob-one-source '
-             'rows) by `dev/generators/manual.py` — edit the registry (or '
-             'the REF data in the generator) and re-run, never this file.'))
     w('')
     ref = REF[tool]
     w('## Run it')
@@ -1932,7 +2418,8 @@ def render(tool, daemon, daemon_bin, blurb, cli, sock, port, example,
     out.extend(commands_section(meta, tool))
     out.extend(knobs_section(rows))
     out.extend(show_section(shows))
-    for title, items in ref['tail']:
+    tail = sorted(ref['tail'], key=lambda t: SECTION_ORDER.get(t[0], 500))
+    for title, items in tail:
         w('## %s' % title)
         w('')
         render_items(out, items)

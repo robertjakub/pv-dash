@@ -4,13 +4,6 @@ A dependency-free (Python stdlib only) Modbus TCP server that plays an
 inverter — the battery, the smart meter, the diagnostics — for the family to
 develop and test against. Part of the pv-suite family.
 
-- the daemon's own `--help` and the man page (`modbus-fake-inverter --man`)
-  carry the startup surface; this page carries the full reference.
-
-- **generated** from `lib/options.json` (the one-knob-one-source rows) by
-  `dev/generators/manual.py` — edit the registry (or the REF data in the
-  generator) and re-run, never this file.
-
 ## Run it
 
     python3 apps/inverter/bin/modbus-fake-inverter.py                       # 127.0.0.1:5502 — scraper defaults just work
@@ -105,7 +98,11 @@ develop and test against. Part of the pv-suite family.
   clamped 22–44 %) distribute the load asymmetrically: the per-phase meter
   currents really differ; the inverter injection stays balanced.
 
-## Speaking to the daemon
+## The control plane
+
+- the cli ships beside the daemon (`bin/modbus-fake-cli.py`, its own man page
+  via `--man`) — the same client the suites drive; every word below is its
+  spelling.
 
 - the control server is a JSON-lines listener: a unix socket (the default
   `/tmp/fake-inverter-5502.socket`) or a TCP port on 127.0.0.1 — the
@@ -319,18 +316,6 @@ the state dump: the live overrides' file, the restore-on-start
 | `show version` | show-only | the suite version |
 | `show config` | show-only (hidden) | the effective configuration as a set-grammar script (the secret knobs render as *** SECRET REMOVED ***) |
 | `show knobs` | show-only (hidden) | the dictionary of all knobs: every knob, its flag, its env twin, its section, how it changes |
-## Inverter profiles
-
-- the fake doesn't hardcode any device layout: the simulator computes **named
-  physical values** (`pv-power`, `grid-power`, `battery-soc`, …) and the
-  **inverter profile** maps each name onto a register address and encoding.
-  The format, the semantics and the shipped devices are documented once in
-  `shared/profiles/README.md`.
-
-- `show registers` prints the loaded profile as a table, `set modbus profile <name|path>`
-  swaps it live, `--modbus-profile` / `MODBUS_PROFILE` pick it at start;
-  `clear modbus profile` returns to the configured map.
-
 ## Signals
 
 | signal | effect |
@@ -339,47 +324,85 @@ the state dump: the live overrides' file, the restore-on-start
 | `SIGUSR1` | reset the scenario: all runtime pins, the cloud machine and the Modbus write overlay are dropped, the simulation continues |
 | `SIGTERM` / `SIGINT` | graceful shutdown with a session summary (duration, connections, requests, chaos hits) |
 
-## Served registers (the default profile)
+## Configuration
 
-| register | meaning |
-|---|---|
-| **32064** / **32080** | PV power / power limit (I32 W) |
-| **32016+** | the string block: per-string voltage/current (a dark string serves 0/0) |
-| **37113** | grid power (I32 W, positive = feed-in) |
-| **37100+** | smart meter block: status, per-phase voltages/currents, reactive power, power factor, grid frequency; **37119** exported / **37121** imported kWh totals grow through the simulated day |
-| **32089** | device status (512 on-grid / 40960 standby at night) |
-| **32087** / **32114** / **32106** | temperature (I16, °C×10) / daily and total yield (U32, kWh×100) |
-| **37001+** | battery block (power, SoC, lifetime totals) |
+- the config file (`--config PATH`, `$CONFIG`, then
+  `modbus-fake-inverter.conf` next to the script) speaks the **set grammar** —
+  every line a `set <name> <value>` in the CLI spelling, the same line pastes
+  into the console or `modbus-fake-cli`; a value resolves flag > env > this
+  file > the row's default, and `--dry-run` prints the effective settings.
 
-- all of the above addresses come from the profile — remap them freely. The
-  profile's per-entry **`fc`** picks each entry's address space (`3` holding /
-  `4` input for the word types, `1` coils / `2` discrete for `bit` — the four
-  spaces are served separately).
+- the bundled `apps/inverter/examples/modbus-fake-inverter.conf` is GENERATED
+  from the registry (`dev/generators/examples.py`): every knob declared, every
+  line commented at its default — copy it, uncomment what you change, point
+  `--config` at it.
 
-- writes stick in overlays: the register writes (FC06/FC16) overlay the
-  holding registers, the coil writes (FC05/FC15) the coil space (FC5 demands
-  the spec values `0x0000`/`0xFF00`); computed registers are recomputed per
-  poll, overlay values win until cleared (`reset`, SIGUSR1, shutdown). A
-  malformed frame on an implemented function code is answered with exception
-  03, never a silent disconnect.
+- the pins and the machines (`set pv`, `set load`, `set batt`, `set grid`,
+  `set soc`, `set mppt`, `set cloud`, `set scenario`, `set battery-state`,
+  `set grid-outage`) are runtime set words — no flag, no env twin, no config
+  line: the file names one and the start refuses. They exist to be driven
+  live.
 
-- **65000–65003** — the modbus-cache diagnostics block (magic `0xCAFE`,
-  version, uptime, id): always mocked by the fake, never part of the profile —
-  it exists so the scraper's `scraper_cache_*` auto-detection can be exercised
-  without a cache. The only address range the fake hardcodes.
+- `SIGHUP` re-applies the **environment layer** (all-or-nothing — flags are
+  startup-only): a config change to a knob rides the reload; the machine pins
+  never do (they are runtime state by design).
 
-## Chaos injection (`--chaos`)
+## Runtime control
 
-- `--chaos 0.4` (probability, `--seed` for reproducibility) makes the fake
-  answer a fraction of requests hostile — garbage, short/lying MBAP lengths,
-  wrong transaction/unit ids, stalls, dropouts, raw exceptions — then drop the
-  connection.
+- the fake IS runtime control — the demo machines are runtime set words with
+  no startup surface: `set pv|load|batt|grid|soc|mppt|cloud|scenario|battery-state|grid-outage`
+  pin the simulation live, `auto` / `clear <pin>` hands the decision back to
+  the day, `set time 18:00` is time-lapse control, `set time-scale N` runs the
+  clock N× real speed.
 
-- unlike the regression suites' scripted EvilInverter this runs unattended:
-  point the scraper at it and watch `scraper_modbus_errors_total` climb while
-  `scraper_up` flips, with the fake never dying. Tune or disable live (`set chaos off`).
+- the write emulation is runtime too: `set register <addr> <value>` plants a
+  holding-register value, `set coil <addr> <0|1>` a coil — reads answer the
+  overlay until `reset` (or `SIGUSR1`) drops every pin, the cloud machine and
+  the overlay together.
 
-## Audit trail
+- the registry knobs ride the family ladder: the settable rows apply at once,
+  the restart-marked record a pending `set` and fold in on `request reload`,
+  the secrets never render back; every command is audited once, by the server.
+
+    # live: freeze the evening, cloud it over, seed the SoC
+    set time 18:00
+    set cloud 0.7
+    set soc 40
+    reset
+
+## Access control
+
+- the fake is the family's **trusted-LAN test tool (F11)**: control works over
+  TCP without a token too (`--control-token` is still honored when the wire is
+  not yours); over the unix socket a trusted peer (root, the daemon's own user
+  or `--control-trust-uids` — SO_PEERCRED) always speaks without one. Bind it
+  to loopback when in doubt.
+
+- the Modbus leg: `--connect-acl` (`any` / `none` / a comma-separated IP/CIDR
+  list / `file:<path>`) gates which Modbus clients may connect at all, and
+  `--modbus-auth suite` (+ `--modbus-auth-key`, min 16 characters,
+  `file:<path>` the shipped spelling) makes the fake the **server side** of
+  the suite handshake — a client that cannot prove the key never sees a frame.
+
+- writes are the point: the register/coil overlay is the feature, so there is
+  no write ACL — every write the overlay takes lands in the audit trail
+  instead (`type=command` / the `reset` events).
+
+- the fake's own `/metrics` (`--metrics-server`) carries the family posture: a
+  bearer token beyond loopback (`--metrics-token`) and the metrics ACL
+  (`--metrics-acl`).
+
+## Metrics
+
+- the power numbers are **not** metrics here — they are Modbus registers (the
+  profile above) the scraper exports; point the scraper at the fake and the
+  dashboard at the scraper.
+
+- the fake does carry the family's own `/metrics` stack (`--metrics-server` /
+  `--metrics-listen`, off by default) for its self-observability — the token
+  and the ACL ride as in Access control.
+
+## Audit logging
 
 - the fake itself and both clients append to the **audit log** — on by default
   at the **XDG state home** (`~/.local/state/fake-inverter/audit.log`);
@@ -429,6 +452,71 @@ the state dump: the live overrides' file, the restore-on-start
   `RESET`, `SHUTDOWN`). ping/pong keepalives are never logged; the file is
   flushed per event.
 
+## Register maps (the profile)
+
+- the fake doesn't hardcode any device layout: the simulator computes **named
+  physical values** (`pv-power`, `grid-power`, `battery-soc`, …) and the
+  **inverter profile** maps each name onto a register address and encoding.
+  The format, the semantics and the shipped devices are documented once in
+  `shared/profiles/README.md`.
+
+- `show registers` prints the loaded profile as a table, `set modbus profile <name|path>`
+  swaps it live, `--modbus-profile` / `MODBUS_PROFILE` pick it at start;
+  `clear modbus profile` returns to the configured map.
+
+## Served registers (the default profile)
+
+| register | meaning |
+|---|---|
+| **32064** / **32080** | PV power / power limit (I32 W) |
+| **32016+** | the string block: per-string voltage/current (a dark string serves 0/0) |
+| **37113** | grid power (I32 W, positive = feed-in) |
+| **37100+** | smart meter block: status, per-phase voltages/currents, reactive power, power factor, grid frequency; **37119** exported / **37121** imported kWh totals grow through the simulated day |
+| **32089** | device status (512 on-grid / 40960 standby at night) |
+| **32087** / **32114** / **32106** | temperature (I16, °C×10) / daily and total yield (U32, kWh×100) |
+| **37001+** | battery block (power, SoC, lifetime totals) |
+
+- all of the above addresses come from the profile — remap them freely. The
+  profile's per-entry **`fc`** picks each entry's address space (`3` holding /
+  `4` input for the word types, `1` coils / `2` discrete for `bit` — the four
+  spaces are served separately).
+
+- writes stick in overlays: the register writes (FC06/FC16) overlay the
+  holding registers, the coil writes (FC05/FC15) the coil space (FC5 demands
+  the spec values `0x0000`/`0xFF00`); computed registers are recomputed per
+  poll, overlay values win until cleared (`reset`, SIGUSR1, shutdown). A
+  malformed frame on an implemented function code is answered with exception
+  03, never a silent disconnect.
+
+- **65000–65003** — the modbus-cache diagnostics block (magic `0xCAFE`,
+  version, uptime, id): always mocked by the fake, never part of the profile —
+  it exists so the scraper's `scraper_cache_*` auto-detection can be exercised
+  without a cache. The only address range the fake hardcodes.
+
+## Chaos injection (`--chaos`)
+
+- `--chaos 0.4` (probability, `--seed` for reproducibility) makes the fake
+  answer a fraction of requests hostile — garbage, short/lying MBAP lengths,
+  wrong transaction/unit ids, stalls, dropouts, raw exceptions — then drop the
+  connection.
+
+- unlike the regression suites' scripted EvilInverter this runs unattended:
+  point the scraper at it and watch `scraper_modbus_errors_total` climb while
+  `scraper_up` flips, with the fake never dying. Tune or disable live (`set chaos off`).
+
+## Source layout
+
+- `bin/modbus-fake-inverter.py` — the daemon; `bin/modbus-fake-cli.py` — the
+  one-shot/interactive client; `lib/` — the simulator's modules (`battery.py`,
+  `chaos.py`, the machines, the config/registry wiring);
+  `examples/modbus-fake-inverter.conf` — the generated sample; `man/` — the
+  generated man page; `dev` / `dev-cli` — the checkout launchers.
+
+- the shared machinery lives in the suite's `common/` package (the control
+  spine, the Modbus server, the audit, the manpage generator) and `shared/`
+  (the texts, the schemas, the profiles) — `lib/` imports it by path; nothing
+  is packaged separately.
+
 ## Testing
 
 - the fake is the suites' workhorse — it is exercised from the suite root
@@ -438,6 +526,12 @@ the state dump: the live overrides' file, the restore-on-start
     dev/battery/battery.py inverter        # the inverter profile: the fake's regtest, the
                                       #   control fuzz, the audit chain (the suites refuse
                                       #   without the runner's PV_RUN_DIR)
+
+- the suites **always run through the battery runner**
+  (`dev/battery/battery.py`) — it owns the run dir, the port slots and the
+  tally, and a standalone suite run refuses (a hand-run collides across
+  sessions). A new behavior ships with a check: a scenario that fails without
+  it and names the registry rows it pins.
 
 The ?/TAB pools, `show knobs` and `help config` all render from the same
 rows this page was generated from.

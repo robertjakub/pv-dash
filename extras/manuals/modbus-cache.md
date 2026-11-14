@@ -4,13 +4,6 @@ A dependency-free (Python stdlib only) Modbus TCP caching proxy for
 single-client devices: it polls the inverter once and serves every client
 from the cache. Part of the pv-suite family.
 
-- the daemon's own `--help` and the man page (`modbus-cache --man`) carry the
-  startup surface; this page carries the full reference.
-
-- **generated** from `lib/options.json` (the one-knob-one-source rows) by
-  `dev/generators/manual.py` — edit the registry (or the REF data in the
-  generator) and re-run, never this file.
-
 ## Run it
 
     python3 apps/cache/bin/modbus-cache.py --upstream 192.168.1.100:5502
@@ -80,7 +73,11 @@ from the cache. Part of the pv-suite family.
   a client cannot crash the proxy, only burn its own connection (fuzz- and
   soak-tested).
 
-## Speaking to the daemon
+## The control plane
+
+- the cli ships beside the daemon (`bin/modbus-cache-cli.py`, its own man page
+  via `--man`) — the same client the suites drive; every word below is its
+  spelling.
 
 - the control server is a JSON-lines listener: a unix socket (the default
   `/tmp/modbus-cache-15502.socket`) or a TCP port on 127.0.0.1 — the
@@ -333,44 +330,62 @@ the write gates: the forwarding toggle and the register ranges
 | `SIGUSR1` | clean the cache: all cached values, on-demand entries and poll-status errors are dropped atomically, the poller repopulates immediately |
 | `SIGTERM` / `SIGINT` | graceful shutdown |
 
-## Register map (device profile)
+## Configuration
 
-- the proxy caches the registers listed in the **device profile** — the same
-  shared schema the fake inverter serves and the scraper scrapes; the shipped
-  profiles live in the suite's `shared/profiles/` data dir (`sun2000.json` by
-  default); the format is documented in `shared/profiles/README.md`.
-  Resolution: `--modbus-profile` flag, env `MODBUS_PROFILE`, config `set modbus profile`,
-  then the bundled copy; the file is re-read on `SIGHUP`.
+- the config file (`--config PATH`, env `CONFIG`) speaks the **set grammar** —
+  one `set <name> <value>` per line, the control CLI's own spelling, the same
+  line pastes into the console or a ctl; a value resolves flag > env > this
+  file > the row's default, anything left commented falls to the default the
+  line spells.
 
-- entry `type` gives the width and the space: `i16`/`u16` (one word),
-  `i32`/`u32` and the lo-word-first `i32swap`/`u32swap`, the IEEE 754
-  `f32`/`f32swap` (two words each), `bit` (one address = one binary value).
+- the bundled `apps/cache/examples/modbus-cache.conf` is GENERATED from the
+  registry (`dev/generators/examples.py`): every knob declared, every line
+  commented at its default — copy it, uncomment what you change, point
+  `--config` at it. The dev wrapper (`apps/cache/dev`) and the docker image
+  both ride it as their default `--config` target.
 
-- the optional **`fc`** field picks the address space: `3` (holding registers)
-  or `4` (input registers) for the word types (`3` the default), `1` (coils,
-  the bit default) or `2` (discrete inputs) for `bit` — the four spaces are
-  cached and polled independently.
+    # per-register cache TTL: older entries are refetched
+    # set cache ttl 30
 
-- the optional **`ttl`** field overrides the cache TTL per entry (seconds; `0`
-  = never expire): a fast power word at 5s next to a nameplate word at 1h, one
-  poll cadence for both (`show cache-all` marks the entries carrying one). The
-  entry TTL **replaces** the global one in both directions — the global TTL is
-  only the fallback, never a floor.
+    # the inverter Modbus TCP endpoint HOST:PORT (`:5502` = 127.0.0.1:5502)
+    # set modbus upstream 127.0.0.1:5502
 
-- which registers are actually **fetched** comes from a selection file —
-  `{"registers": ["pv-power", ...]}`, profile names only — resolved as
-  `--selection` flag, env `SELECTION`, config `set modbus selection`; the
-  default fetches **every** profile entry (`all`), and **`none`** empties the
-  map: every read forwards and nothing is stored. The shipped
-  `extras/examples/modbus-cache-filter.json` is the essential SUN2000
-  monitoring set. The 65000–65003 diagnostics block is never fetched — the
-  cache synthesizes it.
+- a live daemon re-reads the file on `SIGHUP` / `request reload-config` — a
+  broken file keeps the previous settings; the restart-marked knobs record a
+  pending `set` and fold into the restarted process. `show config` regenerates
+  the script from the running daemon (secrets hidden) and `--dry-run` prints
+  the effective settings without binding anything.
 
-- for slow dongles the poller reads the map in as **few transactions as
-  possible**: ranges closer together than `--modbus-merge-gap` registers are
-  merged into one block read (never across a function-code boundary); a block
-  that fails is split in halves and the pieces are retried — the plan
-  converges to the largest blocks the device actually answers.
+- the secrets never live in the file: every secret row carries the `*** SECRET REMOVED ***`
+  placeholder — pass them by flag, env, or `file:<path>` (the first line of an
+  owner-only `0600` file).
+
+## Runtime control
+
+- the live layer: every `settable` row applies at once (`set <name> <value>`),
+  `clear <name>` returns the configured value, `show <name>` prints the live
+  one — the caps, the ACLs, the trace socket, the audit sinks and the poll
+  plan rotate live; the console completes the row's live/alias path spellings.
+
+- the **restart-marked** rows record a pending `set` and fold into the
+  restarted process on `request reload` (or a plain restart); the
+  **startup-only** rows (every secret, the listen address) answer a restart
+  only. `show config` spells each row's shape, and regenerates the config
+  script from the running daemon (secrets hidden).
+
+- the request verbs: `request reload-config` re-reads the config file (the
+  `SIGHUP` twin), `request dump` / `request dump with-cache` write the state
+  dump, `request restore` loads it, `clear cache` is the `SIGUSR1` twin,
+  `restart` restarts the daemon in place.
+
+- every command is audited once, by the server (the peer, the role, the
+  frame's mac when the wire is signed); the ops-token sessions ride the
+  read-only verb policy.
+
+    # live: retune, inspect, re-read the file
+    set cache ttl 30
+    show cache-all
+    request reload-config
 
 ## Access control
 
@@ -388,8 +403,6 @@ the write gates: the forwarding toggle and the register ranges
 
 - a worked write-gate example ships as
   `extras/examples/acl-write-registers.json` (the deye policy, worked out).
-
-## Modbus auth
 
 - beyond the address-based ACLs the cache speaks the family's **`suite`**
   Modbus auth — a proof-of-key handshake on the Modbus TCP wire itself (the
@@ -415,64 +428,6 @@ the write gates: the forwarding toggle and the register ranges
   same key — the fake inverter serves the server side, the scraper the client
   side, so a chain scraper → cache → inverter can run suite auth on either hop
   independently.
-
-## Persistence
-
-- `--dump-path` turns on the **write-behind state dump**: the live setting
-  overrides and — when asked — the cached words (+ their original stamps), as
-  one JSON written atomically. **What lands in the file is split** (the
-  audit's F18): by default **settings only**; `request dump with-cache` or
-  `--dump-with-cache` includes the words; the restore takes either shape.
-
-- the dumps land every `--dump-interval` seconds (live-settable, `0` = off —
-  the default), on the **`request dump`** command, and on every graceful
-  shutdown. **`--restore-on-start`** opts in to loading the dump when the
-  daemon starts; the default is starting cold — **`request restore`** loads it
-  on demand.
-
-- the file is created **`0600`** explicitly (never the umask); every dump
-  carries a **sha256 integrity hash**; a restore **fails closed** on an
-  edited/truncated/unsigned dump and refuses a group/world-writable file
-  outright.
-
-- with **`--dump-key`** the dump is **sealed**: the state rides encrypted
-  under an HMAC-SHA256 counter-mode keystream, authenticated by an HMAC mac
-  (stdlib only). The gate is symmetric — a restore without the key refuses a
-  sealed dump, and a restore **with** a key refuses an unsealed one. The
-  reload's state file seals under the same key — which is why the knob is
-  startup-only.
-
-- the key rides inline or as **`file:<path>`** (a systemd LoadCredential rides
-  as `file:/run/credentials/...`); the same `file:` reference form works on
-  every secret value. Without a key a dump path stays plaintext **by design**
-  — and says so (a `WARNING` at start, a note on the `set dump path` reply).
-
-## Trace feed
-
-- `--trace-socket` binds the record feed's unix stream socket (`default` = the
-  derived `/tmp/modbus-cache-<listen-port>-trace.socket`, a path, or `none` =
-  off; live-settable, `set trace-socket`): every wire record fans out to the
-  connected `modbus-replay-dump --socket` (the same PVMB protocol
-  modbus-replay's feed speaks); binds `0600`.
-
-- `--trace-sources` picks the wire voices the feed carries: `all`, `client`
-  (the served answers + their provenance) or `upstream` (the poller's polls +
-  the forwards) — whole voices on/off, never sampling; live-settable.
-
-- the feed's records carry a `conn` id pairing each request with its reply,
-  and the two wire faces count in **disjoint spaces**: the client face numbers
-  its sessions from 1 (one id per client connection), the upstream face rides
-  `100000 + <connection serial>` — so `conn=100001` is the device
-  conversation's first incarnation, `conn=100002` the same after a reconnect.
-  The split exists because a forwarded request keeps the client's own
-  transaction id: one conn space would make the dump tool pair the device's
-  reply with the client's request instead of keeping the two stories apart.
-
-- the client face's records state the provenance in the `note` (`served from cache`,
-  `forwarded — device reply`, `refused: …`, `diag registers`); the device's
-  true bytes appear as the upstream conversation beside them, and the upstream
-  auth handshake rides byte-less (`PVA1 handshake (bytes withheld)` — no
-  proof, no password).
 
 ## Metrics
 
@@ -508,7 +463,7 @@ the write gates: the forwarding toggle and the register ranges
   this endpoint's poll down, the age spikes and the write-refusal bursts — the
   cache-only install ships its half (`share/alerts.yml`).
 
-## Audit trail
+## Audit logging
 
 - the proxy logs every audit-relevant event to stdout/stderr with UTC
   timestamps by default (`--local-time` switches). Under systemd, journald
@@ -583,6 +538,117 @@ the write gates: the forwarding toggle and the register ranges
     journalctl -u modbus-cache | grep -E 'SIGHUP|shutdown'        # lifecycle
     journalctl -u modbus-cache | grep -i 'not on'                 # ACL rejections
 
+## Register maps
+
+- the proxy caches the registers listed in the **device profile** — the same
+  shared schema the fake inverter serves and the scraper scrapes; the shipped
+  profiles live in the suite's `shared/profiles/` data dir (`sun2000.json` by
+  default); the format is documented in `shared/profiles/README.md`.
+  Resolution: `--modbus-profile` flag, env `MODBUS_PROFILE`, config `set modbus profile`,
+  then the bundled copy; the file is re-read on `SIGHUP`.
+
+- entry `type` gives the width and the space: `i16`/`u16` (one word),
+  `i32`/`u32` and the lo-word-first `i32swap`/`u32swap`, the IEEE 754
+  `f32`/`f32swap` (two words each), `bit` (one address = one binary value).
+
+- the optional **`fc`** field picks the address space: `3` (holding registers)
+  or `4` (input registers) for the word types (`3` the default), `1` (coils,
+  the bit default) or `2` (discrete inputs) for `bit` — the four spaces are
+  cached and polled independently.
+
+- the optional **`ttl`** field overrides the cache TTL per entry (seconds; `0`
+  = never expire): a fast power word at 5s next to a nameplate word at 1h, one
+  poll cadence for both (`show cache-all` marks the entries carrying one). The
+  entry TTL **replaces** the global one in both directions — the global TTL is
+  only the fallback, never a floor.
+
+- which registers are actually **fetched** comes from a selection file —
+  `{"registers": ["pv-power", ...]}`, profile names only — resolved as
+  `--selection` flag, env `SELECTION`, config `set modbus selection`; the
+  default fetches **every** profile entry (`all`), and **`none`** empties the
+  map: every read forwards and nothing is stored. The shipped
+  `extras/examples/modbus-cache-filter.json` is the essential SUN2000
+  monitoring set. The 65000–65003 diagnostics block is never fetched — the
+  cache synthesizes it.
+
+- for slow dongles the poller reads the map in as **few transactions as
+  possible**: ranges closer together than `--modbus-merge-gap` registers are
+  merged into one block read (never across a function-code boundary); a block
+  that fails is split in halves and the pieces are retried — the plan
+  converges to the largest blocks the device actually answers.
+
+## Persistence
+
+- `--dump-path` turns on the **write-behind state dump**: the live setting
+  overrides and — when asked — the cached words (+ their original stamps), as
+  one JSON written atomically. **What lands in the file is split** (the
+  audit's F18): by default **settings only**; `request dump with-cache` or
+  `--dump-with-cache` includes the words; the restore takes either shape.
+
+- the dumps land every `--dump-interval` seconds (live-settable, `0` = off —
+  the default), on the **`request dump`** command, and on every graceful
+  shutdown. **`--restore-on-start`** opts in to loading the dump when the
+  daemon starts; the default is starting cold — **`request restore`** loads it
+  on demand.
+
+- the file is created **`0600`** explicitly (never the umask); every dump
+  carries a **sha256 integrity hash**; a restore **fails closed** on an
+  edited/truncated/unsigned dump and refuses a group/world-writable file
+  outright.
+
+- with **`--dump-key`** the dump is **sealed**: the state rides encrypted
+  under an HMAC-SHA256 counter-mode keystream, authenticated by an HMAC mac
+  (stdlib only). The gate is symmetric — a restore without the key refuses a
+  sealed dump, and a restore **with** a key refuses an unsealed one. The
+  reload's state file seals under the same key — which is why the knob is
+  startup-only.
+
+- the key rides inline or as **`file:<path>`** (a systemd LoadCredential rides
+  as `file:/run/credentials/...`); the same `file:` reference form works on
+  every secret value. Without a key a dump path stays plaintext **by design**
+  — and says so (a `WARNING` at start, a note on the `set dump path` reply).
+
+## Trace feed
+
+- `--trace-socket` binds the record feed's unix stream socket (`default` = the
+  derived `/tmp/modbus-cache-<listen-port>-trace.socket`, a path, or `none` =
+  off; live-settable, `set trace-socket`): every wire record fans out to the
+  connected `modbus-replay-dump --socket` (the same PVMB protocol
+  modbus-replay's feed speaks); binds `0600`.
+
+- `--trace-sources` picks the wire voices the feed carries: `all`, `client`
+  (the served answers + their provenance) or `upstream` (the poller's polls +
+  the forwards) — whole voices on/off, never sampling; live-settable.
+
+- the feed's records carry a `conn` id pairing each request with its reply,
+  and the two wire faces count in **disjoint spaces**: the client face numbers
+  its sessions from 1 (one id per client connection), the upstream face rides
+  `100000 + <connection serial>` — so `conn=100001` is the device
+  conversation's first incarnation, `conn=100002` the same after a reconnect.
+  The split exists because a forwarded request keeps the client's own
+  transaction id: one conn space would make the dump tool pair the device's
+  reply with the client's request instead of keeping the two stories apart.
+
+- the client face's records state the provenance in the `note` (`served from cache`,
+  `forwarded — device reply`, `refused: …`, `diag registers`); the device's
+  true bytes appear as the upstream conversation beside them, and the upstream
+  auth handshake rides byte-less (`PVA1 handshake (bytes withheld)` — no
+  proof, no password).
+
+## Source layout
+
+- `bin/modbus-cache.py` — the daemon; `bin/modbus-cache-cli.py` — the
+  one-shot/interactive client; `lib/` — the daemon's modules (the cache core,
+  the control server, the config/registry wiring);
+  `examples/modbus-cache.conf` — the generated sample; `man/` — the generated
+  man page; `dev` / `dev-cli` — the checkout launchers (the sys.path and the
+  default `--config` target).
+
+- the shared machinery lives in the suite's `common/` package (the control
+  spine, the Modbus client/server, the audit, the manpage generator) and
+  `shared/` (the texts, the schemas, the profiles) — `lib/` imports it by
+  path; nothing is packaged separately.
+
 ## Testing
 
 - four standalone suites live in the suite root `dev/suites/` — stdlib only,
@@ -595,6 +661,12 @@ the write gates: the forwarding toggle and the register ranges
                                         #   the audit chain (the stress suite rides quick/full)
     dev/battery/battery.py cache-regtest      # one suite — every run needs the runner (the suites
                                         #   refuse without the runner's PV_RUN_DIR)
+
+- the suites **always run through the battery runner**
+  (`dev/battery/battery.py`) — it owns the run dir, the port slots and the
+  tally, and a standalone suite run refuses (a hand-run collides across
+  sessions). A new behavior ships with a check: a scenario that fails without
+  it and names the registry rows it pins.
 
 The ?/TAB pools, `show knobs` and `help config` all render from the same
 rows this page was generated from.

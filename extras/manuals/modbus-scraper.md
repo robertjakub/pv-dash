@@ -4,13 +4,6 @@ A dependency-free (Python stdlib only) Prometheus exporter that polls a
 Modbus device and exposes the metrics at /metrics. Part of the pv-suite
 family.
 
-- the daemon's own `--help` and the man page (`modbus-scraper --man`) carry
-  the startup surface; this page carries the full reference.
-
-- **generated** from `lib/options.json` (the one-knob-one-source rows) by
-  `dev/generators/manual.py` — edit the registry (or the REF data in the
-  generator) and re-run, never this file.
-
 ## Run it
 
     python3 apps/scraper/bin/modbus-scraper.py --upstream 192.168.1.100:502
@@ -61,7 +54,11 @@ family.
   `--metrics-prefix` prefix, default `huawei_`) and the fixed `scraper_*`
   self-observability gauges.
 
-## Speaking to the daemon
+## The control plane
+
+- the cli ships beside the daemon (`bin/modbus-scraper-cli.py`, its own man
+  page via `--man`) — the same client the suites drive; every word below is
+  its spelling.
 
 - the control server is a JSON-lines listener: a unix socket (the default
   `/tmp/modbus-scraper-9350.socket`) or a TCP port on 127.0.0.1 — the
@@ -274,27 +271,72 @@ the state dump: the live overrides' file, the restore-on-start
 | `SIGHUP` | reload the configuration without dropping the exporter: poll interval, caps, the device profile, the auth token (+ file re-read = rotation), client limits, the Modbus auth scheme/key and the upstream take effect immediately; an invalid value keeps the previous settings; the listen address and `metrics.json` need a restart (`log-level` is live — `set system log-level`) |
 | `SIGTERM` / `SIGINT` | graceful shutdown with a session summary (duration + poll-error count) |
 
-## Register defaults
+## Configuration
 
-- register defaults follow Huawei's official *Solar Inverter Modbus Interface
-  Definitions* (Issue 04, 2023-01-10) — they live in the device profile, not
-  in flags.
+- the config file (`--config` picks it; the default hunt: `$CONFIG`, then
+  `modbus-scraper.conf` next to the script, then the subproject root's sample
+  — a missing file is fine) speaks the **set grammar** — one `set <name> <value>`
+  per line, the control CLI's own spelling; a value resolves flag > env > this
+  file > the row's default.
 
-- **32064** — input power, I32, unit kW with gain 1000 (raw values are watts);
-  **37113** — meter power, I32, `> 0` = feed-in (without a meter the inverter
-  alone cannot report grid power).
+- the bundled `apps/scraper/examples/modbus-scraper.conf` is GENERATED from
+  the registry (`dev/generators/examples.py`): every knob declared, every line
+  commented at its default — copy it, uncomment what you change, point
+  `--config` at it. The env-twin set rides the generated
+  `docker/env/modbus-scraper.env.example`.
 
-- older **20200520** protocol: input power at **32089**, meter power at
-  **37258** — point `--modbus-profile` at a profile carrying those addresses.
+- a live scraper re-reads the file on `SIGHUP` (a broken file keeps the
+  previous settings; the auth token's `file:` form re-reads too — that is the
+  rotation story); `show config` regenerates the script from the running
+  daemon (secrets hidden) and `--dry-run` prints the effective settings
+  without binding anything.
 
-- unit quirk: the inverter's `[Power meter collection]` copy of 37113 has been
-  observed reporting **watts** (gain 1) while the meter-section table says kW
-  (gain 1000). The bundled profile assumes watts; if grid power looks 1000×
-  off the other way, set the entry's `scale` to 1000 in your profile copy.
+## Runtime control
 
-- with a battery the derived home load is wrong while the battery
-  charges/discharges — point the dashboard's `load` metric at a real meter
-  register/exporter instead.
+- the live layer: `set modbus profile <name|path>` swaps the register map at
+  runtime (the metric sources rebuild, a profile lacking the power math's
+  inputs rolls back cleanly), `set system log-level` is live; `clear <name>`
+  returns the configured value, `show <name>` prints the live one, `show inputs`
+  / `show inputs-metrics` render the spec.
+
+- the poll cadence and the caps ride the config reload: `request reload-config`
+  re-reads the file (the `SIGHUP` twin — interval, caps, the auth token's
+  `file:` re-read, the upstream); the restart-marked rows (the listen address,
+  the metrics spec) record a pending `set` and fold in on `request reload` or
+  a restart.
+
+- `request poll now` forces a poll off-schedule; `restart` restarts the
+  exporter in place. Every command is audited once, by the server — the
+  ops-token sessions ride the read-only verb policy (no set/clear, no `request poll now`,
+  no reload, no restart, no shutdown).
+
+    # live: swap the map, re-read the file, force a poll
+    set modbus profile sun2000_full
+    request reload-config
+    request poll now
+
+## Access control
+
+- the `/metrics` endpoint: **beyond loopback a token is mandatory** — a
+  non-loopback listen without `--auth-token` refuses to start (one clean line,
+  no traceback — the F13 floor); beside the token the **metrics ACL**
+  (`--metrics-acl`, live `set metrics acl`) gates the accept — `any`, `none`,
+  a comma-separated IP/CIDR list, or `file:<path>` (the ip-prefix acl file;
+  `show metrics-acl-table` renders the chain). An unauthenticated read answers
+  401.
+
+- the control plane: TCP control demands the token (`--control-token`, the
+  wire's `auth` verb); the optional ops token (`--control-ops-token`) scopes a
+  session to the read-only verbs — the ops shift against the admin key, both
+  audited.
+
+- the device leg: `--modbus-auth` picks what the scraper *speaks to the
+  device* — `suite` (the PVA1 proof-of-key handshake, the key floor 16
+  characters) or `waveshare` (the key presented as a Waveshare RS485-to-TCP
+  gateway's connection password, non-empty ASCII) — and `--modbus-auth-key`
+  carries the shared secret (`file:<path>` the shipped spelling). Scheme and
+  key are live-settable; a key set with no scheme stays dormant, and going
+  `suite` over a short standing password refuses at start and on the wire.
 
 ## Metrics
 
@@ -358,7 +400,91 @@ the state dump: the live overrides' file, the restore-on-start
   collector copies the file and lists it under its own `rule_files:`.
   Thresholds assume the default 10 s poll interval — tune them to yours.
 
-## Device profile and metrics spec
+## Battery
+
+- the energy balance always carries the battery term (battery support is
+  always on — the flag retired):
+
+    home = pv − batt − grid
+
+- battery registers (defaults follow the same Huawei convention as the PV
+  register — they come from the device profile's `battery-power` and
+  `battery-soc` entries): **37001** battery power (I32 W, **positive =
+  charging**), **37004** state of charge (U16, percent×10).
+
+- charging midday surplus reduces the home value; evening discharge covers the
+  home load even with PV at 0.
+
+- the consistency checks adapt: exported power may exceed the PV cap by the
+  battery discharge (a battery feeding the grid is legitimate), and a derived
+  `home < 0` is rejected as inconsistent. A device profile without the battery
+  registers keeps the battery metrics absent.
+
+- the fake inverter emulates the battery for testing: `python3 apps/inverter/bin/modbus-fake-inverter.py`.
+
+## Audit logging
+
+- logging is `logging`-based with **UTC timestamps by default**
+  (`--local-time` switches): one startup line with the effective settings,
+  reachability changes and reloads at INFO/WARNING (every poll at DEBUG). HTTP
+  requests are quiet by default; **`--log-access`** logs every request at INFO
+  as an audit trail of who scraped what when. **Rejected requests are always
+  audited** regardless.
+
+- handled connection problems always log a single line — the suite enforces
+  that **no scenario produces a traceback**. Under systemd (`JOURNAL_STREAM`
+  set) log lines omit their own timestamp — journald adds one.
+
+- the control commands (with their wire macs), the auth failures, the reloads
+  and the shutdowns land in the **SCR audit trail** (`--audit-log`, the XDG
+  state home by default — `dev/gates/audit_verify.py` walks it like the
+  others).
+
+- `--audit-forward` mirrors every line — the per-writer hash chain included —
+  onward: `syslog` (the local socket auto-scan), `syslog:/path` (an explicit
+  socket), `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]`
+  (RFC6587 framing) — the **off-box copy** (the F10 answer): a scheduled
+  search at the collector can chain-verify the extracted prefix/chain fields
+  and alert on a break.
+
+- the remote envelope rides `--audit-forward-format` (`rfc5424`, the default,
+  or `cef` — the local forms keep the verbatim send). A send failure notes
+  once and the next event re-arms.
+
+- `--audit-log none` turns the local file off: with a forward spelled that is
+  the **remote-only mode** (the collector is the sole holder, the chain
+  reseeds at GENESIS per run), without one the audit is disabled (the state
+  `--no-audit-log` spells).
+
+- every line names its writer daemon in `instance=<id>` — the control port
+  when `--audit-instance` is unset (unique per host by construction), the
+  override when spelled; keep an override unique among everything that shares
+  one collector (the native line and CEF carry no hostname) — the chain groups
+  by the (application, writer, instance) triple.
+
+## Register maps (the register defaults)
+
+- register defaults follow Huawei's official *Solar Inverter Modbus Interface
+  Definitions* (Issue 04, 2023-01-10) — they live in the device profile, not
+  in flags.
+
+- **32064** — input power, I32, unit kW with gain 1000 (raw values are watts);
+  **37113** — meter power, I32, `> 0` = feed-in (without a meter the inverter
+  alone cannot report grid power).
+
+- older **20200520** protocol: input power at **32089**, meter power at
+  **37258** — point `--modbus-profile` at a profile carrying those addresses.
+
+- unit quirk: the inverter's `[Power meter collection]` copy of 37113 has been
+  observed reporting **watts** (gain 1) while the meter-section table says kW
+  (gain 1000). The bundled profile assumes watts; if grid power looks 1000×
+  off the other way, set the entry's `scale` to 1000 in your profile copy.
+
+- with a battery the derived home load is wrong while the battery
+  charges/discharges — point the dashboard's `load` metric at a real meter
+  register/exporter instead.
+
+## Register maps and the metrics spec
 
 - *where* the primary values live comes from a **device profile** — the same
   shared schema the fake inverter serves and the cache polls; the shipped
@@ -408,67 +534,20 @@ the state dump: the live overrides' file, the restore-on-start
     batt     [battery_net_watts]    Net battery power in watts (positive …
     pv       [pv_generation_watts]  PV input power in watts (the …
 
-## Battery
+## Source layout
 
-- the energy balance always carries the battery term (battery support is
-  always on — the flag retired):
+- `bin/modbus-scraper.py` — the exporter; `bin/modbus-scraper-cli.py` — the
+  one-shot/interactive client; `lib/` — the daemon's modules (the poll loop,
+  the metrics assembly, the config/registry wiring); `metrics.json` — the
+  shipped self-observability spec (merged over the configured spec);
+  `examples/` — the generated conf and the example metrics spec; `schema/` —
+  the JSON Schemas; `man/` — the generated man page; `dev` / `dev-cli` — the
+  checkout launchers.
 
-    home = pv − batt − grid
-
-- battery registers (defaults follow the same Huawei convention as the PV
-  register — they come from the device profile's `battery-power` and
-  `battery-soc` entries): **37001** battery power (I32 W, **positive =
-  charging**), **37004** state of charge (U16, percent×10).
-
-- charging midday surplus reduces the home value; evening discharge covers the
-  home load even with PV at 0.
-
-- the consistency checks adapt: exported power may exceed the PV cap by the
-  battery discharge (a battery feeding the grid is legitimate), and a derived
-  `home < 0` is rejected as inconsistent. A device profile without the battery
-  registers keeps the battery metrics absent.
-
-- the fake inverter emulates the battery for testing: `python3 apps/inverter/bin/modbus-fake-inverter.py`.
-
-## Logging and audit trail
-
-- logging is `logging`-based with **UTC timestamps by default**
-  (`--local-time` switches): one startup line with the effective settings,
-  reachability changes and reloads at INFO/WARNING (every poll at DEBUG). HTTP
-  requests are quiet by default; **`--log-access`** logs every request at INFO
-  as an audit trail of who scraped what when. **Rejected requests are always
-  audited** regardless.
-
-- handled connection problems always log a single line — the suite enforces
-  that **no scenario produces a traceback**. Under systemd (`JOURNAL_STREAM`
-  set) log lines omit their own timestamp — journald adds one.
-
-- the control commands (with their wire macs), the auth failures, the reloads
-  and the shutdowns land in the **SCR audit trail** (`--audit-log`, the XDG
-  state home by default — `dev/gates/audit_verify.py` walks it like the
-  others).
-
-- `--audit-forward` mirrors every line — the per-writer hash chain included —
-  onward: `syslog` (the local socket auto-scan), `syslog:/path` (an explicit
-  socket), `udp://host[:514]` (RFC5426, best-effort) or `tcp://host[:514]`
-  (RFC6587 framing) — the **off-box copy** (the F10 answer): a scheduled
-  search at the collector can chain-verify the extracted prefix/chain fields
-  and alert on a break.
-
-- the remote envelope rides `--audit-forward-format` (`rfc5424`, the default,
-  or `cef` — the local forms keep the verbatim send). A send failure notes
-  once and the next event re-arms.
-
-- `--audit-log none` turns the local file off: with a forward spelled that is
-  the **remote-only mode** (the collector is the sole holder, the chain
-  reseeds at GENESIS per run), without one the audit is disabled (the state
-  `--no-audit-log` spells).
-
-- every line names its writer daemon in `instance=<id>` — the control port
-  when `--audit-instance` is unset (unique per host by construction), the
-  override when spelled; keep an override unique among everything that shares
-  one collector (the native line and CEF carry no hostname) — the chain groups
-  by the (application, writer, instance) triple.
+- the shared machinery lives in the suite's `common/` package (the control
+  spine, the Modbus client, the audit, the compute-expression evaluator) and
+  `shared/` (the texts, the schemas, the profiles) — `lib/` imports it by
+  path; nothing is packaged separately.
 
 ## Testing
 
@@ -480,6 +559,12 @@ the state dump: the live overrides' file, the restore-on-start
     dev/battery/battery.py scraper        # the scraper profile: the regtest, the fuzz, the
                                     #   audit chain (the suites refuse without the
                                     #   runner's PV_RUN_DIR)
+
+- the suites **always run through the battery runner**
+  (`dev/battery/battery.py`) — it owns the run dir, the port slots and the
+  tally, and a standalone suite run refuses (a hand-run collides across
+  sessions). A new behavior ships with a check: a scenario that fails without
+  it and names the registry rows it pins.
 
 The ?/TAB pools, `show knobs` and `help config` all render from the same
 rows this page was generated from.

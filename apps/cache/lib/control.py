@@ -264,7 +264,8 @@ class ControlServer(_ControlServer):
             v = numi(val, 'modbus-unit', 'unit id')
             self._gate_range(key, v)
             p.upstream.unit = v
-            p.upstream.close()   # the in-flight session spoke the old unit
+            with p.upstream.lock:
+                p.upstream.close()   # the in-flight session spoke the old unit
             p.config['modbus_unit'] = v
             return '%d' % v
         if key == 'modbus-auth':
@@ -292,7 +293,8 @@ class ControlServer(_ControlServer):
                                      'pass modbus-auth-upstream-key by flag/env/config and restart' % (v, err))
             p.config['modbus_auth_upstream'] = v
             p.upstream.auth = v
-            p.upstream.close()   # the session re-proves the new scheme on the next exchange
+            with p.upstream.lock:
+                p.upstream.close()   # the session re-proves the new scheme on the next exchange
             return v or 'none'
         if key == 'allow-write':
             on = on_off(val, 'allow-write')

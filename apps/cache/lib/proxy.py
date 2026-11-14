@@ -282,7 +282,8 @@ class Proxy:
                 done.append((fc, start, count, leaves))
             except (ModbusError, OSError) as e:
                 paced = False
-                self.upstream.close()
+                with self.upstream.lock:
+                    self.upstream.close()
                 if len(leaves) > 1:
                     mid = len(leaves) // 2
                     left, right = leaves[:mid], leaves[mid:]
@@ -691,7 +692,8 @@ class Proxy:
             self._local.fwd_note = 'forwarded — device reply'
             return resp
         except (ModbusError, OSError) as e:
-            self.upstream.close()
+            with self.upstream.lock:
+                self.upstream.close()
             self._local.fwd_note = 'forwarded — upstream failed'
             if desc:
                 logger.warning('write failed: %s (%s)', desc, e)

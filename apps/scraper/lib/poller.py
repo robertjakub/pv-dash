@@ -13,6 +13,7 @@ import threading
 import time
 from collections import deque
 
+from common.modbus import DeviceError, is_busy_error, ReplyTimeout
 from common.modbus.blocks import BIT_READ_FUNCS, block_stat, build_blocks, span
 from .expr import evaluate
 from .statics import DIAG_BASE, DIAG_COUNT, DIAG_MAGIC, DIAG_MAX
@@ -143,6 +144,7 @@ class Scraper:
         done = []
         ok_words = {}               # leaf -> the block reply's words for the leaf
         failed = {}                 # leaf -> the terminal read exception
+        retried = set()
         first = True
         paced = True   # the read delay paces a healthy device; failures sweep unpaced
         while pending:
@@ -161,16 +163,49 @@ class Scraper:
                 done.append((fc, start, count, leaves))
             except Exception as e:
                 paced = False
-                self.client.close()
-                if len(leaves) > 1:
+                soft = is_busy_error(e) or isinstance(e, ReplyTimeout)
+                if soft and (fc, start, count) not in retried:
+                    # the device is alive and the session is healthy — wait
+                    # a beat and retry the same query once per cycle ON THE
+                    # SAME CONNECTION (a reconnect would only buy another
+                    # lost first query): the dongle's 'not now' (exception
+                    # 06) or its lost first query (a fresh session's first
+                    # exchange draws silence — the mbpoll repro)
+                    retried.add((fc, start, count))
+                    if isinstance(e, ReplyTimeout):
+                        logger.info('the device timed out waiting to retry fc%d %d:%d', fc, start, count)
+                    else:
+                        logger.info('the device is busy waiting to retry fc%d %d:%d', fc, start, count)
+                    time.sleep(delay or 1.0)
+                    pending.appendleft((fc, start, count, leaves))
+                    continue
+                if soft:
+                    # still away: not an error — the cycle keeps its last
+                    # words (no leaf poisoning, no split; the device, not
+                    # the range, is the problem), the next cycle retries
+                    block_stat(self.block_stats, (fc, start, count), time.monotonic() - t0, e)
+                    logger.debug('the device is away fc%d %d:%d keeps last words', fc, start, count)
+                    done.append((fc, start, count, leaves))
+                elif isinstance(e, DeviceError) and len(leaves) > 1:
+                    # the device's own shape answer (illegal function/address/
+                    # value): the block straddles a map hole or exceeds the
+                    # device's count — split in half, the halves re-queue this
+                    # cycle. The split STAYS: it is the learned shape of the
+                    # device, re-probing the merged block would only buy the
+                    # same refusal (reload/restart rebuilds the plan).
                     mid = len(leaves) // 2
                     left, right = leaves[:mid], leaves[mid:]
                     logger.debug('splitting block fc%d %d:%d after failure (%s)', fc, start, count, e)
                     pending.appendleft((fc, right[0][1], span(right), right))
                     pending.appendleft((fc, left[0][1], span(left), left))
                 else:
+                    # transport or garbage: connection-scoped, the halves
+                    # would learn nothing — the block stays WHOLE in the
+                    # plan and the leaves fail honestly until the next good
+                    # cycle re-polls the full block
                     block_stat(self.block_stats, (fc, start, count), time.monotonic() - t0, e)
-                    failed[leaves[0]] = e
+                    for lf in leaves:
+                        failed[lf] = e
                     done.append((fc, start, count, leaves))
         if plan_gen == self.plan_gen:   # the plan still owns the walk (no live rebuild mid-cycle)
             self.blocks = done
@@ -188,7 +223,6 @@ class Scraper:
                     logger.warning('read of %s (%s) failed, the metric stays absent (%s)',
                                    name, cfg['sources'][name]['metric'], e)
         if hard_err is not None:
-            self.client.close()
             self._mark_up(False, hard_err)
             logger.debug('poll failed: %s', hard_err)
             self._account_cycle(started)

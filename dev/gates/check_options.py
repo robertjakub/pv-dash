@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """The one-knob-one-source gate (docs/TODO.md): every knob must agree across
 the four surfaces it lives on — the argparse flags, the env twins, the
-NixOS module options and the README flag tables — against the option
-registry (per-tool lib/options.py, the common Option rows). The bundled
+NixOS module options and the generated manual's knob tables — against the
+option registry (per-tool lib/options.py, the common Option rows). The bundled
 config script and the man pages ride the same check (the man OPTIONS render
 from the parser; the bundled config's `set` lines must name registry
 options); the control-grammar vocabulary rides the rows too (every live
@@ -73,10 +73,12 @@ def nix_options(module_nix):
 
 
 def readme_flags(readme):
-    """The flags named in the README's flag tables (`| \`--flag\`` rows and the
-    prose). A knob is covered when the README mentions its flag at all — the
-    tables are documentation, not a registry dump; what the check enforces
-    is that every registry row is mentioned somewhere."""
+    """The flags named in the tool's generated manual page (`| \`--flag\``
+    rows and the prose) — the front-page split moved the flags reference out
+    of the READMEs (extras/manuals/<daemon>.md, rendered from the registry).
+    A knob is covered when the page mentions its flag at all — the tables
+    are documentation, not a registry dump; what the check enforces is that
+    every registry row is mentioned somewhere."""
     text = open(os.path.join(REPO, readme)).read()
     return text
 
@@ -324,10 +326,10 @@ def check_tool(tool):
     rows.append((not extra, '%s: every --help flag is in the registry%s'
                  % (tool, ' — undocumented: %s' % ', '.join(extra) if extra else '')))
 
-    # the README mentions every flag
+    # the manual page mentions every flag (the generated reference)
     text = readme_flags(readme)
     unmentioned = sorted(f for f in flags if f not in text)
-    rows.append((not unmentioned, '%s: the README mentions every flag%s'
+    rows.append((not unmentioned, '%s: the manual mentions every flag%s'
                  % (tool, ' — unmentioned: %s' % ', '.join(unmentioned) if unmentioned else '')))
 
     if module_nix:

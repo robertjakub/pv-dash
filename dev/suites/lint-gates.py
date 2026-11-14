@@ -6,10 +6,10 @@ per gate:
 
   lint/acl.py --check          the acl gate-objects
   lint/options.py --check      the four registries' canonical layout
-  lint/readmes.py --check      the tool READMEs' skeleton canon
+  lint/readmes.py --check      the tool READMEs' front-page canon
   lint/texts.py                the rendered texts vs texts.json
   lint/profile.py --check      the shared device profiles
-  generators/manual.py --check   the four MANUAL pages
+  generators/manual.py --check   the five MANUAL pages
   generators/examples.py --check the env + conf examples
   generators/trace_example.py --check  the example trace
   generators/sbom.py --check     the SBOM pair

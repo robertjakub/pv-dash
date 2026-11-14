@@ -365,10 +365,10 @@ READMEs' `##` skeletons.
 
 **The README `##` skeletons:**
 
-- cache: How it works -> Usage -> Configuration -> Runtime control -> Diagnostics registers -> Register map (device profile) -> Access control -> Modbus auth -> Persistence -> Metrics -> Audit logging -> Security -> Testing -> Source layout -> License
-- scraper: How it works -> Usage -> Configuration -> Runtime control -> Metrics -> Alerting -> Device profile -> Battery -> Logging and audit trail -> Test inverter -> Security -> Testing -> Source layout -> License
-- inverter: How it works -> Usage -> Configuration -> Runtime control -> Served registers (the default profile) -> Internal registers (not in the profile) -> Chaos injection (`--chaos`) -> Audit trail -> Security -> Testing -> Source layout -> License
-- dashboard: How it works -> Usage -> Configuration -> Runtime control -> Behind a reverse proxy -> Metrics source -> Security -> Testing -> Source layout -> License
+- cache: Usage -> Security -> License
+- scraper: Usage -> Security -> License
+- inverter: Usage -> Security -> License
+- dashboard: Usage -> Security -> License
 
 The skeleton verdict (`dev/gates/readmes.py --check` gates it):
 
@@ -383,13 +383,12 @@ The findings:
   sections appended at the tail) — the man.py generator owns the
   shape; the drift risk is a hand-edited page, which this sweep
   flags by the .SH ladder changing.
-- **The README skeleton** is the one-skeleton wave's shape (how it
-  works -> usage -> configuration -> runtime control -> the features
-  -> security -> testing -> nix -> source layout -> license) and
-  `dev/gates/readmes.py --check` pins it: the canon H2s in order,
-  the tool's own sections only in the slot between runtime control
-  and security, and a `### Signals` block leading the Runtime-control
-  H3s — this sweep prints the gate's verdict beside the ladders.
+- **The README skeleton** is the front-page split's shape (the
+  description under the H1, then usage -> security -> license, and
+  nothing else) and `dev/gates/readmes.py --check` pins it: the canon
+  H2s in order, no other H2s — the tool's own reference material
+  moved into the generated manuals (`extras/manuals/<daemon>.md`),
+  which this sweep prints the gate's verdict beside.
 
 ## The NixOS-parity sweep — the modules vs the registries
 

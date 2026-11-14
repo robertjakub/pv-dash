@@ -871,13 +871,12 @@ The findings:
   sections appended at the tail) — the man.py generator owns the
   shape; the drift risk is a hand-edited page, which this sweep
   flags by the .SH ladder changing.
-- **The README skeleton** is the one-skeleton wave's shape (how it
-  works -> usage -> configuration -> runtime control -> the features
-  -> security -> testing -> nix -> source layout -> license) and
-  `dev/gates/readmes.py --check` pins it: the canon H2s in order,
-  the tool's own sections only in the slot between runtime control
-  and security, and a `### Signals` block leading the Runtime-control
-  H3s — this sweep prints the gate's verdict beside the ladders."""
+- **The README skeleton** is the front-page split's shape (the
+  description under the H1, then usage -> security -> license, and
+  nothing else) and `dev/gates/readmes.py --check` pins it: the canon
+  H2s in order, no other H2s — the tool's own reference material
+  moved into the generated manuals (`extras/manuals/<daemon>.md`),
+  which this sweep prints the gate's verdict beside."""
 
 NIXOS_FINDINGS = """\
 The findings:

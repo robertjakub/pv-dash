@@ -9,18 +9,21 @@ import sys
 
 from lib import REPO
 
-# tool -> (bin script, nixos module, README, bundled config) — the
+# tool -> (bin script, nixos module, manual page, bundled config) — the
 # per-tool surfaces the gates check the registry against (the tool dir
-# IS the key; the fake answers no NixOS module)
+# IS the key; the fake answers no NixOS module). The third element is the
+# GENERATED manual page (extras/manuals/, dev/generators/manual.py) — the
+# front-page split moved the flags reference out of the READMEs (the
+# readmes.py gate pins the front-page canon)
 SURFACES = {
     'cache': ('apps/cache/bin/modbus-cache.py', 'nixos/modules/modbus-cache.nix',
-              'apps/cache/README.md', 'apps/cache/examples/modbus-cache.conf'),
+              'extras/manuals/modbus-cache.md', 'apps/cache/examples/modbus-cache.conf'),
     'scraper': ('apps/scraper/bin/modbus-scraper.py', 'nixos/modules/modbus-scraper.nix',
-                'apps/scraper/README.md', 'apps/scraper/examples/modbus-scraper.conf'),
+                'extras/manuals/modbus-scraper.md', 'apps/scraper/examples/modbus-scraper.conf'),
     'inverter': ('apps/inverter/bin/modbus-fake-inverter.py', None,
-                 'apps/inverter/README.md', 'apps/inverter/examples/modbus-fake-inverter.conf'),
+                 'extras/manuals/fake-inverter.md', 'apps/inverter/examples/modbus-fake-inverter.conf'),
     'dashboard': ('apps/dashboard/bin/dashboard.py', 'nixos/modules/dashboard.nix',
-                  'apps/dashboard/README.md', 'apps/dashboard/examples/dashboard.conf'),
+                  'extras/manuals/dashboard.md', 'apps/dashboard/examples/dashboard.conf'),
 }
 
 

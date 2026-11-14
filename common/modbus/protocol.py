@@ -11,6 +11,7 @@ import hmac
 import json
 import os
 import secrets
+import socket
 import struct
 
 _tree = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -47,6 +48,25 @@ class DeviceError(ModbusError):
     def __init__(self, msg, code):
         super().__init__(msg)
         self.code = code
+
+
+SLAVE_BUSY = 6              # exception 06: slave device (or server) is busy
+
+
+def is_busy_error(e):
+    """True when e is a Modbus exception 06 (slave device or server busy) —
+    the dongle's 'not now' (its cloud uplink owns the inverter): not a leaf
+    error, the poller waits a beat and retries the query, the session
+    stays."""
+    return isinstance(e, DeviceError) and e.code == SLAVE_BUSY
+
+
+class ReplyTimeout(ModbusError):
+    """A silent reply timeout with zero bytes of the frame received — the
+    stream is still in sync and the session can carry the next exchange
+    (the dongle's lost first query recovers on the standing connection).
+    A partial frame's timeout stays a plain error: that stream is
+    desynced."""
 
 
 # --- the suite auth handshake ------------------------------------------------
@@ -176,11 +196,19 @@ def describe_fc(func):
 
 
 def recv_exact(sock, n):
-    """Read exactly n bytes or raise ConnectionError (an OSError subclass —
-    callers that wrap OSErrors into ModbusError keep working)."""
+    """Read exactly n bytes or raise: ConnectionError (an OSError subclass —
+    callers that wrap OSErrors into ModbusError keep working) on a clean
+    peer close, ReplyTimeout when nothing arrived before the socket timeout
+    (the session stays usable), the raw socket timeout when a partial frame
+    stalled (that stream is desynced — the caller closes)."""
     buf = b''
     while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
+        try:
+            chunk = sock.recv(n - len(buf))
+        except socket.timeout:   # the socket's own timeout class (3.9: not the builtin TimeoutError)
+            if not buf:
+                raise ReplyTimeout('timed out')
+            raise
         if not chunk:
             raise ConnectionError('connection closed by peer')
         buf += chunk

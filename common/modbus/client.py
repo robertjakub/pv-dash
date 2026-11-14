@@ -7,7 +7,7 @@ come from each tool's lib/defaults.json."""
 import socket
 import time
 
-from .protocol import (DeviceError, ModbusError, PROTOCOL,
+from .protocol import (DeviceError, ModbusError, PROTOCOL, ReplyTimeout,
                        auth_handshake_client, check_head, recv_exact,
                        waveshare_handshake_client)
 
@@ -71,12 +71,18 @@ class ClientBase:
     def _exchange(self, out, want_txn):
         """One wire exchange with the session accounting: send + the two
         recvs count the bytes, a txn/proto mismatch raises, any failure
-        lands in errors/last_error and closes the session socket before
-        re-raising — the failed exchange drops its own connection while it
-        still holds the caller's serialization (the cache's upstream.lock;
-        the scraper's single poll thread), so no other thread can be mid-
+        lands in errors/last_error and re-raising closes the session socket
+        — the failed exchange drops its own connection while it still holds
+        the caller's serialization (the cache's upstream.lock; the
+        scraper's single poll thread), so no other thread can be mid-
         exchange on the dying socket and no later close can land on a
-        reconnect another thread won. `out` is the READY frame
+        reconnect another thread won. The one exception: a zero-byte reply
+        timeout (ReplyTimeout — nothing of the frame arrived) leaves the
+        session up, the stream is still in sync and the next exchange rides
+        the warm connection instead of a fresh one (the dongle's lost
+        first query recovers on the second — the pollers re-send the same
+        query on the warm connection, a reconnect would only buy another
+        lost first query). `out` is the READY frame
         (the caller packs — the cache forwards client frames verbatim);
         returns (txn, proto, length, unit, body)."""
         try:
@@ -97,7 +103,8 @@ class ClientBase:
             self.errors += 1
             self.last_error = str(e)
             self.last_error_at = time.monotonic()
-            self.close()
+            if not isinstance(e, ReplyTimeout):
+                self.close()
             raise
         self.exchanges += 1
         return txn, proto, length, unit, body

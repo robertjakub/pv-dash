@@ -3,11 +3,11 @@ primitives — one implementation for the whole family (stdlib only)."""
 
 from .protocol import (AUTH_DOMAIN, AUTH_ERR, AUTH_FRAME_LEN, AUTH_MAGIC,
                        AUTH_MAC_LEN, AUTH_MIN_KEY, AUTH_NONCE_LEN, AUTH_OK,
-                       FC_NAMES, WAVESHARE_REPLY_MAX, DeviceError,
-                       ModbusError, auth_handshake_client,
+                       FC_NAMES, SLAVE_BUSY, WAVESHARE_REPLY_MAX, DeviceError,
+                       ModbusError, ReplyTimeout, auth_handshake_client,
                        auth_handshake_server, auth_mac, check_head,
-                       describe_fc, exception_frame, frame, pack_bits,
-                       unit_in_range,
+                       describe_fc, exception_frame, frame, is_busy_error,
+                       pack_bits, unit_in_range,
                        read_frame, recv_exact, unpack_bits,
                        waveshare_handshake_client)
 from .client import ClientBase, check_data_bytes, check_reply, open_socket

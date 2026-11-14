@@ -41,7 +41,7 @@ import socket
 import threading
 import time
 
-from .protocol import ModbusError, auth_handshake_server, read_frame
+from .protocol import ModbusError, ReplyTimeout, auth_handshake_server, read_frame
 
 
 def serve_modbus(face, host, port, backlog=128):
@@ -114,7 +114,7 @@ def _session(face, client, addr):
             # the key is dropped before it ever sees a frame
             try:
                 proved = auth_handshake_server(client, auth_key)
-            except (ConnectionError, OSError) as e:
+            except (ConnectionError, OSError, ReplyTimeout) as e:
                 face.log.info('suite auth with %s:%d died mid-handshake (%s)', addr[0], addr[1], e)
                 return
             if not proved:
@@ -125,6 +125,11 @@ def _session(face, client, addr):
             face.on_frame()
             try:
                 txn, proto, length, unit, pdu = read_frame(client, face.max_pdu)
+            except ReplyTimeout:
+                # the client idled past its timeout — a disconnect, not a
+                # malformed frame (the pre-ReplyTimeout behavior)
+                face.access('client %s:%d disconnected (timed out)', *addr[:2])
+                break
             except ModbusError as e:
                 face.malformed(addr, e)
                 break

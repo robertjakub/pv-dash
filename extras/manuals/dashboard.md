@@ -73,6 +73,46 @@ One process, three surfaces: the page, the proxy, the control socket.
 - The repo also ships `screenshots/demo.png` — a rendered capture of
   the page, used by the README, not served by the daemon.
 
+A request's walk: the connection caps and the bearer gate first
+(loopback serves tokenless), then the route — a static file from the
+static dir, `/config.js` rendered from the configured sample, or
+`/prom/...` proxied upstream with the fixed 30-second timeout. The
+page is one document: on load it fetches `/config.js`, then polls the
+proxied query API on its interval and redraws the flow diagram, the
+summary and the chart — the vendored ECharts doing the drawing.
+
+## Source layout
+
+The subproject, entry by entry:
+
+```text
+apps/dashboard/
+├── bin/
+│   ├── dashboard.py            # the daemon: the HTTP server, the proxy, the signal handling
+│   └── dashboard-cli.py        # the control client (a symlink to the family's
+│                               #   pvsuite-cli, apps/pvsuite-cli.py)
+├── lib/
+│   ├── control.py              # the JSON-lines control server
+│   ├── metrics.py              # the /metrics endpoint
+│   ├── config.py               # the config script, the env layer, the resolution ladder
+│   ├── options.json            # the knob registry — one row per knob
+│   ├── options.py              # the registry loader
+│   ├── statics.py              # the shipped defaults for the static surface
+│   ├── defaults.json           # the packaged defaults
+│   ├── man.py                  # the man pages' prose (the pages render from it)
+│   └── cli_spec.py             # the client SPEC — the per-tool half of pvsuite-cli
+├── static/                     # the served page: index.html, app.js, boot.js, i18n.js,
+│                               #   style.css, vendor/echarts.min.js (Apache ECharts 5.5.1)
+├── examples/                   # the generated example conf + the shipped config.js sample
+├── man/                        # the shipped man pages
+├── screenshots/                # demo.png — used by the README, not served
+├── dev, dev-cli                # the dev wrappers
+└── README.md                   # the front page
+```
+
+The client page ([pvsuite-cli.md](pvsuite-cli.md)) covers the console
+half; the served page lives in `static/` (`--static-dir` moves it).
+
 ## Installing
 
 ### From the tree
@@ -254,6 +294,26 @@ dashboard:8080 > show max-clients
 dashboard:8080 > request reload-config
 ok
 ```
+
+## Persistence
+
+The dashboard holds no history — the Prometheus upstream keeps the
+series — and the dump family carries the part of a restart the page
+would feel: the live setting overrides. With `--dump-path` configured,
+`request dump` writes them as one JSON document, `--dump-interval`
+writes on a cadence, the graceful shutdown writes a final dump, and
+`--restore-on-start` loads it at start.
+
+The file writes atomically and 0600, and every dump carries a sha256
+integrity hash of its content — edited, truncated or foreign files
+refuse to restore, and a group- or world-writable dump is refused
+outright. `--dump-key` seals the file with the family's shared seal —
+the version-2 envelope: HMAC-SHA256 keystream encryption, an HMAC over
+nonce+box, the mac checked first — and the gate is symmetric: a
+restore without the key refuses a sealed dump, a restore with the key
+refuses an unsealed one. `request reload` rides the same machinery:
+the overrides save to a state file, the process re-execs, the fresh
+daemon re-applies them once.
 
 ## The control plane
 
@@ -498,3 +558,12 @@ python3 dev/battery/battery.py dashboard   # the dashboard's commit set
 | [nixos/README.md](../../nixos/README.md) | the NixOS adoption — modules, packages, tests |
 | [docker/README.md](../../docker/README.md) | the container topologies — demo and prod stacks |
 | [docs/book/src/index.md](../../docs/book/src/index.md) | the book — the family rendered as chapters |
+
+## License
+
+The dashboard code (server, page, Nix packaging) is licensed under the
+**BSD 3-Clause License** — see the `LICENSE` file. The bundled chart
+library `static/vendor/echarts.min.js` is
+[Apache ECharts](https://echarts.apache.org/) 5.5.1, licensed under the
+**Apache License 2.0** (© the Apache Software Foundation); the license
+notice is preserved in the vendored file.

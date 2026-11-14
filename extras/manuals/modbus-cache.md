@@ -64,6 +64,13 @@ ranges into block reads. The poller walks the blocks every
 timestamp; a cached register older than `--cache-ttl` is refetched
 before it is served again.
 
+One connection discipline underlies the whole: the poller and every
+forwarded read share a single upstream session object (the device sees
+one client, whatever the local crowd), while the cached reads never
+touch the device at all — they answer out of the lock-guarded
+dictionary, the per-register stamp deciding fresh against the ttl.
+The map itself is the next section's subject.
+
 - **Serves** — FC3/FC4 reads that fall inside the map answer from the
   cache, immediately, without touching the device.
 - **Forwards** — reads outside the map and every other function code
@@ -97,7 +104,75 @@ device. The `waveshare` upstream leg instead sends the key as the
 gateway's connection password (raw ASCII right after every connect);
 the gateway's `OK` opens the plain Modbus session. An upstream auth
 failure fails the exchange like any other upstream fault and the
-poller retries.
+poller retries. The legs' wiring, the frame and the key floors are
+[Modbus auth](#modbus-auth).
+
+## The register map
+
+The register map is the device profile narrowed by the selection — one
+JSON document saying which register holds which value and how the words
+decode. A bare name resolves against the shared home
+[shared/profiles/](../../shared/profiles/) first, then the packaged
+copy; a path passes through. The shipped family: `sun2000` (the
+working default), the exhaustive `sun2000_full`, the three Deye hybrids
+(`deye-sg03lp1`, `deye-sg04lp3`, `deye-sg05lp3`) and `demo-fc4`.
+
+Each register entry names a logical value and carries: the `fc` — the
+address space it lives in (FC3 holding / FC4 input words, FC1 coils /
+FC2 discrete inputs); the address and the `type` (`u16`/`i16`,
+`u32`/`i32` and the word-swapped forms, `f32`, `bit`); a terse `desc`;
+an optional per-register `ttl` that overrides the global `cache/ttl`
+for that one word. Coded registers carry their value maps in the
+profile's `mappings` tree; the profile's `acl` tree is the typed write
+gate `write/registers profile` points at.
+
+The daemon reads the map at start and again on every reload: the
+selection narrows the profile to the names it keeps, the planner
+merges the surviving ranges into block reads (`--modbus-merge-gap`
+decides how wide a gap one read may span), and that compiled map is
+the cache's surface — reads inside it answer from memory, reads
+outside it and every other function code forward live. `show
+uplink-sources` renders the compiled map. The profile lint is
+[dev/gates/profile.py](../../dev/gates/profile.py); the format's
+details are [shared/profiles/README.md](../../shared/profiles/README.md).
+
+## Source layout
+
+The subproject, entry by entry:
+
+```text
+apps/cache/
+├── bin/
+│   ├── modbus-cache.py         # the daemon: the flags, the config load, the signal handling
+│   └── modbus-cache-cli.py     # the console-style control session (a symlink to the
+│                               #   family's pvsuite-cli, apps/pvsuite-cli.py)
+├── lib/
+│   ├── proxy.py                # the proxy itself: the poller thread, the client handling,
+│   │                           #   the forwarding, the reload
+│   ├── cache.py                # the in-memory cache and the poll block planner
+│   ├── upstream.py             # the one upstream Modbus TCP session, shared by every thread
+│   ├── persist.py              # the state dumps: the overrides, the cached words, the seal
+│   ├── tracefeed.py            # the record feed (trace/socket, trace/sources)
+│   ├── metrics.py              # the /metrics endpoint
+│   ├── control.py              # the JSON-lines control server
+│   ├── config.py               # the config script, the env layer, the resolution ladder
+│   ├── options.json            # the knob registry — one row per knob
+│   ├── options.py              # the registry loader
+│   ├── statics.py              # the Modbus protocol limits and the shipped constants
+│   ├── defaults.json           # the packaged defaults
+│   ├── man.py                  # the man pages' prose (the pages render from it)
+│   └── cli_spec.py             # the client SPEC — the per-tool half of pvsuite-cli
+├── examples/
+│   └── modbus-cache.conf       # the generated all-commented example configuration
+├── man/                        # the shipped man pages
+├── dev, dev-cli                # the dev wrappers: the daemon on the example conf, its console
+└── README.md                   # the front page
+```
+
+The client page ([pvsuite-cli.md](pvsuite-cli.md)) covers the console
+half; the daemon's surfaces live in the modules above — one
+implementation each, the shared halves (`common/`) imported from the
+repo root.
 
 ## Installing
 
@@ -345,6 +420,37 @@ The prompt shows the connected port; `set`/`clear` confirm
 confirms silently, `shutdown` asks first. The `show cache` line above
 is illustrative — the report's shape is the registry's.
 
+## Persistence
+
+The cache keeps its state in memory; the dump family is the
+write-behind that survives a restart. `--dump-path` names the file:
+one JSON document carrying the live setting overrides and — with
+`--dump-with-cache` — the cached words with their per-register stamps.
+`request dump` writes it on demand, `--dump-interval` writes it on a
+cadence, the graceful shutdown writes a final one, and
+`--restore-on-start` loads it at start: a restart serves last-known
+values instead of cold misses. A restore puts the words back as they
+were, their ttl bounding any staleness; a later map swap prunes
+whatever the profile no longer names.
+
+The file writes atomically and 0600, and every dump carries a sha256
+integrity hash of its content: a restore recomputes the hash and
+refuses edited, truncated or foreign files, and a group- or
+world-writable dump is refused outright — the dump is config-equivalent
+trust at rest, the write bits stay owner-only.
+
+`--dump-key` seals the dump. The shared seal is a version-2 envelope:
+the whole state rides as the encrypted box, the keystream and the
+authentication mac both HMAC-SHA256 (counter mode; the mac covers
+nonce+box and is checked first, so a wrong key reads as tampered
+content, never as garbage). The gate is symmetric — a restore without
+the key refuses a sealed dump, a restore with the key refuses an
+unsealed one — and a dump path without a key warns at start and on the
+dump reply. `request reload` rides the same machinery: the live
+overrides save to a settings-only state file beside the config
+(`<config>.reload`), the process re-execs, the fresh daemon re-applies
+them once.
+
 ## The control plane
 
 `modbus-cache-cli` is one client with three invocation shapes: command
@@ -438,7 +544,37 @@ every connect, and `--modbus-auth-upstream suite|waveshare` does the
 same toward the device. Both keys are secret knobs — pass them as
 `file:<path>`. The family-wide grammar is
 [docs/specs/ACL.md](../../docs/specs/ACL.md); the security story is
-[docs/SECURITY.md](../../docs/SECURITY.md).
+[docs/SECURITY.md](../../docs/SECURITY.md); the legs in detail are
+[Modbus auth](#modbus-auth).
+
+## Modbus auth
+
+The auth legs speak the family's suite handshake — an authentication
+at connect, not a tunnel: once the verdict passes, the session speaks
+plain Modbus; there is no TLS and no per-frame cryptography. The
+proving side opens every connection with a 52-byte frame — the
+protocol magic, a fresh nonce, an HMAC-SHA256 proof of the shared key
+— and the other side answers `OK` (plain Modbus follows) or `ERR` (the
+session drops before a frame is served). The suite key's floor is 16
+characters.
+
+Two legs, wired separately:
+
+- **The clients' leg** — `--modbus-auth suite` demands the handshake
+  of every client that connects to the cache's Modbus port. Unset, the
+  port serves plain Modbus to anyone the connect ACL lets in.
+- **The upstream leg** — `--modbus-auth-upstream suite` proves the
+  cache's own key toward the device. The `waveshare` scheme instead
+  sends the key as a Waveshare RS485-to-TCP gateway's connection
+  password — raw ASCII right after every connect; the gateway's `OK`
+  opens the plain session. An upstream auth failure fails the exchange
+  like any other upstream fault and the poller retries.
+
+Both keys are secret knobs (`modbus/auth/key`,
+`modbus/auth-upstream/key`) — pass them as `file:<path>`; they never
+render, and the wire refuses a live `set`/`clear`. The handshake's
+frame layout and the verdicts are specified in
+[docs/specs/MODBUS.md](../../docs/specs/MODBUS.md).
 
 ## Metrics
 
@@ -661,3 +797,8 @@ The tool's own documents first, then the family's:
 | [docker/README.md](../../docker/README.md) | the images, the entrypoints, the two compose stacks |
 | [docs/book/](../../docs/book/) | the mdBook render of the suite's documentation |
 | [extras/manuals/pvsuite-cli.md](../../extras/manuals/pvsuite-cli.md) | the one client: the name resolution, the shapes, the console |
+
+## License
+
+The proxy (source, Nix packaging, service module) is licensed under the
+**BSD 3-Clause License** — see the repo-root `LICENSE` file.

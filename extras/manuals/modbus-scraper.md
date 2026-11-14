@@ -89,6 +89,76 @@ bare device just as happily (`--upstream 192.168.1.100:502`), and
   exposition `503` — the sensors are suspect, not the poller — and
   names the register in the log.
 
+The shapes around the loop: the poller runs on its own thread, the
+exposition and the control server are the other two surfaces, and the
+store between them is the latest decoded value per source — a
+completed poll rewrites it, a failed block leaves the previous values
+standing (the health gauges say which).
+
+## The register map
+
+The poller walks the device profile's register map — the same shared
+home the fake serves from and the cache fetches from. A bare name
+resolves against [shared/profiles/](../../shared/profiles/) first,
+then the packaged copy; a path passes through. The shipped family:
+`sun2000` (the working default), the exhaustive `sun2000_full`, the
+three Deye hybrids (`deye-sg03lp1`, `deye-sg04lp3`, `deye-sg05lp3`)
+and `demo-fc4`.
+
+Each register entry names a logical value and carries: the `fc` — the
+address space it lives in (FC3 holding / FC4 input words, FC1 coils /
+FC2 discrete inputs); the address and the `type` (`u16`/`i16`,
+`u32`/`i32` and the word-swapped forms, `f32`, `bit`); a terse `desc`;
+an optional per-register `ttl`. Coded registers carry their value maps
+in the profile's `mappings` tree; the profile's `acl` tree is the
+typed write gate the cache can point its register allow-list at.
+
+The map is an input, not the output: the metrics spec binds metric
+names onto profile names, the planner merges the bound ranges into as
+few block reads as `--modbus-merge-gap` allows, and the ok replies
+decode per the profile's types back into the named sources. `show
+uplink-sources` renders the compiled map — fc, register, the range
+that fetches it, the source it feeds. The profile lint is
+[dev/gates/profile.py](../../dev/gates/profile.py); the format's
+details are [shared/profiles/README.md](../../shared/profiles/README.md).
+
+## Source layout
+
+The subproject, entry by entry:
+
+```text
+apps/scraper/
+├── bin/
+│   ├── modbus-scraper.py       # the daemon: the flags, the config load, the signal handling
+│   └── modbus-scraper-cli.py   # the console-style control session (a symlink to the
+│                               #   family's pvsuite-cli, apps/pvsuite-cli.py)
+├── lib/
+│   ├── poller.py               # the poll loop: read, sanity-check, store
+│   ├── protocol.py             # the Modbus TCP wire format and the poll connection
+│   ├── metrics.py              # the metrics spec loader — the merge over the built-in
+│   ├── expr.py                 # the compute-expression mini-evaluator (the whitelist)
+│   ├── server.py               # the /metrics exposition endpoint
+│   ├── control.py              # the JSON-lines control server
+│   ├── config.py               # the config script, the env layer, the resolution ladder
+│   ├── options.json            # the knob registry — one row per knob
+│   ├── options.py              # the registry loader
+│   ├── statics.py              # the Modbus protocol limits and the shipped constants
+│   ├── defaults.json           # the packaged defaults
+│   ├── metrics.json            # the built-in metrics spec (the packaged root copy)
+│   ├── man.py                  # the man pages' prose (the pages render from it)
+│   └── cli_spec.py             # the client SPEC — the per-tool half of pvsuite-cli
+├── schema/
+│   └── metrics.schema.json     # the JSON Schema the metrics spec must satisfy
+├── examples/                   # the generated example conf + the sample metrics spec
+├── man/                        # the shipped man pages
+├── dev, dev-cli                # the dev wrappers: the daemon on the shipped samples, its console
+└── README.md                   # the front page
+```
+
+The client page ([pvsuite-cli.md](pvsuite-cli.md)) covers the console
+half; the daemon's surfaces live in the modules above — the shared
+halves (`common/`) imported from the repo root.
+
 ## Installing
 
 ### From the tree
@@ -315,6 +385,30 @@ integrity-hashed, sealed when `--dump-key` is set), `request
 restore` re-applies them, `--restore-on-start` loads them at start —
 a restart serves last-known values instead of cold misses.
 
+## Persistence
+
+The exporter keeps its state in memory — the latest decoded value per
+source — and the dump family carries the part a restart would lose:
+the live setting overrides. With `--dump-path` configured, `request
+dump` writes them as one JSON document, `--dump-interval` writes on a
+cadence, the graceful shutdown writes a final dump, and
+`--restore-on-start` loads it at start.
+
+The file writes atomically and 0600, and every dump carries a sha256
+integrity hash of its content: a restore recomputes the hash and
+refuses edited, truncated or foreign files, and a group- or
+world-writable dump is refused outright — the dump is config-equivalent
+trust at rest.
+
+`--dump-key` seals the dump with the family's shared seal — the
+version-2 envelope: the state encrypted under an HMAC-SHA256
+counter-mode keystream, authenticated by an HMAC-SHA256 over nonce+box,
+the mac checked first (a wrong key reads as tampered content, never as
+garbage). The gate is symmetric: a restore without the key refuses a
+sealed dump, a restore with the key refuses an unsealed one.
+`request reload` rides the same machinery: the overrides save to a
+state file, the process re-execs, the fresh daemon re-applies them once.
+
 ## The control plane
 
 `modbus-scraper-cli` is one client with three invocation shapes:
@@ -393,7 +487,34 @@ Three legs, each verifiable from the man page:
   cache's front legs (the suite auth, the write ACL) are the
   hardened shape (see
   [docs/specs/ACL.md](../../docs/specs/ACL.md),
-  [docs/SECURITY.md](../../docs/SECURITY.md)).
+  [docs/SECURITY.md](../../docs/SECURITY.md)). The leg in detail is
+  [Modbus auth](#modbus-auth).
+
+## Modbus auth
+
+The scraper is a Modbus client, so its leg is the device leg. The
+`suite` scheme proves the shared key right after every connect — the
+family's 52-byte frame: the protocol magic, a fresh nonce, an
+HMAC-SHA256 proof — and the device answers `OK` (plain Modbus follows)
+or `ERR` (the connect fails and the poller keeps retrying). The
+handshake authenticates the session, it does not encrypt it: after the
+verdict the wire is plain Modbus, no TLS. The `suite` key's floor is
+16 characters.
+
+The `waveshare` scheme speaks to a Waveshare RS485-to-TCP gateway: the
+key rides as the gateway's connection password — raw ASCII, no
+framing, right after every connect — and the gateway's `OK` opens the
+plain session; anything else (a rejection, a non-Waveshare peer's
+exception frame, silence, an early EOF) fails the connect like any
+other device fault. The floor here is non-empty ASCII — the gateway
+defines the shape.
+
+The scheme knob is `modbus/auth` (`suite`, `waveshare`, `none`), the
+key `modbus/auth/key` — a secret, passed as `file:<path>`, never
+rendering. An unset scheme is no auth at all: network isolation is the
+deployment's own boundary, and the hardened shape is the cache in
+front with its suite auth and write ACL. The frame layout is
+[docs/specs/MODBUS.md](../../docs/specs/MODBUS.md).
 
 ## Metrics
 
@@ -615,3 +736,9 @@ The family documents:
 | [nixos/README.md](../../nixos/README.md) | the Nix packaging and the module story |
 | [docker/README.md](../../docker/README.md) | the compose stacks, the secret staging, both topologies |
 | [docs/book/](../../docs/book/src/index.md) | the mdBook — the family narrative that includes these pages |
+
+## License
+
+The scraper (source, Nix packaging, service module) is licensed under
+the **BSD 3-Clause License** — see the `LICENSE` file in the repository
+root.

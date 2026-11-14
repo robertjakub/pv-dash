@@ -91,6 +91,80 @@ pieces, each in its own module under `apps/inverter/lib/`:
   serves the classic constant demo values (PV 4000 W, the battery
   charging at 1200 W) instead of the day simulation.
 
+The tick order matters for what a client sees: each pass of the
+simulated clock recomputes the machines, the profile layer maps every
+name onto its address, and a read answers the overlay first, the
+simulated value second, and nothing (0, or exception 02 under
+`--strict`) where the profile has no entry.
+
+## The register map
+
+The profile is the fake's served truth: a JSON register map from
+[shared/profiles/](../../shared/profiles/) (a bare name) or a path —
+`sun2000` the default, the exhaustive `sun2000_full`, the three Deye
+hybrids (`deye-sg03lp1`, `deye-sg04lp3`, `deye-sg05lp3`), `demo-fc4`.
+Each entry maps a logical name onto a wire address and carries the
+`fc` — the address space it lives in (FC3 holding / FC4 input words,
+FC1 coils / FC2 discrete inputs) — the `type` (`u16`/`i16`, `u32`/`i32`
+and the word-swapped forms, `f32`, `bit`), a terse `desc` and, for
+coded registers, the value map in the profile's `mappings` tree; the
+profile's `acl` tree is the typed write gate the cache can point its
+register allow-list at.
+
+Serving walks the table: the simulator produces the named values, the
+profile layer encodes each onto its address in its type, and the
+server answers reads out of the assembled map. A name the profile
+leaves out is not served — it reads as 0, or refuses with exception 02
+under `--strict`. The write overlays sit on top: an accepted Modbus
+write (or `set register`/`set coil`/`set discrete`) pins its value and
+the overlay wins over the simulation wherever the profile reads the
+address. The 65000–65003 diagnostics block (the cache/scraper 0xCAFE
+magic) is always mocked, whatever the profile says.
+
+The round trip is the point of the shared profile home: the cache and
+the scraper decode the fake's words with the same profile entries that
+encoded them, so a value survives the ladder — what the simulator
+computed is what the metrics serve. One JSON home for the whole suite
+([shared/profiles/README.md](../../shared/profiles/README.md)), the
+lint at [dev/gates/profile.py](../../dev/gates/profile.py).
+
+## Source layout
+
+The subproject, entry by entry:
+
+```text
+apps/inverter/
+├── bin/
+│   ├── modbus-fake-inverter.py  # the daemon: the flags, the config load, the serving loop
+│   └── modbus-fake-cli.py       # the console-style control session (a symlink to the
+│                                #   family's pvsuite-cli, apps/pvsuite-cli.py)
+├── lib/
+│   ├── simulator.py             # the day: the PV curves, the clouds, the grid wanderers,
+│   │                            #   the outage machine, the runtime overrides
+│   ├── battery.py               # the battery state machine (the SoC integrates)
+│   ├── chaos.py                 # the seeded hostile-reply dice layer
+│   ├── profile.py               # the register-map profiles: name -> address, encoding
+│   ├── inverter.py              # the Modbus TCP server: the reads, the write overlays
+│   ├── signals.py               # the SIGHUP env layer, the SIGUSR1 reset, the shutdown
+│   ├── metrics.py               # the /metrics endpoint
+│   ├── control.py               # the JSON-lines control server
+│   ├── config.py                # the config script, the env layer, the resolution ladder
+│   ├── options.json             # the knob registry — one row per knob
+│   ├── options.py               # the registry loader
+│   ├── statics.py               # the numbers a demo device is born with
+│   ├── defaults.json            # the packaged defaults
+│   ├── man.py                   # the man pages' prose (the pages render from it)
+│   └── cli_spec.py              # the client SPEC — the per-tool half of pvsuite-cli
+├── examples/
+│   └── modbus-fake-inverter.conf  # the generated all-commented example configuration
+├── man/                         # the shipped man pages
+├── dev, dev-cli                 # the dev wrappers: the daemon on the example conf, its console
+└── README.md                    # the front page
+```
+
+The client page ([pvsuite-cli.md](pvsuite-cli.md)) covers the console
+half; the daemon's surfaces live in the modules above.
+
 ## Installing
 
 ### From the tree
@@ -319,6 +393,31 @@ value pins; `show config` prints the effective set-grammar script
 config file over the running machines without a restart. A bare terminal
 command opens the interactive console with the same verbs.
 
+## Persistence
+
+The simulation is stateful — the battery's SoC integrates, the pins and
+overlays accumulate — and the dump family is how a demo survives a
+restart. `--dump-path` names the file: the live setting overrides (the
+values a `set` pinned over the machines) as one JSON document.
+`request dump` writes on demand, `--dump-interval` on a cadence, the
+graceful shutdown writes a final dump (the session summary rides the
+log), and `--restore-on-start` loads it at start.
+
+The file writes atomically and 0600, and every dump carries a sha256
+integrity hash of its content — edited, truncated or foreign files
+refuse to restore, and a group- or world-writable dump is refused
+outright. `--dump-key` seals the file with the family's shared seal —
+the version-2 envelope: HMAC-SHA256 keystream encryption, an HMAC over
+nonce+box, the mac checked first — and the gate is symmetric: a
+restore without the key refuses a sealed dump, a restore with the key
+refuses an unsealed one. `request reload` rides the same machinery:
+the overrides save to a state file, the process re-execs, the fresh
+daemon re-applies them once.
+
+The clock itself is not persisted: a restart re-derives the day from
+the pinned or wall time (`--time`, `--time-scale`) — and a restored
+`soc` pin re-seeds the battery machine where the dump left it.
+
 ## The control plane
 
 `modbus-fake-cli` is one client with three invocation shapes: command
@@ -369,7 +468,8 @@ beyond a lab segment. What does exist, opt-in:
   handshake right after every connect: 52 bytes (magic, fresh nonce,
   HMAC-SHA256 proof of `--modbus-auth-key`, min 16 characters); the fake
   answers `OK` (plain Modbus follows) or `ERR` and drops the client
-  before it ever sees a register. Empty auth means no auth at all.
+  before it ever sees a register. Empty auth means no auth at all. The
+  leg in detail is [Modbus auth](#modbus-auth).
 - **The write gate** — `--allow-write` off (the default) refuses every
   Modbus write with exception 01 and audits WRITE-REFUSED; on, a write
   lands in the overlay, audited WRITE.
@@ -383,6 +483,18 @@ beyond a lab segment. What does exist, opt-in:
 
 The full family story — the caps, the supply-chain claim — is
 `docs/SECURITY.md`.
+
+## Modbus auth
+
+The fake's leg is the server side of the family's suite handshake.
+With `--modbus-auth suite`, every client proves the shared key right
+after every connect — the 52-byte frame: the protocol magic, a fresh
+nonce, an HMAC-SHA256 proof — and the fake answers `OK` (plain Modbus
+follows) or `ERR` (the client drops before it ever sees a register).
+The key's floor is 16 characters; the key itself (`--modbus-auth-key`)
+is a secret — passed as `file:<path>`, startup-only, never rendering.
+The handshake authenticates the session; the traffic after it is plain
+Modbus, no TLS. An unset scheme is no auth at all — the F11 posture.
 
 ## Metrics
 
@@ -546,3 +658,9 @@ depth.
 | `nixos/README.md` | the NixOS deployment story for the family |
 | `docker/README.md` | the images, the compose topologies |
 | `docs/book/src/fake.md` | the book's chapter on the fake |
+
+## License
+
+The fake inverter (source, Nix packaging) is licensed under the
+**BSD 3-Clause License** — see the `LICENSE` file in the repository
+root.

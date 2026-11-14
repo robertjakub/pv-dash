@@ -1,8 +1,10 @@
 # manuals — the book-style operator pages
 
 Full documentation, book style: one page per tool app, written to be
-read front to back — the family picture, how it works, every knob, the
-control plane, the access model, deployment, troubleshooting. The pages
+read front to back — the family picture, how it works, the register
+map, the source layout, every knob, the control plane, the access
+model, the Modbus auth leg, the persistence, deployment,
+troubleshooting, the license. The pages
 are **hand-written markdown** and nothing in the repo's build or
 runtime path consumes them (the `extras/` convention).
 

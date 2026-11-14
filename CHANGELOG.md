@@ -35,11 +35,13 @@ history (0.4.2 and older) lives in [docs/history/CHANGELOG.md](docs/history/CHAN
   inside each) and `pvsuite-cli.md` (the one client behind the four
   installed `-cli` names), plus the pack README and the
   `extras/README.md` index line. GitHub-flavored markdown, hard-wrapped
-  prose, one section ladder per page (the family, how it works,
-  installing, quick start, configuration with the full knob table mined
-  from the registry, runtime control, the control plane, access
-  control, metrics, the audit trail, tuning, deployment,
-  troubleshooting, testing, the docs map). Nothing generated and no
+  prose, one section ladder per page (the family, how it works, the
+  register map — the device profile — and the source layout, installing,
+  quick start, configuration with the full knob table mined
+  from the registry, runtime control, persistence, the control plane,
+  access control, the Modbus auth leg where the tool has one, metrics,
+  the audit trail, tuning, deployment, troubleshooting, testing, the
+  docs map, the license). Nothing generated and no
   gate hooks: the reference stays the daemon's `--help` and the
   generated man page (`<daemon> --man`) — the manuals distill them and
   the man page wins a disagreement; the links gate reads the pages like

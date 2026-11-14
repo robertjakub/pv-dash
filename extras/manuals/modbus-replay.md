@@ -113,6 +113,41 @@ there is no control plane and no config file.
   can record the feed to a trace file (`--record`) any reader takes
   for captured.
 
+A run's lifecycle: the start validates the mode (exactly one of
+`--upstream`/`--replay`; `--capture` only with an upstream), binds,
+and from then on the only writes are the trace file and the log — the
+record feed is a push, not a poll. The stop prints the session summary
+(the accepted pairs, the frames, the bytes) and closes the trace
+flushed.
+
+## Source layout
+
+The sidecar, entry by entry:
+
+```text
+apps/modbus-replay/
+├── bin/
+│   ├── modbus-replay.py        # the sidecar daemon: capture or replay, exactly one mode per run
+│   └── modbus-replay-dump.py   # the reader: the views, the converter, the live view, the recorder
+├── lib/
+│   ├── capture.py              # the capture face: the pipe, the pumps, the MBAP tap
+│   ├── replay.py               # the replay face: the index match, the latencies, the miss policy
+│   ├── trace.py                # the trace face beside the family's shared trace home
+│   ├── config.py               # the env layer and the CLI flags, resolved
+│   ├── options.json            # the knob registry the parser and the man page render
+│   ├── options.py              # the registry loader
+│   ├── statics.py              # the trace format's identity, the constants
+│   ├── defaults.json           # the packaged defaults
+│   └── man.py                  # the man pages' prose (the pages render from it)
+├── man/                        # the shipped man pages
+├── dev                         # the dev launcher: the daemon straight from the checkout
+└── README.md                   # the front page
+```
+
+The shared trace home is `common/modbus/trace.py` — the sidecar's
+`lib/trace.py` re-exports it; the capture, the replay and the dump
+tool speak one implementation of the format.
+
 ## Installing
 
 ### From the tree
@@ -295,6 +330,26 @@ Every knob in the tables above is a startup knob; the family's live
 `set`/`clear` wire does not reach here by design — nothing to control,
 the trace is the record.
 
+## Persistence
+
+The sidecar keeps no state of its own — the trace file is the record.
+The capture appends across runs, each run stamping its header block
+(magic, version, started, posture) into the same file, so one trace
+reads as a set of sessions; the replay and the dump tool read both
+shapes, the first bytes picking the walk, and a torn tail keeps what
+parsed — a killed capture leaves a readable trace.
+
+The disk knobs bound a long capture: `--trace-max-mb` rotates the file
+at size, `--trace-files` keeps the backups — the `.1` .. `.N` shift,
+the oldest dropped, the file reopened fresh with a new run header, and
+no record straddles two files. Every file writes 0600 — the captures,
+the conversions, the `--record` recordings — and belongs with the
+secrets, the handshake bytes riding the trace (see
+[Modbus auth](#modbus-auth)).
+
+Nothing else lands on disk: no config file, no state dump, no audit
+trail — the trace is the record.
+
 ## The control plane
 
 The honest answer is the absence: no control server, no control
@@ -325,6 +380,25 @@ connection password raw, a suite-auth capture the PVA1 proof, and a
 leaked trace can replay it at any server holding the key. Traces
 belong with the secrets. The recorded files (`--record`) ride the
 same posture. The family story is `docs/SECURITY.md`.
+
+## Modbus auth
+
+Neither face enforces anything: no scheme knob rides here, no connect
+ACL, no tokens. On an authenticated wire the capture's only act is to
+peel and name the handshake it sees go past — the PVA1 suite proof,
+the Waveshare connection password, their verdicts — for the log and
+the decoded views; the raw bytes ride the pipe and land in the trace
+verbatim either way. The replay answers from the record and enforces
+no auth of its own.
+
+That last part is the operational fact: a capture of an authenticated
+wire holds the handshake's bytes — the Waveshare connection password
+raw, the suite proof with its nonce — and a leaked trace can replay
+them at any server holding the key. Traces belong with the secrets
+(the posture in [Access control](#access-control)); the schemes
+themselves are the family's, specified in
+[docs/specs/MODBUS.md](../../docs/specs/MODBUS.md) and described in
+each daemon's manual.
 
 ## Tuning
 
@@ -450,3 +524,8 @@ slot, so a concurrent battery cannot kill it.
 | [docs/book/src/security.md](../../docs/book/src/security.md) | the book's security chapter |
 | [docs/book/src/config.md](../../docs/book/src/config.md) | the family configuration story — the ladder this tool rides the first half of |
 | [docs/book/src/common.md](../../docs/book/src/common.md) | the shared code the sidecar rides (the serve ladder, the trace writer) |
+
+## License
+
+The sidecar is part of the suite and licensed under the **BSD 3-Clause
+License** — see the repo-root `LICENSE` file.

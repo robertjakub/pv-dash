@@ -62,6 +62,32 @@ installed client names are symlinks to it —
 its three siblings the same shape; the package and the images install
 the same links.
 
+Nothing tool-shaped lives in the resolver: the SPEC carries the
+setting pool (the names the console completes and `?` lists, grouped
+by the registry's own groups), the report words and their labels, the
+default control socket and the greeting's data. The wire grammar
+itself — the verbs, the frame shapes, the auth — belongs to the
+daemons; the client learns a tool only as far as its SPEC describes it.
+
+## Source layout
+
+One script, the four links, the two halves:
+
+```text
+apps/
+├── pvsuite-cli.py                    # the resolver: the tool word, the SPEC load, the runner
+├── cache/bin/modbus-cache-cli.py     #   -> ../../pvsuite-cli.py
+├── scraper/bin/modbus-scraper-cli.py #   -> ../../pvsuite-cli.py
+├── inverter/bin/modbus-fake-cli.py   #   -> ../../pvsuite-cli.py
+└── dashboard/bin/dashboard-cli.py    #   -> ../../pvsuite-cli.py
+```
+
+The runner half is the family's shared client, `common/wire/cli.py` —
+the wire, the console, the pager, the keepalive, the audit; the tool
+half is the SPEC, `<tool>/lib/cli_spec.py` — the pools, the defaults,
+the labels, the special renders. The sources above are the checkout's;
+the installed names resolve to the same script.
+
 ## The three invocation shapes
 
 One client, three modes by the invocation shape:
@@ -149,3 +175,8 @@ server gates each verb.
 The per-tool verb lists, the setting pools and the example sequences
 live in the daemon manuals — the client is one dispatcher; the voices
 are the daemons'.
+
+## License
+
+The client is part of the suite and licensed under the **BSD 3-Clause
+License** — see the repo-root `LICENSE` file.
